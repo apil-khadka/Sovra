@@ -1,0 +1,9 @@
+{
+  "plan_id": "pln_test_003",
+  "requested_outcome": "age_over_18",
+  "candidate_issuer_id": "np-synthetic-issuer",
+  "credential_type": "AdultStatusCredential",
+  "claim_paths": ["adultOver18", "birthYear"],
+  "evidence": [{ "document_id": "rp-au-demo-v1", "section_id": "age_eligibility" }],
+  "recommendation": "CANDIDATE_ONLY"
+}

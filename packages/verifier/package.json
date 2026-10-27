@@ -1,0 +1,26 @@
+{
+  "name": "@sovra/verifier",
+  "version": "0.1.0",
+  "description": "Deterministic verification of consented demo presentations with replay protection.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@sovra/credentials": "workspace:*",
+    "@sovra/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "vitest": "3.2.4"
+  }
+}

@@ -114,7 +114,9 @@ def check_repository(root: Path) -> tuple[list[str], int]:
                 errors.append(f"missing final newline: {name}")
             if path.suffix == ".json":
                 documents[name] = json.loads(content)
-            elif path.suffix in {".yaml", ".yml"}:
+            elif path.suffix in {".yaml", ".yml"} and path.name != "pnpm-lock.yaml":
+                # pnpm-lock.yaml is a generated multi-document install record,
+                # not a hand-authored document; it is still newline-checked above.
                 documents[name] = yaml.load(content, Loader=UniqueKeyLoader)
             elif path.suffix == ".md":
                 for link in markdown_links(content):
