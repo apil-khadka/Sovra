@@ -1,1 +1,1 @@
-export { validatePlan } from "./guard.js";
+export { validatePlan, type SelectedPolicy } from "./guard.js";

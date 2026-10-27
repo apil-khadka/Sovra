@@ -126,7 +126,16 @@ function checkCitations(plan: CandidatePlan, context: GuardContext): GuardVerdic
  * Returns `GUARD_ACCEPTED` only when every check passes; the wallet must
  * still obtain explicit holder consent before any presentation.
  */
-export function validatePlan(plan: CandidatePlan, context: GuardContext): GuardVerdict {
+export interface SelectedPolicy {
+  policy_id: string;
+  policy_version: string;
+}
+
+export function validatePlan(
+  plan: CandidatePlan,
+  context: GuardContext,
+  selected: SelectedPolicy,
+): GuardVerdict {
   if (plan.recommendation !== "CANDIDATE_ONLY") {
     return {
       accepted_for_consideration: false,
@@ -141,17 +150,28 @@ export function validatePlan(plan: CandidatePlan, context: GuardContext): GuardV
   const issuer = checkIssuer(plan, context);
   if (!("issuer_id" in issuer)) return issuer;
 
-  // The disclosure budget comes only from the RP-selected policy version.
-  // Citations ground the mapping but can never widen what the RP approved.
-  const selected = context.policies[plan.policy_id];
-  if (!selected || selected.version !== plan.policy_version) {
+  // The disclosure budget comes only from the RP-selected policy, delivered
+  // through trusted input alongside the plan. The plan echoes its policy
+  // binding, but a mismatch with the trusted selection is a rejection:
+  // citations and self-selected policies can never widen what the RP approved.
+  if (
+    plan.policy_id !== selected.policy_id ||
+    plan.policy_version !== selected.policy_version
+  ) {
+    return reject(
+      OUTCOME_CODES.GUARD_POLICY_MISMATCH,
+      `Plan policy '${plan.policy_id}' version '${plan.policy_version}' does not match the RP-selected policy.`,
+    );
+  }
+  const trusted = context.policies[selected.policy_id];
+  if (!trusted || trusted.version !== selected.policy_version) {
     return reject(
       OUTCOME_CODES.GUARD_UNKNOWN_POLICY,
-      `Selected policy '${plan.policy_id}' version '${plan.policy_version}' is not a known versioned policy.`,
+      `Selected policy '${selected.policy_id}' version '${selected.policy_version}' is not a known versioned policy.`,
     );
   }
 
-  const budget = checkDisclosureBudget(plan, issuer, selected.approved_claims);
+  const budget = checkDisclosureBudget(plan, issuer, trusted.approved_claims);
   if (budget) return budget;
 
   const citations = checkCitations(plan, context);
