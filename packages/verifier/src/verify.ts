@@ -30,6 +30,12 @@ export interface PresentationInput {
   /** Holder-signed challenge binding (compact JWT). */
   holderProof: string;
   expectedAudience: string;
+  /** Challenge this verifier issued for this session; holder input is untrusted. */
+  expectedNonce: string;
+  challengeExpiresAt: Date;
+  /** Credential type and claim values the approved plan requires. */
+  expectedCredentialType: string;
+  requiredClaims: Record<string, unknown>;
   /** Single-use challenges already consumed; extended only on success. */
   consumedNonces: Set<string>;
   consentGranted: boolean;
@@ -55,6 +61,19 @@ function asString(value: unknown): string | null {
 
 function asInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) ? value : null;
+}
+
+function claimEquals(actual: unknown, required: unknown): boolean {
+  if (Object.is(actual, required)) return true;
+  if (
+    typeof actual === "object" &&
+    typeof required === "object" &&
+    actual !== null &&
+    required !== null
+  ) {
+    return JSON.stringify(actual) === JSON.stringify(required);
+  }
+  return false;
 }
 
 function headerKeyId(token: string): string {
@@ -162,6 +181,39 @@ export async function verifyPresentation(
     );
   }
 
+  // The presenter must be the subject the issuer attested about; any other
+  // registered holder presenting this credential is rejected here.
+  if (proof["iss"] !== attestation["sub"]) {
+    return rejected(
+      OUTCOME_CODES.VERIFY_INVALID_SIGNATURE,
+      "Holder proof presenter does not match the attestation subject.",
+      input.correlationId,
+    );
+  }
+
+  // Verification never upgrades evidence: the credential must be the
+  // approved type and must carry each required claim value.
+  if (attestation["type"] !== input.expectedCredentialType) {
+    return rejected(
+      OUTCOME_CODES.VERIFY_CREDENTIAL_MISMATCH,
+      "Attestation is not the approved credential type.",
+      input.correlationId,
+    );
+  }
+  const attestationClaims =
+    typeof attestation["claims"] === "object" && attestation["claims"] !== null
+      ? (attestation["claims"] as Record<string, unknown>)
+      : {};
+  for (const [claim, required] of Object.entries(input.requiredClaims)) {
+    if (!claimEquals(attestationClaims[claim], required)) {
+      return rejected(
+        OUTCOME_CODES.VERIFY_CREDENTIAL_MISMATCH,
+        `Attestation does not meet required claim '${claim}'.`,
+        input.correlationId,
+      );
+    }
+  }
+
   const nowSeconds = Math.floor((input.now ?? new Date()).getTime() / 1000);
   const attestationExpiry = asInteger(attestation["exp"]);
   const proofExpiry = asInteger(proof["exp"]);
@@ -186,11 +238,27 @@ export async function verifyPresentation(
     );
   }
 
+  // Only a challenge this verifier issued for this session is acceptable;
+  // holder-invented nonces and expired challenges are rejected.
   const nonce = asString(proof["nonce"]);
-  if (nonce === null || input.consumedNonces.has(nonce)) {
+  if (nonce === null || nonce !== input.expectedNonce) {
     return rejected(
       OUTCOME_CODES.VERIFY_REPLAY_DETECTED,
-      "Challenge is missing or has already been consumed.",
+      "Challenge was not issued by this verifier for this session.",
+      input.correlationId,
+    );
+  }
+  if (input.challengeExpiresAt.getTime() <= (input.now ?? new Date()).getTime()) {
+    return rejected(
+      OUTCOME_CODES.VERIFY_EXPIRED,
+      "Verifier challenge has expired.",
+      input.correlationId,
+    );
+  }
+  if (input.consumedNonces.has(nonce)) {
+    return rejected(
+      OUTCOME_CODES.VERIFY_REPLAY_DETECTED,
+      "Challenge has already been consumed.",
       input.correlationId,
     );
   }

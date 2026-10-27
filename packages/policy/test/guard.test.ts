@@ -48,6 +48,12 @@ describe("validatePlan", () => {
     expect(verdict.code).toBe(OUTCOME_CODES.MANUAL_REVIEW);
   });
 
+  it("rejects a plan bound to an unknown policy version", () => {
+    const verdict = validatePlan({ ...planValid, policy_version: "99" }, context);
+    expect(verdict.accepted_for_consideration).toBe(false);
+    expect(verdict.code).toBe(OUTCOME_CODES.GUARD_UNKNOWN_POLICY);
+  });
+
   it("rejects a malformed plan missing required fields", () => {
     const malformed: CandidatePlan = { ...planValid, claim_paths: [] };
     const verdict = validatePlan(malformed, context);

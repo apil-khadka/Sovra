@@ -6,5 +6,7 @@
   "claim_paths": [],
   "evidence": [],
   "recommendation": "NO_PATH",
-  "unresolved_issues": ["No trusted issuer supports the requested outcome."]
+  "unresolved_issues": [
+    "No trusted issuer supports the requested outcome."
+  ]
 }

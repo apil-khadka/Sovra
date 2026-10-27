@@ -33,6 +33,8 @@ Do **not** provide the model a general-purpose HTTP execution or `issueCredentia
   ],
   "unresolved_issues": [],
   "needs_holder_consent": true,
+  "policy_id": "rp-au-demo-v1",
+  "policy_version": "1",
   "recommendation": "CANDIDATE_ONLY"
 }
 ```

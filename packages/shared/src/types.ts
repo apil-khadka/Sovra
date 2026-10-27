@@ -34,6 +34,9 @@ export interface CandidatePlan {
   credential_type: string;
   claim_paths: string[];
   evidence: EvidenceCitation[];
+  /** RP-selected policy binding the disclosure budget; citations cannot widen it. */
+  policy_id: string;
+  policy_version: string;
   recommendation: "CANDIDATE_ONLY" | "NO_PATH" | "MANUAL_REVIEW";
   /** Optional planner-reported gaps; never a substitute for guard checks. */
   unresolved_issues?: string[];

@@ -3,7 +3,16 @@
   "requested_outcome": "age_over_18",
   "candidate_issuer_id": "np-synthetic-issuer",
   "credential_type": "AdultStatusCredential",
-  "claim_paths": ["adultOver18"],
-  "evidence": [{ "document_id": "rp-au-demo-v1", "section_id": "nonexistent_section" }],
-  "recommendation": "CANDIDATE_ONLY"
+  "claim_paths": [
+    "adultOver18"
+  ],
+  "evidence": [
+    {
+      "document_id": "rp-au-demo-v1",
+      "section_id": "nonexistent_section"
+    }
+  ],
+  "recommendation": "CANDIDATE_ONLY",
+  "policy_id": "rp-au-demo-v1",
+  "policy_version": "1"
 }

@@ -31,6 +31,8 @@ function checkShape(plan: CandidatePlan): GuardVerdict | null {
     !isNonEmptyString(plan.requested_outcome) ||
     !isNonEmptyString(plan.candidate_issuer_id) ||
     !isNonEmptyString(plan.credential_type) ||
+    !isNonEmptyString(plan.policy_id) ||
+    !isNonEmptyString(plan.policy_version) ||
     !Array.isArray(plan.claim_paths) ||
     plan.claim_paths.length === 0 ||
     !plan.claim_paths.every(isNonEmptyString) ||
@@ -139,24 +141,17 @@ export function validatePlan(plan: CandidatePlan, context: GuardContext): GuardV
   const issuer = checkIssuer(plan, context);
   if (!("issuer_id" in issuer)) return issuer;
 
-  // Disclosure budget comes from the cited RP policy when one is known,
-  // otherwise from the tightest known policy: fail closed.
-  const citedPolicyIds = new Set(plan.evidence.map((citation) => citation.document_id));
-  const knownPolicies = [...citedPolicyIds]
-    .map((id) => context.policies[id])
-    .filter((policy) => policy !== undefined);
-  if (citedPolicyIds.size > 0 && knownPolicies.length === 0) {
+  // The disclosure budget comes only from the RP-selected policy version.
+  // Citations ground the mapping but can never widen what the RP approved.
+  const selected = context.policies[plan.policy_id];
+  if (!selected || selected.version !== plan.policy_version) {
     return reject(
       OUTCOME_CODES.GUARD_UNKNOWN_POLICY,
-      "Plan cites only unknown policy documents.",
+      `Selected policy '${plan.policy_id}' version '${plan.policy_version}' is not a known versioned policy.`,
     );
   }
-  const budgetedClaims =
-    knownPolicies.length > 0
-      ? [...new Set(knownPolicies.flatMap((policy) => policy.approved_claims))]
-      : [];
 
-  const budget = checkDisclosureBudget(plan, issuer, budgetedClaims);
+  const budget = checkDisclosureBudget(plan, issuer, selected.approved_claims);
   if (budget) return budget;
 
   const citations = checkCitations(plan, context);

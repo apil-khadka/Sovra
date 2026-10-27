@@ -11,7 +11,10 @@ const now = new Date("2026-10-27T12:00:00Z");
 const issuedAt = new Date("2026-10-27T11:00:00Z");
 const expiresAt = new Date("2026-10-27T13:00:00Z");
 
-async function happyPath(status: "ACTIVE" | "REVOKED" | "UNKNOWN" = "ACTIVE") {
+async function happyPath(
+  status: "ACTIVE" | "REVOKED" | "UNKNOWN" = "ACTIVE",
+  overrides: { claims?: Record<string, unknown>; credentialType?: string } = {},
+) {
   const issuer = await generateIssuerKeys("np-demo-ed25519-v1");
   const holder = await generateIssuerKeys("holder-key-001");
   const consumedNonces = new Set<string>();
@@ -27,8 +30,8 @@ async function happyPath(status: "ACTIVE" | "REVOKED" | "UNKNOWN" = "ACTIVE") {
     keyId: issuer.keyId,
     issuer: "np-synthetic-issuer",
     subject: "holder-pseudonym-001",
-    credentialType: "AdultStatusCredential",
-    claims: { adultOver18: true },
+    credentialType: overrides.credentialType ?? "AdultStatusCredential",
+    claims: overrides.claims ?? { adultOver18: true },
     issuedAt,
     expiresAt,
     credentialId: "cred-001",
@@ -53,12 +56,16 @@ async function happyPath(status: "ACTIVE" | "REVOKED" | "UNKNOWN" = "ACTIVE") {
     attestation,
     holderProof,
     expectedAudience: "rp-au-demo",
+    expectedNonce: challenge.nonce,
+    challengeExpiresAt: challenge.expiresAt,
+    expectedCredentialType: "AdultStatusCredential",
+    requiredClaims: { adultOver18: true },
     consumedNonces,
     consentGranted: true,
     correlationId: "corr-001",
     now,
   };
-  return { input, trust, consumedNonces, issuer };
+  return { input, trust, consumedNonces, issuer, holder };
 }
 
 describe("verifyPresentation", () => {
@@ -142,6 +149,82 @@ describe("verifyPresentation", () => {
       trust,
     );
     expect(result.code).toBe(OUTCOME_CODES.VERIFY_EXPIRED);
+  });
+
+  it("rejects a second holder presenting another holder's credential", async () => {
+    const { input, trust } = await happyPath();
+    const intruder = await generateIssuerKeys("holder-key-002");
+    const intruderProof = await issueHolderProof({
+      privateKey: intruder.privateKey,
+      keyId: intruder.keyId,
+      holder: "holder-pseudonym-002",
+      credentialId: "cred-001",
+      nonce: input.expectedNonce,
+      audience: "rp-au-demo",
+      issuedAt,
+      expiresAt,
+    });
+    const result = await verifyPresentation(
+      { ...input, holderProof: intruderProof },
+      {
+        ...trust,
+        holderKeys: {
+          ...trust.holderKeys,
+          "holder-pseudonym-002": intruder.publicKey,
+        },
+      },
+    );
+    expect(result.decision).toBe("REJECTED");
+    expect(result.code).toBe(OUTCOME_CODES.VERIFY_INVALID_SIGNATURE);
+  });
+
+  it("rejects a holder-invented challenge nonce", async () => {
+    const { input, trust, holder } = await happyPath();
+    const forgedProof = await issueHolderProof({
+      privateKey: holder.privateKey,
+      keyId: holder.keyId,
+      holder: "holder-pseudonym-001",
+      credentialId: "cred-001",
+      nonce: "attacker-invented-nonce",
+      audience: "rp-au-demo",
+      issuedAt,
+      expiresAt,
+    });
+    const result = await verifyPresentation(
+      { ...input, holderProof: forgedProof },
+      trust,
+    );
+    expect(result.decision).toBe("REJECTED");
+    expect(result.code).toBe(OUTCOME_CODES.VERIFY_REPLAY_DETECTED);
+  });
+
+  it("rejects an expired verifier challenge", async () => {
+    const { input, trust } = await happyPath();
+    const result = await verifyPresentation(
+      { ...input, challengeExpiresAt: new Date("2026-10-27T11:30:00Z") },
+      trust,
+    );
+    expect(result.decision).toBe("REJECTED");
+    expect(result.code).toBe(OUTCOME_CODES.VERIFY_EXPIRED);
+  });
+
+  it("rejects an unexpected credential type", async () => {
+    const { input, trust } = await happyPath();
+    const result = await verifyPresentation(
+      { ...input, expectedCredentialType: "UnrelatedCredential" },
+      trust,
+    );
+    expect(result.decision).toBe("REJECTED");
+    expect(result.code).toBe(OUTCOME_CODES.VERIFY_CREDENTIAL_MISMATCH);
+  });
+
+  it("rejects a signed credential that does not meet the required claim", async () => {
+    const { input, trust } = await happyPath("ACTIVE", {
+      claims: { adultOver18: false },
+    });
+    const result = await verifyPresentation(input, trust);
+    expect(result.decision).toBe("REJECTED");
+    expect(result.code).toBe(OUTCOME_CODES.VERIFY_CREDENTIAL_MISMATCH);
   });
 
   it("rejects without holder consent and sends no proof outcome", async () => {
