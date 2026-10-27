@@ -1,8 +1,8 @@
-# TrustMesh - Documentation Index
+# Sovra - Documentation Index
 
 **Snapshot:** 2026-10-27 · **Status:** proposed hackathon architecture; not a production identity system.
 
-TrustMesh explores whether a **Meta-powered, policy-grounded interoperability planner** can discover compatible verification evidence across independently governed identity systems, while keeping user identity source records in local jurisdiction-controlled domains.
+Sovra explores whether a **Meta-powered, policy-grounded interoperability planner** can discover compatible verification evidence across independently governed identity systems, while keeping user identity source records in local jurisdiction-controlled domains.
 It is a research/demo prototype using **synthetic data** and **simulated jurisdictions**.
 
 > **Design contract:** Meta AI proposes. Approved policies, consent and deterministic code authorize. Issuers sign evidence. Verifiers verify evidence. Relying parties decide legal KYC/CDD sufficiency themselves.
@@ -11,7 +11,7 @@ It is a research/demo prototype using **synthetic data** and **simulated jurisdi
 
 | Question | Document |
 | --- | --- |
-| Why does TrustMesh exist, and what is new? | [Vision](product/vision-and-scope.md), [Positioning](product/positioning-and-alternatives.md) |
+| Why does Sovra exist, and what is new? | [Vision](product/vision-and-scope.md), [Positioning](product/positioning-and-alternatives.md) |
 | What exactly must we build? | [SRS](requirements/software-requirements-specification.md), [MVP](engineering/mvp-specification.md) |
 | How do the nodes work together? | [Architecture](architecture/system-architecture.md), [Sequence flows](architecture/sequence-diagrams.md), [Data and trust boundaries](architecture/data-boundaries-and-trust.md) |
 | What are the AI agent's permitted behaviors? | [Agent design](architecture/ai-agent-design.md), [Agent contract](ai/agent-contract.md), [AI evaluation](ai/evaluation-plan.md) |

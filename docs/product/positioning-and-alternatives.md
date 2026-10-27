@@ -2,13 +2,13 @@
 
 ## User problem and narrow wedge
 
-A foreign relying party may recognize neither a jurisdiction's identity schema nor its assurance vocabulary and therefore fall back to requesting full document scans and manual expert mapping. TrustMesh tests whether a model can **discover possible evidence paths** across unfamiliar issuer capability descriptions and cite **specific supplied policies**, instead of hard-coding country-to-country adapters.
+A foreign relying party may recognize neither a jurisdiction's identity schema nor its assurance vocabulary and therefore fall back to requesting full document scans and manual expert mapping. Sovra tests whether a model can **discover possible evidence paths** across unfamiliar issuer capability descriptions and cite **specific supplied policies**, instead of hard-coding country-to-country adapters.
 
 **Pitch:** An AI-native verification-planning layer for sovereign credential networks—not a new government registry and not an AI judge of legal compliance.
 
 ## What already exists / should not be claimed as invention
 
-- Verifiable credentials, holder wallets, trust registries and consent are established technical concepts, not new TrustMesh inventions.
+- Verifiable credentials, holder wallets, trust registries and consent are established technical concepts, not new Sovra inventions.
 - EUDI/eIDAS and OpenID standards already support large elements of cross-border identity interoperability.
 - MOSIP and SSI wallets show existing approaches to national identity infrastructure.
 - Enterprise identity orchestration and KYC vendors already combine providers and policy routing. A language model that merely chooses a provider is a weak novelty claim.

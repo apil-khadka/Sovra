@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: TrustMesh Demo Orchestration API (NOT OpenID4VCI/4VP)
+  title: Sovra Demo Orchestration API (NOT OpenID4VCI/4VP)
   version: 0.2.0-draft
   description: >-
-    Custom illustrative control-plane API for synthetic TrustMesh demo.
+    Custom illustrative control-plane API for synthetic Sovra demo.
     This is not normative VC/OID protocol conformance evidence.
 servers:
   - url: http://localhost:8080

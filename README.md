@@ -1,6 +1,6 @@
 # Sovra
 
-Sovra is the repository for the TrustMesh identity-interoperability prototype.
+Sovra is an identity-interoperability prototype.
 The prototype explores how a Meta-powered AI planner can propose verification evidence across simulated jurisdictions, while deterministic policy checks, holder consent, and issuer signatures control authorization.
 
 **Current status:** documentation and synthetic examples only.

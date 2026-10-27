@@ -1,5 +1,5 @@
 /**
- * Shared TrustMesh contracts.
+ * Shared Sovra contracts.
  *
  * These types mirror the demo orchestration draft
  * (`docs/engineering/api-contract.openapi.yaml`) for the portions this

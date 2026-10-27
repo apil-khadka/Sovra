@@ -1,4 +1,4 @@
-# TrustMesh Software Requirements Specification (SRS)
+# Sovra Software Requirements Specification (SRS)
 
 **Version:** 0.2 candidate · **Date:** 2026-10-27 · **Scope:** hackathon MVP only.
 

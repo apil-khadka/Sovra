@@ -1,7 +1,7 @@
 {
   "name": "@sovra/shared",
   "version": "0.1.0",
-  "description": "Shared TrustMesh contracts: intents, plans, verdicts, and machine-readable outcome codes.",
+  "description": "Shared Sovra contracts: intents, plans, verdicts, and machine-readable outcome codes.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

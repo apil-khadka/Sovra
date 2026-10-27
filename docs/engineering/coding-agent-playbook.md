@@ -19,7 +19,7 @@ With fewer developers, combine workstreams; do not spawn agents against overlapp
 ## One-task agent brief format
 
 ```text
-Context: TrustMesh, Oct 27–Nov 4 hackathon. Read docs/README.md,
+Context: Sovra, Oct 27–Nov 4 hackathon. Read docs/README.md,
 requirements/software-requirements-specification.md,
 architecture/security-privacy-threat-model.md, and the assigned contract.
 Task: [single bounded feature].

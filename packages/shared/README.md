@@ -1,6 +1,6 @@
 # `@sovra/shared`
 
-Shared TrustMesh contracts: verification intents, candidate plans, guard
+Shared Sovra contracts: verification intents, candidate plans, guard
 verdicts, proof requests, verification results, and the stable
 machine-readable outcome-code table.
 
