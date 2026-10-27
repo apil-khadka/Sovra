@@ -1,0 +1,28 @@
+{
+  "issuer_id": "np-synthetic-issuer",
+  "jurisdiction": "NP-SIM",
+  "public_metadata_only": true,
+  "accreditation": {
+    "simulated": true,
+    "allowed_credential_types": [
+      "AdultStatusCredential"
+    ]
+  },
+  "credential_schemas": [
+    {
+      "schema_id": "np-adult-v1",
+      "type": "AdultStatusCredential",
+      "claims": {
+        "adultOver18": {
+          "type": "boolean",
+          "meaning": "Age at least 18 at issuance"
+        }
+      },
+      "section_id": "adult-status"
+    }
+  ],
+  "trusted_key_ids": [
+    "np-demo-ed25519-v1"
+  ],
+  "status_endpoint": "https://np-demo.example.test/status"
+}

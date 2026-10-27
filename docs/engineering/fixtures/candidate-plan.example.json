@@ -1,0 +1,22 @@
+{
+  "plan_id": "pln_demo_001",
+  "requested_outcome": "age_over_18",
+  "candidate_issuer_id": "np-synthetic-issuer",
+  "credential_type": "AdultStatusCredential",
+  "claim_paths": [
+    "adultOver18"
+  ],
+  "evidence": [
+    {
+      "document_id": "rp-au-demo-v1",
+      "section_id": "age_eligibility"
+    },
+    {
+      "document_id": "np-adult-v1",
+      "section_id": "adult-status"
+    }
+  ],
+  "unresolved_issues": [],
+  "needs_holder_consent": true,
+  "recommendation": "CANDIDATE_ONLY"
+}

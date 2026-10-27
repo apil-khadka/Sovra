@@ -1,0 +1,22 @@
+{
+  "document_id": "rp-au-demo-v1",
+  "jurisdiction": "AU-SIM",
+  "simulated_policy": true,
+  "purpose": "age_restricted_service_access",
+  "desired_outcome": "age_over_18",
+  "sections": [
+    {
+      "id": "age_eligibility",
+      "text": "For this fictional service, request evidence that the holder is at least 18 years old. Do not require full date of birth or a passport image when a trusted adult-status attestation is available."
+    }
+  ],
+  "approved_claims": [
+    "adultOver18",
+    "qualifiesAsAdult"
+  ],
+  "prohibited_claims": [
+    "passportImage",
+    "fullName",
+    "dateOfBirth"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "issuer_id": "fictional-issuer-c",
+  "jurisdiction": "C-SIM",
+  "public_metadata_only": true,
+  "accreditation": {
+    "simulated": true,
+    "allowed_credential_types": [
+      "EligibilityCertificate"
+    ]
+  },
+  "credential_schemas": [
+    {
+      "schema_id": "c-eligibility-v1",
+      "type": "EligibilityCertificate",
+      "claims": {
+        "qualifiesAsAdult": {
+          "type": "boolean",
+          "meaning": "Holder is 18 years old or older at the time of issuance"
+        }
+      },
+      "section_id": "adult-eligibility"
+    }
+  ],
+  "trusted_key_ids": [
+    "c-demo-ed25519-v1"
+  ],
+  "status_endpoint": "https://c-demo.example.test/status"
+}

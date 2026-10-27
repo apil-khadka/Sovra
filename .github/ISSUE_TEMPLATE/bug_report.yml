@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a reproducible failure using sanitized evidence.
+title: "[Bug]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report vulnerabilities through SECURITY.md, not this public form.
+        Use synthetic data and redact secrets, identity records, and signed proofs.
+  - type: input
+    id: component
+    attributes:
+      label: Affected component
+      placeholder: Documentation, planner, issuer, verifier, wallet, or CI
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version and environment
+      placeholder: Commit SHA, operating system, browser or runtime version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest user-facing flow that demonstrates the failure.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - Blocks the core workflow; no workaround
+        - Incorrect behavior; workaround available
+        - Minor or cosmetic problem
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized error details
+      description: Include error codes, correlation IDs, logs, or screenshots when available. Never include secrets or identity data.

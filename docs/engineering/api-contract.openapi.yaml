@@ -1,0 +1,124 @@
+openapi: 3.1.0
+info:
+  title: TrustMesh Demo Orchestration API (NOT OpenID4VCI/4VP)
+  version: 0.2.0-draft
+  description: >-
+    Custom illustrative control-plane API for synthetic TrustMesh demo.
+    This is not normative VC/OID protocol conformance evidence.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/plans:
+    post:
+      operationId: proposePlan
+      summary: Propose an evidence mapping using live eligible Meta model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationIntent'
+      responses:
+        '200':
+          description: Candidate ONLY; not authorized
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CandidatePlan' }
+        '422': { description: Input or source validation failure }
+        '503': { description: Model/discovery unavailable }
+  /api/plans/{planId}/guard:
+    post:
+      operationId: validatePlan
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Guard verdict; does not itself issue credentials
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GuardVerdict' }
+  /api/verification-sessions:
+    post:
+      operationId: createVerificationSession
+      description: Requires separately validated and approved plan; server issues nonce/audience/expiry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [plan_id, relying_party_id, purpose]
+              properties:
+                plan_id: { type: string }
+                relying_party_id: { type: string }
+                purpose: { type: string }
+      responses:
+        '201': { description: Session created awaiting holder consent }
+        '403': { description: Plan not approved }
+  /api/verification-sessions/{sessionId}/present:
+    post:
+      operationId: presentEvidence
+      description: Requires consent and challenge-bound holder proof; only credential-safe bytes
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [consent_token, proof]
+              properties:
+                consent_token: { type: string }
+                proof: { type: string, description: 'Signed presentation/profile-specific proof' }
+      responses:
+        '200': { description: Verification evidence outcome (not legal KYC) }
+        '403': { description: Consent or policy denied }
+        '409': { description: Replay challenge }
+        '422': { description: Invalid cryptographic proof }
+        '503': { description: Unavailable trust/status dependency }
+components:
+  schemas:
+    VerificationIntent:
+      type: object
+      additionalProperties: false
+      required: [relying_party_id, purpose, outcome, policy_id, policy_version]
+      properties:
+        relying_party_id: { type: string }
+        purpose: { type: string }
+        outcome: { type: string, enum: [age_over_18] }
+        policy_id: { type: string }
+        policy_version: { type: string }
+    CandidatePlan:
+      type: object
+      required: [plan_id, requested_outcome, candidate_issuer_id, credential_type, claim_paths, evidence, recommendation]
+      properties:
+        plan_id: { type: string }
+        requested_outcome: { type: string }
+        candidate_issuer_id: { type: string }
+        credential_type: { type: string }
+        claim_paths: { type: array, items: { type: string } }
+        evidence:
+          type: array
+          items:
+            type: object
+            required: [document_id, section_id]
+            properties:
+              document_id: { type: string }
+              section_id: { type: string }
+        recommendation: { type: string, enum: [CANDIDATE_ONLY, NO_PATH, MANUAL_REVIEW] }
+    GuardVerdict:
+      type: object
+      required: [accepted_for_consideration, code]
+      properties:
+        accepted_for_consideration: { type: boolean }
+        code: { type: string }
+        reason: { type: string }

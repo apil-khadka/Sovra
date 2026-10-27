@@ -1,0 +1,20 @@
+[
+  {"name": "bug", "color": "d73a4a", "description": "Reproducible incorrect behavior"},
+  {"name": "enhancement", "color": "a2eeef", "description": "A scoped capability or improvement"},
+  {"name": "documentation", "color": "0075ca", "description": "Public documentation or contract changes"},
+  {"name": "question", "color": "d876e3", "description": "A decision or clarification is needed"},
+  {"name": "needs-triage", "color": "ededed", "description": "Awaiting scope, priority, and ownership review"},
+  {"name": "priority:p0", "color": "b60205", "description": "Critical blocker requiring immediate attention"},
+  {"name": "priority:p1", "color": "d93f0b", "description": "Core workflow or delivery is materially affected"},
+  {"name": "priority:p2", "color": "fbca04", "description": "Normal planned work"},
+  {"name": "status:todo", "color": "c5def5", "description": "Accepted and ready for implementation"},
+  {"name": "status:implementing", "color": "1d76db", "description": "Implementation is in progress"},
+  {"name": "status:tests", "color": "5319e7", "description": "Implementation is undergoing validation"},
+  {"name": "status:review", "color": "0e8a16", "description": "Ready for review or awaiting review changes"},
+  {"name": "status:blocked", "color": "b60205", "description": "Cannot proceed; record the blocker in the issue"},
+  {"name": "area:ci", "color": "bfdadc", "description": "Repository tooling, automation, and CI"},
+  {"name": "area:ai", "color": "bfdadc", "description": "Planner, model tools, and AI evaluation"},
+  {"name": "area:credentials", "color": "bfdadc", "description": "Issuance, signatures, holder proof, and status"},
+  {"name": "area:policy", "color": "bfdadc", "description": "Trust, consent, authorization, and verification gates"},
+  {"name": "area:web", "color": "bfdadc", "description": "User interface and accessibility"}
+]

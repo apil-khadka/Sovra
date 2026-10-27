@@ -1,0 +1,38 @@
+name: Triage new contributions
+
+on:
+  issues:
+    types: [opened, reopened]
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Keep this metadata-only: never check out or execute pull request code.
+      - name: Add triage and changed-area labels
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const labels = ['needs-triage'];
+            if (context.payload.pull_request) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                ...context.repo, pull_number: context.issue.number, per_page: 100,
+              });
+              if (files.some(file => file.filename.startsWith('docs/') || file.filename.endsWith('.md'))) {
+                labels.push('documentation');
+              }
+              if (files.some(file => file.filename.startsWith('.github/') || file.filename.startsWith('scripts/'))) {
+                labels.push('area:ci');
+              }
+            }
+            await github.rest.issues.addLabels({
+              ...context.repo, issue_number: context.issue.number, labels,
+            });
