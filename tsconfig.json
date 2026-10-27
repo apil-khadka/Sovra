@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true
+  },
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/policy" },
+    { "path": "packages/credentials" },
+    { "path": "packages/verifier" }
+  ],
+  "include": []
+}

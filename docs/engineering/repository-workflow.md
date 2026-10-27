@@ -56,8 +56,9 @@ A common runtime error envelope remains implementation work; the repository does
 
 ## CI and repository settings
 
-Repository checks run for pushes and pull requests, including changes to documentation and automation.
-They check the public file list, private-path exclusion, local documentation links, JSON and YAML syntax, and local API references.
+Repository checks and application checks run for pushes and pull requests, including changes to documentation and automation.
+Repository checks cover the public file list, private-path exclusion, local documentation links, JSON and YAML syntax, and local API references.
+Application checks run `pnpm install --frozen-lockfile`, `pnpm typecheck`, and `pnpm test` on Node.js 22.
 These checks do not replace secret scanning, application tests, dependency review, or security review.
 Dependabot proposes weekly updates for Python validation tooling and GitHub Actions.
 

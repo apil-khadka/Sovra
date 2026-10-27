@@ -1,0 +1,25 @@
+{
+  "name": "@sovra/policy",
+  "version": "0.1.0",
+  "description": "Deterministic authorization guard for AI-proposed evidence plans.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@sovra/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "vitest": "3.2.4"
+  }
+}

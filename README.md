@@ -20,17 +20,22 @@ It does not establish legal KYC compliance, government approval, or production i
 
 ## Repository checks
 
-Use Python 3.11 or newer:
+Use Node.js 22 with pnpm, and Python 3.11 or newer:
 
 ```sh
+pnpm install
+pnpm typecheck
+pnpm test
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python scripts/check_repository.py
 ```
 
-The same checks run in GitHub Actions.
-They validate public file boundaries, local Markdown links, JSON and YAML syntax, and local references in the API draft.
-Application lint, type checks, unit tests, and end-to-end tests must be added with the first executable code.
+The same checks run in GitHub Actions (`Application checks` and
+`Repository checks` workflows).
+They validate TypeScript compilation, unit tests, public file boundaries,
+local Markdown links, JSON and YAML syntax, and local references in the API
+draft.
 
 ## Contributing and reporting problems
 
