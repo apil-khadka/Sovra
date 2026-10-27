@@ -23,11 +23,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up pnpm
-        uses: pnpm/action-setup@41ff090614579cd1a954490edd1d842ad64bbab4 # v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           run_install: false
       - name: Set up Node.js
-        uses: actions/setup-node@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
           cache: pnpm
