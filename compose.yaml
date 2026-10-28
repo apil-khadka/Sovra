@@ -10,6 +10,7 @@ services:
       POSTGRES_USER: sovra
       POSTGRES_PASSWORD: ${SOVRA_DB_ADMIN_PASSWORD:-sovra-dev-only}
       SOVRA_APP_DB_PASSWORD: ${SOVRA_APP_DB_PASSWORD:-sovra-dev-app-only}
+      SOVRA_QUARANTINE_DB_PASSWORD: ${SOVRA_QUARANTINE_DB_PASSWORD:-sovra-dev-quarantine-only}
     volumes:
       - sovra-pgdata:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
@@ -118,6 +119,29 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+    networks:
+      - sovra-net
+
+  # SOV-017 isolated quarantine worker: same image, plain-main
+  # entrypoint, own database role, no published ports, no Spring, no
+  # HTTP. Heap-capped so a hostile decode cannot take the host.
+  quarantine-worker:
+    build: ./backend
+    entrypoint:
+      ["java", "-Xmx512m", "-cp", "BOOT-INF/classes:BOOT-INF/lib/*",
+        "dev.sovra.worker.QuarantineWorkerMain"]
+    environment:
+      SOVRA_MODE: demo
+      SOVRA_WORKER_DB_URL: jdbc:postgresql://db:5432/sovra
+      SOVRA_WORKER_DB_USER: sovra_quarantine
+      SOVRA_WORKER_DB_PASSWORD: ${SOVRA_QUARANTINE_DB_PASSWORD:-sovra-dev-quarantine-only}
+      SOVRA_VAULT_SEED: c292cmEtZGVtby12YXVsdC1zZWVkLTAxLU5PTi1QUk9EVUNUSU9OIQ==
+    depends_on:
+      db:
+        condition: service_healthy
+      app-a:
+        condition: service_started
+    restart: unless-stopped
     networks:
       - sovra-net
 

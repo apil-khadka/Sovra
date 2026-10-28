@@ -18,3 +18,17 @@ END
 \$\$;
 ALTER ROLE sovra_app WITH LOGIN PASSWORD '$ESCAPED_PW';
 EOF
+psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<'EOF'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'sovra_quarantine') THEN
+    CREATE ROLE sovra_quarantine WITH NOLOGIN;
+  END IF;
+END
+$$;
+EOF
+if [ -n "${SOVRA_QUARANTINE_DB_PASSWORD:-}" ]; then
+  ESCAPED_QPW=$(printf '%s' "$SOVRA_QUARANTINE_DB_PASSWORD" | sed "s/'/''/g")
+  psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+    -c "ALTER ROLE sovra_quarantine WITH LOGIN PASSWORD '$ESCAPED_QPW'"
+fi

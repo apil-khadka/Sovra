@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.5.0
+  version: 0.6.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -414,6 +414,80 @@ paths:
         '200': { description: '{kekVersion}' }
         '401': { description: Anonymous }
         '403': { description: Lacks TRUST_ADMIN }
+  /api/quarantine/admissions:
+    post:
+      operationId: admitQuarantineBytes
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Admit hostile bytes into sealed quarantine (SOV-017). Content
+        is base64 (1 to 8388608 bytes decoded) and must sniff as an
+        allowlisted image type; it seals as a quarantine-marked vault
+        object for the isolated worker. Returns identity only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contentBase64, issuerId]
+              properties:
+                contentBase64: { type: string, description: 1 to 8388608 bytes decoded }
+                claimedType: { type: string, description: Uploader label only, never trusted }
+                issuerId: { type: string }
+      responses:
+        '202': { description: '{admissionId, objectId, status QUARANTINED, actualType, sizeBytes}' }
+        '400': { description: Malformed shape, bounds, or non-allowlisted magic }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '503': { description: Wrapping backend unavailable (kms_unavailable) }
+  /api/quarantine/admissions/{id}:
+    get:
+      operationId: readQuarantineAdmission
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Read admission metadata and the worker verdict
+        (SOV-017). Metadata-only: no endpoint serves quarantine bytes.
+      responses:
+        '200':
+          description: >-
+            {admissionId, objectId, status, claimedType, actualType,
+            sizeBytes, contentSha256Hex, verdict, imageWidth,
+            imageHeight, scannedAt, createdAt}
+        '401': { description: Anonymous }
+        '403': { description: Lacks a verdict-reading role }
+        '404': { description: Unknown admission }
+  /api/quarantine/admissions/{id}/promote:
+    post:
+      operationId: promoteQuarantineAdmission
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Promote a CLEAN admission (SOV-017): the quarantine seal opens
+        server-side under the caller's scan grant and re-seals into a
+        fresh vault object with real purposes. The admission flips to
+        PROMOTED exactly once; anything else conflicts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantId, purpose, workload]
+              properties:
+                grantId: { type: string, format: uuid }
+                purpose: { type: string }
+                workload: { type: string }
+                purposes:
+                  type: array
+                  items: { type: string }
+                  description: Promoted purposes, default [enrollment-review]
+                displayName: { type: string }
+      responses:
+        '201': { description: '{admissionId, objectId, version 1}' }
+        '400': { description: Malformed shape or quarantine purpose in promoted set }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS, or scan grant invalid }
+        '404': { description: Unknown admission, object, or grant }
+        '409': { description: Admission is not CLEAN, or already promoted }
   /api/audit/events:
     get:
       operationId: listAuditEvents

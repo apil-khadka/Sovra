@@ -34,6 +34,21 @@ public abstract class SovraAppRoleBase {
   }
 
   private static HikariDataSource ownerPool;
+  private static HikariDataSource quarantinePool;
+
+  /** Isolated-worker connection against this base's own container. */
+  protected static synchronized DataSource quarantineRoleDataSource() {
+    if (quarantinePool == null) {
+      HikariConfig config = new HikariConfig();
+      config.setJdbcUrl(POSTGRES.getJdbcUrl());
+      config.setUsername(SovraPostgresBase.QUARANTINE_ROLE);
+      config.setPassword(SovraPostgresBase.QUARANTINE_ROLE_PASSWORD);
+      config.setMaximumPoolSize(2);
+      config.setMaxLifetime(300_000);
+      quarantinePool = new HikariDataSource(config);
+    }
+    return quarantinePool;
+  }
 
   /** Owner connection for fixtures (this base owns its own container). */
   protected static synchronized DataSource ownerDataSource() {

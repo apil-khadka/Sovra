@@ -19,6 +19,8 @@ public abstract class SovraPostgresBase {
 
   static final String APP_ROLE = "sovra_app";
   static final String APP_ROLE_PASSWORD = "sovra-app-test";
+  static final String QUARANTINE_ROLE = "sovra_quarantine";
+  static final String QUARANTINE_ROLE_PASSWORD = "sovra-quarantine-test";
 
   static final PostgreSQLContainer POSTGRES =
       new PostgreSQLContainer(DockerImageName.parse("postgres:17.7"))
@@ -39,6 +41,7 @@ public abstract class SovraPostgresBase {
 
   private static HikariDataSource ownerPool;
   private static HikariDataSource appPool;
+  private static HikariDataSource quarantinePool;
 
   /** Least-privilege connection for RLS/grant assertions. */
   protected static synchronized DataSource appRoleDataSource() {
@@ -46,6 +49,14 @@ public abstract class SovraPostgresBase {
       appPool = roleDataSource(APP_ROLE, APP_ROLE_PASSWORD);
     }
     return appPool;
+  }
+
+  /** Isolated-worker connection for containment assertions. */
+  protected static synchronized DataSource quarantineRoleDataSource() {
+    if (quarantinePool == null) {
+      quarantinePool = roleDataSource(QUARANTINE_ROLE, QUARANTINE_ROLE_PASSWORD);
+    }
+    return quarantinePool;
   }
 
   /** Owner connection for fixtures and cross-tenant seeding. */

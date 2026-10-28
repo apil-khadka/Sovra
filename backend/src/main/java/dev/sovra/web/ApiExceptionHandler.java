@@ -84,7 +84,8 @@ public class ApiExceptionHandler {
     VerificationNotFoundException.class,
     IssuerKeyNotFoundException.class,
     dev.sovra.auth.ServiceAccountService.ServiceAccountNotFoundException.class,
-    dev.sovra.vault.VaultNotFoundException.class
+    dev.sovra.vault.VaultNotFoundException.class,
+    dev.sovra.quarantine.QuarantineNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -219,6 +220,23 @@ public class ApiExceptionHandler {
       return problem(HttpStatus.BAD_REQUEST, "invalid_request", false);
     }
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid_request"));
+  }
+
+  @ExceptionHandler(dev.sovra.quarantine.QuarantineInvalidException.class)
+  public ResponseEntity<Object> quarantineInvalid(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.BAD_REQUEST, "invalid_request", false);
+    }
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid_request"));
+  }
+
+  @ExceptionHandler(dev.sovra.quarantine.QuarantineConflictException.class)
+  public ResponseEntity<Object> quarantineConflict(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.CONFLICT, "quarantine_conflict", false);
+    }
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(Map.of("error", "quarantine_conflict"));
   }
 
   @ExceptionHandler(dev.sovra.vault.VaultAuthenticationException.class)

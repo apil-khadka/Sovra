@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 9;
+  static final long RULES_VERSION = 10;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
       Map.ofEntries(
@@ -77,7 +77,13 @@ public class AuthorizationService {
           Map.entry(Action.VAULT_GRANT_ACCESS, Set.of("ISSUER_OPS")),
           Map.entry(Action.VAULT_REVOKE_GRANT, Set.of("ISSUER_OPS", "TRUST_ADMIN")),
           Map.entry(Action.VAULT_ROTATE_KEK, Set.of("TRUST_ADMIN")),
-          Map.entry(Action.VAULT_DELETE_VERSION, Set.of("TRUST_ADMIN")));
+          Map.entry(Action.VAULT_DELETE_VERSION, Set.of("TRUST_ADMIN")),
+          // Quarantine (SOV-017): issuer-operated admission desk;
+          // auditors and trust admins inspect verdicts, never bytes.
+          Map.entry(Action.QUARANTINE_ADMIT, Set.of("ISSUER_OPS")),
+          Map.entry(
+              Action.QUARANTINE_READ, Set.of("ISSUER_OPS", "AUDIT_READER", "TRUST_ADMIN")),
+          Map.entry(Action.QUARANTINE_PROMOTE, Set.of("ISSUER_OPS")));
 
   private final ServiceAccountRepository accounts;
   private final HumanMembershipRepository humans;

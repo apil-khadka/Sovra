@@ -10,10 +10,8 @@ import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ReasonCode;
 import dev.sovra.authz.ResourceRef;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,9 +40,15 @@ public class VaultService {
   static final long MIN_GRANT_TTL_SECONDS = 60;
   static final long MAX_GRANT_TTL_SECONDS = 86400;
 
+  /**
+   * Quarantine marker purpose (SOV-017). Objects carrying it are
+   * unscanned hostile input: the content endpoint refuses them even
+   * under a live grant, and only {@link #readForQuarantine} opens
+   * them, server-side, during promotion of a CLEAN verdict.
+   */
+  public static final String QUARANTINE_PURPOSE = "quarantine-scan";
+
   private static final Pattern NAME = Pattern.compile("^[a-z0-9-]{1,64}$");
-  private static final String CONTENT_AAD_LABEL = "sovra-vault-content/v1";
-  private static final String WRAP_AAD_LABEL = "sovra-vault-wrap/v1";
 
   private final AuthorizationService authz;
   private final AuditService audit;
@@ -295,30 +299,16 @@ public class VaultService {
     if (!"VALID".equals(row.status())) {
       throw new VaultNotFoundException();
     }
+    if (row.purposes().contains(QUARANTINE_PURPOSE)) {
+      // Unscanned input never leaves through the content endpoint,
+      // grant or no grant; promotion re-seals it server-side.
+      deny(caller, Action.VAULT_READ_OBJECT, objectId.toString(), decision,
+          ReasonCode.GRANT_INVALID);
+      throw new ForbiddenException(ReasonCode.GRANT_INVALID);
+    }
     GrantRow grant = grantRow(grantId);
     checkGrant(caller, grant, objectId, version, purpose, workload, decision);
-    byte[] content;
-    try {
-      byte[] wrapAad = wrapAad(caller.tenantId(), row);
-      byte[] dek = kek.unwrapDek(
-          caller.tenantId(), row.kekVersion(), row.wrappedDek(), row.dekNonce(), wrapAad);
-      if (!row.purposes().contains(purpose)) {
-        // Checked after the wrap opens, so the set compared is the
-        // authenticated envelope set, not just the database row.
-        deny(caller, Action.VAULT_READ_OBJECT, objectId.toString(), decision,
-            ReasonCode.GRANT_INVALID);
-        throw new ForbiddenException(ReasonCode.GRANT_INVALID);
-      }
-      content = VaultCrypto.open(
-          dek, row.contentNonce(), row.ciphertext(), contentAad(caller.tenantId(), row));
-    } catch (VaultAuthenticationException e) {
-      audit.record(
-          caller, Action.VAULT_READ_OBJECT,
-          ResourceRef.tenantScoped("vault-object", objectId.toString(), caller.tenantId()),
-          Decision.deny(ReasonCode.VAULT_INTEGRITY_FAILURE, decision.policyVersion()),
-          "", Map.of("version", String.valueOf(version)));
-      throw e;
-    }
+    byte[] content = openAuthenticated(caller, row, purpose, decision);
     audit.record(
         caller, Action.VAULT_READ_OBJECT,
         ResourceRef.tenantScoped("vault-object", objectId.toString(), caller.tenantId()),
@@ -326,6 +316,63 @@ public class VaultService {
         Map.of("version", String.valueOf(version), "purpose", purpose, "grant",
             grantId.toString()));
     return new ReadResult(content, version, hex(row.contentSha256()));
+  }
+
+  /**
+   * Server-side quarantine open (SOV-017): mirrors {@link #read} but
+   * accepts only quarantine-marked objects and never serves bytes to
+   * a caller — the quarantine service re-seals them into a promoted
+   * vault object. Same grant checks, same fail-closed integrity.
+   */
+  @Transactional(noRollbackFor = {ForbiddenException.class, VaultAuthenticationException.class})
+  public byte[] readForQuarantine(
+      ServiceAccountPrincipal caller,
+      UUID objectId,
+      int version,
+      UUID grantId,
+      String purpose,
+      String workload) {
+    Decision decision =
+        require(caller, Action.VAULT_READ_OBJECT, "vault-object", objectId.toString());
+    StoredRow row = versionRow(objectId, version);
+    if (!"VALID".equals(row.status())) {
+      throw new VaultNotFoundException();
+    }
+    if (!row.purposes().contains(QUARANTINE_PURPOSE)) {
+      throw new VaultInvalidException("not a quarantine object");
+    }
+    GrantRow grant = grantRow(grantId);
+    checkGrant(caller, grant, objectId, version, purpose, workload, decision);
+    return openAuthenticated(caller, row, purpose, decision);
+  }
+
+  private byte[] openAuthenticated(
+      ServiceAccountPrincipal caller,
+      StoredRow row,
+      String purpose,
+      Decision decision) {
+    try {
+      byte[] wrapAad = wrapAad(caller.tenantId(), row);
+      byte[] dek = kek.unwrapDek(
+          caller.tenantId(), row.kekVersion(), row.wrappedDek(), row.dekNonce(), wrapAad);
+      if (!row.purposes().contains(purpose)) {
+        // Checked after the wrap opens, so the set compared is the
+        // authenticated envelope set, not just the database row.
+        deny(caller, Action.VAULT_READ_OBJECT, row.objectId().toString(), decision,
+            ReasonCode.GRANT_INVALID);
+        throw new ForbiddenException(ReasonCode.GRANT_INVALID);
+      }
+      return VaultCrypto.open(
+          dek, row.contentNonce(), row.ciphertext(), contentAad(caller.tenantId(), row));
+    } catch (VaultAuthenticationException e) {
+      audit.record(
+          caller, Action.VAULT_READ_OBJECT,
+          ResourceRef.tenantScoped("vault-object", row.objectId().toString(),
+              caller.tenantId()),
+          Decision.deny(ReasonCode.VAULT_INTEGRITY_FAILURE, decision.policyVersion()),
+          "", Map.of("version", String.valueOf(row.version())));
+      throw e;
+    }
   }
 
   @Transactional(noRollbackFor = {ForbiddenException.class, VaultAuthenticationException.class})
@@ -413,26 +460,13 @@ public class VaultService {
   }
 
   private byte[] contentAad(UUID tenantId, StoredRow row) {
-    return VaultCrypto.frame(CONTENT_AAD_LABEL,
-        tenantId.toString().getBytes(StandardCharsets.UTF_8),
-        row.issuerId().getBytes(StandardCharsets.UTF_8),
-        row.objectId().toString().getBytes(StandardCharsets.UTF_8),
-        Integer.toString(row.version()).getBytes(StandardCharsets.UTF_8),
-        Integer.toString(row.kekVersion()).getBytes(StandardCharsets.UTF_8),
-        row.contentSha256());
+    return VaultEnvelope.contentAad(tenantId, row.issuerId(), row.objectId(), row.version(),
+        row.kekVersion(), row.contentSha256());
   }
 
   private byte[] wrapAad(UUID tenantId, StoredRow row) {
-    List<byte[]> fields = new ArrayList<>();
-    fields.add(tenantId.toString().getBytes(StandardCharsets.UTF_8));
-    fields.add(row.issuerId().getBytes(StandardCharsets.UTF_8));
-    fields.add(row.objectId().toString().getBytes(StandardCharsets.UTF_8));
-    fields.add(Integer.toString(row.version()).getBytes(StandardCharsets.UTF_8));
-    fields.add(Integer.toString(row.kekVersion()).getBytes(StandardCharsets.UTF_8));
-    for (String purpose : row.purposes()) {
-      fields.add(purpose.getBytes(StandardCharsets.UTF_8));
-    }
-    return VaultCrypto.frame(WRAP_AAD_LABEL, fields.toArray(new byte[0][]));
+    return VaultEnvelope.wrapAad(tenantId, row.issuerId(), row.objectId(), row.version(),
+        row.kekVersion(), row.purposes());
   }
 
   private void checkGrant(
