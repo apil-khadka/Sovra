@@ -1,0 +1,1567 @@
+openapi: 3.1.2
+info:
+  title: Sovra Issuer Node API - design draft
+  version: 0.1.0-draft
+  description: Proposed issuer-local data API; no handlers or SDKs are implemented by this file. Not OpenID4VCI/VP.
+    All hosts are placeholders. OAuth scopes are necessary but do not replace principal, issuer, tenant,
+    object, purpose, approval, or workload authorization. Browser user flows require PKCE and applicable
+    MFA. Production token authentication and final credential protocols remain SRS decision gates.
+servers:
+- url: https://issuer.example.invalid/v1
+  description: Approved issuer-local origin, not the central federation host.
+security:
+- issuerOAuth:
+  - issuer:read
+x-data-boundary: issuer-local
+paths:
+  /capabilities:
+    get:
+      operationId: getCapabilities
+      summary: Read approved node capabilities
+      security:
+      - issuerOAuth:
+        - issuer:read
+      responses:
+        '200':
+          description: Read approved node capabilities
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capabilities'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /subjects:
+    post:
+      operationId: createSubject
+      summary: Create pending issuer-local subject
+      security:
+      - issuerOAuth:
+        - subjects:write
+      responses:
+        '201':
+          description: Create pending issuer-local subject
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubjectCreate'
+  /subjects/{subject_id}:
+    get:
+      operationId: getSubject
+      summary: Read authorized subject metadata
+      security:
+      - issuerOAuth:
+        - subjects:read
+      responses:
+        '200':
+          description: Read authorized subject metadata
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            ETag:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 128
+              description: Opaque version precondition for subsequent reviewed changes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/subject_id'
+  /subjects/{subject_id}/enrollments:
+    post:
+      operationId: createEnrollment
+      summary: Create enrollment under approved issuer policy
+      security:
+      - issuerOAuth:
+        - enrollments:write
+      responses:
+        '201':
+          description: Create enrollment under approved issuer policy
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enrollment'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/subject_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollmentCreate'
+  /enrollments/{enrollment_id}:
+    get:
+      operationId: getEnrollment
+      summary: Read authorized enrollment state
+      security:
+      - issuerOAuth:
+        - enrollments:read
+      responses:
+        '200':
+          description: Read authorized enrollment state
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            ETag:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 128
+              description: Opaque version precondition for subsequent reviewed changes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enrollment'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/enrollment_id'
+  /subjects/{subject_id}/documents:
+    post:
+      operationId: createDocument
+      summary: Register local document before upload
+      security:
+      - issuerOAuth:
+        - documents:write
+      responses:
+        '201':
+          description: Register local document before upload
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/subject_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentCreate'
+  /documents/{document_id}:
+    get:
+      operationId: getDocument
+      summary: Read authorized document metadata
+      security:
+      - issuerOAuth:
+        - documents:read
+      responses:
+        '200':
+          description: Read authorized document metadata
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            ETag:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 128
+              description: Opaque version precondition for subsequent reviewed changes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/document_id'
+    delete:
+      operationId: requestDocumentDeletion
+      summary: Request policy-controlled document lifecycle deletion
+      security:
+      - issuerOAuth:
+        - documents:delete
+      responses:
+        '202':
+          description: Request policy-controlled document lifecycle deletion
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+      description: Check approved retention/hold/backup and dependent evidence policy. 202 does not mean
+        every backup or previous plaintext copy was erased.
+      parameters:
+      - $ref: '#/components/parameters/document_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+  /documents/{document_id}/content:
+    put:
+      operationId: uploadDocumentContent
+      summary: Upload once into encrypted local quarantine
+      security:
+      - issuerOAuth:
+        - documents:write
+      responses:
+        '202':
+          description: Upload once into encrypted local quarantine
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '413':
+          $ref: '#/components/responses/Problem'
+        '415':
+          $ref: '#/components/responses/Problem'
+      description: Authenticated issuer-local TLS upload. Encrypt before durable persistence; exact bytes/media/length,
+        configured size/pixel limits, local scanning, and current pending document/subject binding must
+        pass. Complete immutable content only; no overwrite or automatic extraction approval.
+      parameters:
+      - $ref: '#/components/parameters/document_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+    get:
+      operationId: readDocumentContent
+      summary: Read specifically authorized authenticated plaintext image
+      security:
+      - issuerOAuth:
+        - documents:content
+      responses:
+        '200':
+          description: Read specifically authorized authenticated plaintext image
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            ETag:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 128
+              description: Opaque version precondition for subsequent reviewed changes.
+            Content-Disposition:
+              schema:
+                type: string
+                const: attachment
+              description: Safe original download; any inline preview is a separately authorized safe
+                derivative/viewer.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '410':
+          $ref: '#/components/responses/Problem'
+      description: Reauthorize before unwrap. Grant must match current principal, issuer, purpose, document/version,
+        lifetime and current permissions. Verify AEAD/context before any plaintext is released. Fail closed;
+        no central proxy, key output, or cache.
+      parameters:
+      - $ref: '#/components/parameters/document_id'
+      - $ref: '#/components/parameters/AccessGrant'
+  /documents/{document_id}/access-grants:
+    post:
+      operationId: createDocumentAccessGrant
+      summary: Authorize short-lived original-image read
+      security:
+      - issuerOAuth:
+        - documents:grant
+        - documents:content
+      responses:
+        '201':
+          description: Authorize short-lived original-image read
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessGrant'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/document_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessGrantCreate'
+  /documents/{document_id}/extractions:
+    post:
+      operationId: requestExtraction
+      summary: Request approved local extraction pipeline
+      security:
+      - issuerOAuth:
+        - extractions:write
+      responses:
+        '202':
+          description: Request approved local extraction pipeline
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      description: Only accepted immutable documents and approved schema/pipeline versions. Workload identity
+        and local egress controls apply; never send images/PII to the interoperability planner.
+      parameters:
+      - $ref: '#/components/parameters/document_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractionCreate'
+  /extractions/{extraction_id}:
+    get:
+      operationId: getExtraction
+      summary: Read authorized sensitive local extraction
+      security:
+      - issuerOAuth:
+        - extractions:read
+      responses:
+        '200':
+          description: Read authorized sensitive local extraction
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            ETag:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 128
+              description: Opaque version precondition for subsequent reviewed changes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Extraction'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/extraction_id'
+  /extractions/{extraction_id}/revisions:
+    post:
+      operationId: createExtractionRevision
+      summary: Create unapproved extraction correction revision
+      security:
+      - issuerOAuth:
+        - extractions:write
+      responses:
+        '201':
+          description: Create unapproved extraction correction revision
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Extraction'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+      description: Preserve source and prior observations; correction remains unapproved and needs the
+        exact-revision approval policy.
+      parameters:
+      - $ref: '#/components/parameters/extraction_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractionRevision'
+  /extractions/{extraction_id}/reviews:
+    post:
+      operationId: reviewExtraction
+      summary: Review exact extraction/source revision
+      security:
+      - issuerOAuth:
+        - extractions:review
+      responses:
+        '201':
+          description: Review exact extraction/source revision
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+      description: Review privilege/separation and provenance validation required. Does not automatically
+        approve enrollment or issue identity credentials.
+      parameters:
+      - $ref: '#/components/parameters/extraction_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+  /enrollments/{enrollment_id}/decisions:
+    post:
+      operationId: decideEnrollment
+      summary: Apply approved evidence and holder-binding enrollment decision
+      security:
+      - issuerOAuth:
+        - enrollments:review
+      responses:
+        '200':
+          description: Apply approved evidence and holder-binding enrollment decision
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enrollment'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+      description: Derive assurance server-side from approved policy, current source/reviews and holder
+        binding. No self-asserted identity or admin-role bypass.
+      parameters:
+      - $ref: '#/components/parameters/enrollment_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollmentDecision'
+  /subjects/{subject_id}/credential-issuance-requests:
+    post:
+      operationId: requestCredentialIssuance
+      summary: Admit a permitted credential issuance request
+      security:
+      - issuerOAuth:
+        - credentials:request
+      responses:
+        '202':
+          description: Admit a permitted credential issuance request
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            Location:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 512
+              description: Same-origin resource path; never a redirect to an arbitrary host.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      description: Requires current approved enrollment/source revision, claim authority, holder binding,
+        selected profile, and signing permissions. Returns job admission only; actual credential delivery
+        protocol remains separate and unimplemented.
+      parameters:
+      - $ref: '#/components/parameters/subject_id'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssuanceRequest'
+  /jobs/{job_id}:
+    get:
+      operationId: getJob
+      summary: Read scoped safe asynchronous task status
+      security:
+      - issuerOAuth:
+        - jobs:read
+      responses:
+        '200':
+          description: Read scoped safe asynchronous task status
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+              description: Sensitive response must not be cached.
+            ETag:
+              schema:
+                type: string
+                minLength: 1
+                maxLength: 128
+              description: Opaque version precondition for subsequent reviewed changes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      description: Require underlying resource authorization in addition to jobs:read. Never expose raw
+        exceptions, extracted fields, or signed credentials.
+      parameters:
+      - $ref: '#/components/parameters/job_id'
+components:
+  securitySchemes:
+    issuerOAuth:
+      type: oauth2
+      description: Illustrative OAuth provider; select and validate actual issuer/audience/grants before
+        release. No implicit/password grants. A service principal cannot acquire human-review privileges
+        merely by requesting a scope.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.invalid/oauth2/authorize
+          tokenUrl: https://auth.example.invalid/oauth2/token
+          scopes: &id001
+            issuer:read: Read approved node capabilities; no personal records.
+            subjects:write: Create a pending local subject record.
+            subjects:read: Read authorized subject metadata.
+            enrollments:write: Create an enrollment for an authorized subject.
+            enrollments:read: Read authorized enrollment status.
+            enrollments:review: Decide enrollment under the approved proofing/holder-binding policy.
+            documents:write: Create and upload documents inside the issuer node.
+            documents:read: Read authorized document metadata, excluding content/digests.
+            documents:grant: Request a current-principal/purpose-bound original-image read grant.
+            documents:content: View specifically authorized original image content; requires an access
+              grant.
+            documents:delete: Request retention-policy-controlled local document deletion.
+            extractions:write: Request local extraction or an unapproved correction revision.
+            extractions:read: Read authorized local extracted personal fields.
+            extractions:review: Review a specific extraction revision.
+            credentials:request: Request issuance from approved enrollment; does not authorize arbitrary
+              signing.
+            jobs:read: Read safe status only for jobs whose underlying resources are authorized.
+        clientCredentials:
+          tokenUrl: https://auth.example.invalid/oauth2/token
+          scopes: *id001
+  parameters:
+    subject_id:
+      name: subject_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ResourceId'
+    document_id:
+      name: document_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ResourceId'
+    enrollment_id:
+      name: enrollment_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ResourceId'
+    extraction_id:
+      name: extraction_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ResourceId'
+    job_id:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ResourceId'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      description: Scoped to authenticated caller/issuer/operation and request hash; conflicting body
+        reuse is 409. Preserve key for a documented authorized retry only.
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      description: Exact current ETag; missing precondition is 428 and stale revision is 412.
+    AccessGrant:
+      name: X-Sovra-Access-Grant
+      in: header
+      required: true
+      schema:
+        $ref: '#/components/schemas/ResourceId'
+      description: Sensitive purpose/principal/document/version-bound reference; never place in a URL
+        or log it.
+  schemas:
+    ResourceId:
+      type: string
+      format: uuid
+      description: Opaque local resource identifier; not proof of identity or authorization.
+    Problem:
+      type: object
+      description: RFC 9457 problem details with safe Sovra extension fields; no secret/PII/debug content.
+        HTTP status must equal status.
+      required:
+      - type
+      - title
+      - status
+      - code
+      - correlation_id
+      - retryable
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+          minLength: 1
+          maxLength: 128
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+          maxLength: 256
+        instance:
+          type: string
+          format: uri-reference
+          maxLength: 512
+        code:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]{1,63}$
+        correlation_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        retryable:
+          type: boolean
+    Capabilities:
+      type: object
+      additionalProperties: false
+      properties:
+        issuer_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        api_version:
+          type: string
+          const: v1
+        document_media_types:
+          type: array
+          maxItems: 2
+          items:
+            type: string
+            enum:
+            - image/jpeg
+            - image/png
+        max_upload_bytes:
+          type: integer
+          minimum: 1
+        credential_profiles:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+      required:
+      - issuer_id
+      - api_version
+      - document_media_types
+      - max_upload_bytes
+      - credential_profiles
+    SubjectCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        source_reference:
+          type: string
+          minLength: 1
+          maxLength: 128
+      description: Optional issuer-local opaque source-system reference, never an asserted national ID.
+        Authority comes from authenticated context.
+    Subject:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceId'
+        state:
+          type: string
+          enum:
+          - PENDING_ENROLLMENT
+          - ACTIVE
+          - SUSPENDED
+          - ARCHIVED
+        version:
+          type: integer
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - state
+      - version
+      - created_at
+    EnrollmentCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        policy_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        policy_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+      - policy_id
+      - policy_version
+    Enrollment:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceId'
+        subject_id:
+          $ref: '#/components/schemas/ResourceId'
+        state:
+          type: string
+          enum:
+          - EVIDENCE_PENDING
+          - PROCESSING
+          - REVIEW_REQUIRED
+          - APPROVED
+          - REJECTED
+          - CANCELLED
+        policy_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        policy_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        version:
+          type: integer
+          minimum: 1
+      required:
+      - id
+      - subject_id
+      - state
+      - policy_id
+      - policy_version
+      - version
+    DocumentCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        enrollment_id:
+          $ref: '#/components/schemas/ResourceId'
+        media_type:
+          type: string
+          enum:
+          - image/jpeg
+          - image/png
+        content_length:
+          type: integer
+          minimum: 1
+      required:
+      - enrollment_id
+      - media_type
+      - content_length
+      description: Bound to the same authorized subject/enrollment; node capabilities and decoder limits
+        bound size. No arbitrary download URL or filename.
+    Document:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceId'
+        subject_id:
+          $ref: '#/components/schemas/ResourceId'
+        enrollment_id:
+          $ref: '#/components/schemas/ResourceId'
+        state:
+          type: string
+          enum:
+          - AWAITING_UPLOAD
+          - QUARANTINED
+          - ACCEPTED
+          - REJECTED
+          - DELETION_PENDING
+          - DELETED
+        media_type:
+          type: string
+          enum:
+          - image/jpeg
+          - image/png
+        version:
+          type: integer
+          minimum: 1
+      required:
+      - id
+      - subject_id
+      - enrollment_id
+      - state
+      - media_type
+      - version
+      description: Metadata contains no original digest, extracted fields, storage URL, key, or wrapped
+        DEK.
+    ExtractionCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        schema_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        schema_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        pipeline_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+      - schema_id
+      - schema_version
+      - pipeline_version
+      description: Approved local pipeline only; not an arbitrary external model/OCR endpoint.
+    ExtractedField:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        value_type:
+          type: string
+          enum:
+          - STRING
+          - DATE
+          - INTEGER
+          - BOOLEAN
+        value:
+          type: string
+          maxLength: 4096
+        confidence:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        source_region_ref:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - name
+      - value_type
+      - value
+      description: Sensitive candidate value. The selected schema/normalizer supplies exact semantics;
+        confidence is not identity assurance.
+    Extraction:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceId'
+        document_id:
+          $ref: '#/components/schemas/ResourceId'
+        source_document_version:
+          type: integer
+          minimum: 1
+        schema_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        schema_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        pipeline_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        normalization_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        state:
+          type: string
+          enum:
+          - PENDING_REVIEW
+          - APPROVED
+          - REJECTED
+          - SUPERSEDED
+        fields:
+          type: array
+          maxItems: 128
+          items:
+            $ref: '#/components/schemas/ExtractedField'
+        version:
+          type: integer
+          minimum: 1
+      required:
+      - id
+      - document_id
+      - source_document_version
+      - schema_id
+      - schema_version
+      - pipeline_version
+      - normalization_version
+      - state
+      - fields
+      - version
+      description: Issuer-local sensitive response. Protected internal provenance/digests are not public
+        discovery fields.
+    ExtractionRevision:
+      type: object
+      additionalProperties: false
+      properties:
+        corrections:
+          type: array
+          minItems: 1
+          maxItems: 128
+          items:
+            $ref: '#/components/schemas/ExtractedField'
+        reason_code:
+          type: string
+          enum:
+          - OCR_CORRECTION
+          - SOURCE_CLARIFICATION
+      required:
+      - corrections
+      - reason_code
+      description: Creates an unapproved attributable revision; never edits approved history in place.
+    ReviewCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        decision:
+          type: string
+          enum:
+          - APPROVE
+          - REJECT
+        reason_code:
+          type: string
+          enum:
+          - EVIDENCE_ACCEPTED
+          - EVIDENCE_REJECTED
+          - POLICY_NOT_SATISFIED
+      required:
+      - decision
+      - reason_code
+      description: Review exact If-Match revision; current role/separation-of-duties and source validation
+        still required. APPROVE is extraction review, not sovereign identity verification.
+    Review:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceId'
+        extraction_id:
+          $ref: '#/components/schemas/ResourceId'
+        extraction_version:
+          type: integer
+          minimum: 1
+        decision:
+          type: string
+          enum:
+          - APPROVE
+          - REJECT
+      required:
+      - id
+      - extraction_id
+      - extraction_version
+      - decision
+    EnrollmentDecision:
+      type: object
+      additionalProperties: false
+      properties:
+        decision:
+          type: string
+          enum:
+          - APPROVE
+          - REJECT
+        review_ids:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ResourceId'
+        reason_code:
+          type: string
+          enum:
+          - EVIDENCE_ACCEPTED
+          - EVIDENCE_REJECTED
+          - OWNER_BINDING_FAILED
+          - POLICY_NOT_SATISFIED
+      required:
+      - decision
+      - reason_code
+      description: Server verifies all review/source/holder-binding/assurance requirements; client cannot
+        choose its own assurance level.
+      allOf:
+      - if:
+          properties:
+            decision:
+              const: APPROVE
+          required:
+          - decision
+        then:
+          required:
+          - review_ids
+    AccessGrantCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        purpose_code:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+      - purpose_code
+      description: Server authorizes purpose from approved policy; grants bind the authenticated principal,
+        issuer, document/version, action, and bounded lifetime.
+    AccessGrant:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceId'
+        document_id:
+          $ref: '#/components/schemas/ResourceId'
+        document_version:
+          type: integer
+          minimum: 1
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - document_id
+      - document_version
+      - expires_at
+      description: Opaque sensitive grant reference; requires current access token, entitlement, and resource
+        binding. Not a DEK or independent bearer authorization.
+    IssuanceRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        enrollment_id:
+          $ref: '#/components/schemas/ResourceId'
+        credential_type:
+          type: string
+          minLength: 1
+          maxLength: 128
+        profile_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        policy_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        policy_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        claim_names:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+      required:
+      - enrollment_id
+      - credential_type
+      - profile_id
+      - policy_id
+      - policy_version
+      - claim_names
+      description: Requests only approved derived claims; accepts no client-asserted claim values. Admission
+        is not signing or legal approval. Holder binding and delivery follow the separately selected profile.
+    Job:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum:
+          - DOCUMENT_VALIDATION
+          - EXTRACTION
+          - ISSUANCE_REQUEST
+          - DELETION
+        state:
+          type: string
+          enum:
+          - PENDING
+          - RUNNING
+          - SUCCEEDED
+          - FAILED
+        resource_id:
+          $ref: '#/components/schemas/ResourceId'
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+      - id
+      - kind
+      - state
+      description: Safe status metadata only; job success means its declared task completed, never automatically
+        identity/evidence verification. No image, field value, credential, or raw exception.
+  responses:
+    Problem:
+      description: Safe error; retryable is guidance, not an authorization or approval decision. For 429/temporary
+        failure honor Retry-After when present.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Retry-After:
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+          description: Optional bounded retry guidance for applicable transient/429 errors.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

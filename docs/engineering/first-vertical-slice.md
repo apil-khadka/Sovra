@@ -1,25 +1,39 @@
-# First implementation vertical slice: hours 0–24
+# First Java synthetic vertical slice
 
-**Purpose:** prove feasibility before creating lots of services or screens. This is a build plan, not an implemented artifact.
+**Purpose:** reproduce the core identity-evidence flow on the selected Java backend with real HTTP/PostgreSQL and independent negative assertions.
+**Scope:** G1 in the [business implementation plan](implementation-plan.md), consolidated by SOV-035 in the [backlog](implementation-backlog.md).
+This is a build specification, not an implemented flow or permission to use real identity data.
 
-## Commit sequence
+## Prerequisites
 
-1. **Freeze the demo contract:** choose `age_over_18`, fictional RP policy v1, `AdultStatusCredential`, one issuer trust record, and `VERIFIED_EVIDENCE | REJECTED | MANUAL_REVIEW` outcomes. Document whether profile is demo JWT/JWS or a fully interoperable VC flow.
-2. **Run the actual Meta model smoke test:** account credentials from environment variables only; confirm model availability, structured response or tool capability, and a bounded JSON candidate. Record actual model ID (not from memory), response ID, latency and token counts; redact sensitive values.
-3. **Minimal crypto fixture:** trusted issuer signs a synthetic `adultOver18: true` credential via a vetted library, verifier checks fixed issuer key/scope, signature, validity and status. Add tampering test *first*.
-4. **Single guard:** a candidate request proposing `passportImage` instead of signed adult evidence is rejected, even if produced by model. Test invented issuer and absent policy citation.
-5. **Session authorization:** RP creates audience/nonce/expiry; wallet UI explicitly consents; sign or otherwise cryptographically bind holder proof to nonce/audience; verifier consumes one-time challenge. Test replay and wrong audience.
-6. **Connect agent discovery:** it reads the public synthetic policy and issuer schema through scoped tools; creates a candidate mapping and citation; validation checks both.
-7. **Record a one-minute fresh checkout demo:** valid, then tampered or replayed, plus evidence of live Meta model planning. Only then add second country and polished UI.
+- Approved SOV-001 proof, holder-binding, trust/status freshness and session/idempotency semantics.
+- Approved SOV-002 locality/custody/root threat scope and SOV-004 provider/interface contracts for dependent behavior.
+- SOV-003 pinned Java 25/Spring workspace, migrations, synthetic fixtures and two-instance HTTP/PostgreSQL harness.
+- Versioned API contracts, scoped authorization, durable audit and approved trust/policy revisions.
 
-## Definition of ready before parallel agents
+Synthetic local provider doubles must be labelled and cannot satisfy production provider/IAM evidence.
+The TypeScript prototype was removed by explicit decision; its preserved JSON fixtures are migration evidence only and do not substitute for reviewed Java behavior.
 
-- Shared types/JSON schemas and error code table exist.
-- One cross-process test harness exists, with deterministic fixture clock where practical.
-- No service assumes source country databases are globally reachable.
-- Model API key is never embedded in prompts, fixtures or Git history.
-- Every model-generated plan is `UNAPPROVED` until the validator checks it.
+## Implementation sequence
 
-## Stop condition
+1. Implement a synthetic issuer and approved narrow claim such as `adultOver18`, constrained signing and idempotent issuance with explicit key/profile/version bindings.
+2. Implement an RP proof request and holder page showing the exact RP, purpose, claims and expiry before explicit approval.
+3. Validate proof/profile, holder, audience, consent, policy, trust/status and freshness, then atomically commit one-time challenge consumption and the immutable decision/audit relation.
+4. Connect the actual Meta endpoint through bounded Spring AI tools using only approved schemas, policy excerpts and minimized synthetic context.
+5. Run every proposed mapping through the independent deterministic guard and real source/citation validation before creating a holder request.
+6. Add semantic flow readiness and sanitized stage timing/reason evidence, including critical dependency failures with superficially healthy HTTP probes.
+7. Prove the full cross-issuer flow from a clean public checkout and retain all SRS AC-01 through AC-08 outcomes.
 
-If no end-to-end trusted, signed evidence by end of Oct 29, do not add a third country or complex UX. If no working Meta model call, do not simulate a model response in the submitted product; fix Meta integration first.
+## Required evidence
+
+- Valid approved evidence produces exactly one fresh acceptance across two instances with healthy dependencies.
+- Tampering, wrong issuer/scope/holder/audience, expiry, revocation, replay, refused/changed consent and unknown/stale authority produce no accepted evidence.
+- Process restart, concurrent submission, commit interruption and response loss cannot duplicate issuance/acceptance or turn uncertainty into success.
+- Unseen/incompatible schemas, invented citations and injected metadata fail safely against a frozen deterministic baseline.
+- Actual model/tool/error/timeout behavior is observed with bounded work and captured sanitized configuration/results.
+- Sensitive synthetic canaries do not appear in model requests, unauthorized responses, logs, traces or metric labels.
+- Startup, migrations, fixture loading, HTTP/E2E commands and actual artifact/version references reproduce without private files or production secrets.
+
+No source database is globally reachable and no model tool can sign, approve consent, modify trust/policy or accept a proof.
+A completed synthetic slice supports Java migration review; the [production validation gates](security-validation-plan.md) remain separate.
+Use the [dated hackathon schedule](hackathon-milestone-plan.md) only for the synthetic milestone.

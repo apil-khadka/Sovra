@@ -1,0 +1,76 @@
+# SOV-003 integration harness: two backend instances sharing one PostgreSQL.
+# Dev-only credentials; production secrets arrive with SOV-006.
+name: sovra
+
+services:
+  db:
+    image: postgres:17.7
+    environment:
+      POSTGRES_DB: sovra
+      POSTGRES_USER: sovra
+      POSTGRES_PASSWORD: ${SOVRA_DB_ADMIN_PASSWORD:-sovra-dev-only}
+      SOVRA_APP_DB_PASSWORD: ${SOVRA_APP_DB_PASSWORD:-sovra-dev-app-only}
+    volumes:
+      - sovra-pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sovra -d sovra"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - sovra-net
+
+  app-a:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      SOVRA_DB_URL: jdbc:postgresql://db:5432/sovra
+      SOVRA_DB_USER: sovra_app
+      SOVRA_DB_PASSWORD: ${SOVRA_APP_DB_PASSWORD:-sovra-dev-app-only}
+      SOVRA_DB_ADMIN_USER: sovra
+      SOVRA_DB_ADMIN_PASSWORD: ${SOVRA_DB_ADMIN_PASSWORD:-sovra-dev-only}
+      # Smoke/dev only: G1 synthetic double. Production sets SOVRA_SIGNER=kms
+      # and leaves the synthetic flags off.
+      SOVRA_SIGNER: local-dev
+      SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
+      SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sovra-net
+
+  app-b:
+    build: ./backend
+    ports:
+      - "8081:8080"
+    environment:
+      SOVRA_DB_URL: jdbc:postgresql://db:5432/sovra
+      SOVRA_DB_USER: sovra_app
+      SOVRA_DB_PASSWORD: ${SOVRA_APP_DB_PASSWORD:-sovra-dev-app-only}
+      SOVRA_DB_ADMIN_USER: sovra
+      SOVRA_DB_ADMIN_PASSWORD: ${SOVRA_DB_ADMIN_PASSWORD:-sovra-dev-only}
+      # Smoke/dev only: G1 synthetic double. Production sets SOVRA_SIGNER=kms
+      # and leaves the synthetic flags off.
+      SOVRA_SIGNER: local-dev
+      SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
+      SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sovra-net
+
+volumes:
+  sovra-pgdata:
+
+# Explicit subnet: host daemons with many project networks can exhaust the
+# default auto-allocation pools; this keeps the harness self-sufficient.
+networks:
+  sovra-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.244.0.0/24

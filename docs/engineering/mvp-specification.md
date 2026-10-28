@@ -1,5 +1,11 @@
 # Hackathon minimum viable product specification
 
+This document defines the synthetic milestone only.
+The [business SRS](../requirements/software-requirements-specification.md) governs the broader application requirements and production release gates.
+Demo priorities do not waive its security or real-data requirements.
+The [business implementation plan](implementation-plan.md) and [task backlog](implementation-backlog.md) govern delivery beyond this synthetic milestone.
+The dated [hackathon schedule](hackathon-milestone-plan.md) remains a separate milestone reference.
+
 ## Actors
 
 - Mock sovereign issuer administrator; synthetic holder; foreign relying-party operator; trust federation administrator; AI interoperability planner; deterministic authorization/verifier service.

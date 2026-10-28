@@ -12,11 +12,17 @@ A federation of independently governed issuers, holder-controlled credentials, a
 
 **Centralize trust metadata; federate authority; minimize identity disclosure.**
 
+## Business document and integration scope
+
+The business [SRS](../requirements/software-requirements-specification.md) additionally includes issuer-local encrypted document custody, extraction/review and identity enrollment, plus developer APIs/SDKs and role-specific dashboards.
+The [document architecture](../architecture/federated-document-lifecycle.md) keeps source data and encryption authority local while the [developer platform](../engineering/developer-platform.md) exposes governed integration resources.
+These are production requirements and proposed designs, not implemented capabilities of the current synthetic demo.
+
 ## Distinguishing demonstration
 
 Provide two mock jurisdiction configurations and one *previously unseen* third schema. The model should adapt by reading discovery metadata and policy specs, not by relying on hard-coded per-country branching. Show at least one correctly rejected incompatible or excessive request. Compare against a static mapping baseline.
 
-## Non-goals and honesty
+## Demonstration non-goals and claims
 
 - No claims of actual state certification, sovereign accreditation or official Nepal/Australia deployment.
 - No legal determination that a business completed KYC/AML obligations.

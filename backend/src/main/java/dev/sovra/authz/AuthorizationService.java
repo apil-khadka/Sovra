@@ -1,0 +1,123 @@
+package dev.sovra.authz;
+
+import dev.sovra.auth.ServiceAccountPrincipal;
+import dev.sovra.auth.ServiceAccountRepository;
+import java.time.Clock;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import javax.sql.DataSource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+/**
+ * Central authorization entry point. Every protected service method calls
+ * {@link #authorize} explicitly; annotations are not used so no proxy or
+ * self-invocation gap can skip the check. Credential validity (revoked /
+ * expired) is rechecked live on every call; only the role/action decision
+ * is cached, for 60 seconds keyed by policy version.
+ */
+@Service
+public class AuthorizationService {
+
+  /** Bump to invalidate every cached decision on rule changes. */
+  static final long RULES_VERSION = 2;
+
+  private static final Map<Action, Set<String>> REQUIRED_ROLES =
+      Map.of(
+          Action.ISSUE_CREDENTIAL, Set.of("ISSUER_OPS"),
+          Action.READ_CREDENTIAL, Set.of("TENANT_MEMBER", "ISSUER_OPS"),
+          Action.PROPOSE_TRUST_CHANGE, Set.of("TRUST_ADMIN"),
+          Action.APPROVE_TRUST_CHANGE, Set.of("TRUST_ADMIN"),
+          Action.ACTIVATE_TRUST_SNAPSHOT, Set.of("TRUST_ADMIN"),
+          Action.READ_AUDIT, Set.of("AUDIT_READER", "TRUST_ADMIN"));
+
+  private final ServiceAccountRepository accounts;
+  private final EmergencyFlagService emergency;
+  private final PermissionCache cache;
+  private final JdbcTemplate global;
+  private final Clock clock;
+
+  public AuthorizationService(
+      ServiceAccountRepository accounts,
+      EmergencyFlagService emergency,
+      PermissionCache cache,
+      DataSource globalDataSource,
+      Clock clock) {
+    this.accounts = accounts;
+    this.emergency = emergency;
+    this.cache = cache;
+    this.global = new JdbcTemplate(globalDataSource);
+    this.clock = clock;
+  }
+
+  /**
+   * Authorizes the action or throws {@link ForbiddenException} /
+   * {@link TenantMismatchException}. Returns the auditable decision.
+   */
+  public Decision authorize(
+      Optional<ServiceAccountPrincipal> caller, Action action, ResourceRef resource) {
+    long policyVersion = policyVersion();
+    if (emergency.enabled()) {
+      return Decision.deny(ReasonCode.EMERGENCY_FREEZE, policyVersion);
+    }
+    if (caller.isEmpty()) {
+      return Decision.deny(ReasonCode.ANONYMOUS, policyVersion);
+    }
+    ServiceAccountPrincipal principal = caller.get();
+    boolean live =
+        accounts
+            .findLive(principal.id())
+            .map(row -> row.live(clock.instant()))
+            .orElse(false);
+    if (!live) {
+      cache.invalidatePrincipal(principal.id());
+      return Decision.deny(ReasonCode.CREDENTIAL_REVOKED, policyVersion);
+    }
+    if (resource.tenantId().isPresent()
+        && !resource.tenantId().get().equals(principal.tenantId())) {
+      return Decision.deny(ReasonCode.WRONG_TENANT, policyVersion);
+    }
+    Decision cached = cache.get(principal.id(), action, resource, policyVersion);
+    if (cached != null) {
+      return cached;
+    }
+    Decision decision = decide(principal, action, policyVersion);
+    cache.put(principal.id(), action, resource, policyVersion, decision);
+    return decision;
+  }
+
+  /** Authorizes and throws the HTTP-mapped exception on denial. */
+  public void enforce(
+      Optional<ServiceAccountPrincipal> caller, Action action, ResourceRef resource) {
+    Decision decision = authorize(caller, action, resource);
+    if (decision.permitted()) {
+      return;
+    }
+    if (decision.reasonCode() == ReasonCode.WRONG_TENANT) {
+      throw new TenantMismatchException();
+    }
+    throw new ForbiddenException(decision.reasonCode());
+  }
+
+  private Decision decide(ServiceAccountPrincipal principal, Action action, long policyVersion) {
+    Set<String> required = REQUIRED_ROLES.get(action);
+    if (required == null) {
+      return Decision.deny(ReasonCode.MISSING_ROLE, policyVersion);
+    }
+    for (String role : principal.roles()) {
+      if (required.contains(role)) {
+        return Decision.permit(policyVersion);
+      }
+    }
+    return Decision.deny(ReasonCode.MISSING_ROLE, policyVersion);
+  }
+
+  private long policyVersion() {
+    Long active =
+        global.queryForObject(
+            "SELECT COALESCE(MAX(snapshot_version), 0) FROM trust_snapshot_activation",
+            Long.class);
+    return RULES_VERSION * 1_000_000_000L + (active == null ? 0 : active);
+  }
+}

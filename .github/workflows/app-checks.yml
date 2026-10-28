@@ -13,8 +13,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  app:
-    name: Typecheck and tests
+  backend:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up JDK 25
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Build and test
+        run: cd backend && ./mvnw verify
+      - name: Two-instance smoke test
+        run: ./scripts/smoke-two-instance.sh
+
+  frontend:
+    name: Frontend build and lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -29,16 +49,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: "22"
+          node-version: '22'
           cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Typecheck
-        run: pnpm typecheck
-      - name: Run tests
-        run: pnpm test
-      - name: Validate public repository
-        run: |
-          python3 -m venv .venv
-          .venv/bin/python -m pip install --disable-pip-version-check -r requirements-dev.txt
-          .venv/bin/python scripts/check_repository.py
+        run: pnpm --dir frontend install --frozen-lockfile
+      - name: Build
+        run: pnpm --dir frontend run build
+      - name: Lint
+        run: pnpm --dir frontend run lint

@@ -3,16 +3,20 @@
 Sovra is an identity-interoperability prototype.
 The prototype explores how a Meta-powered AI planner can propose verification evidence across simulated jurisdictions, while deterministic policy checks, holder consent, and issuer signatures control authorization.
 
-**Current status:** documentation and synthetic examples only.
-There is no runnable application, deployed demo, or completed security evaluation yet.
+**Current status:** documentation, a Java 25/Spring Boot backend bootstrap, a React frontend bootstrap, and synthetic examples.
+The earlier TypeScript prototype was removed; JSON fixtures in `tests/fixtures/` and `docs/engineering/fixtures/` are preserved as migration evidence.
+Java 25 LTS with Spring Boot is the [selected backend direction](docs/architecture/java-spring-baseline.md); the G1 vertical slice, deployed demo, and security evaluation are pending.
 Architecture documents describe intended behavior rather than implemented guarantees.
 
 ## Start here
 
 - [Documentation index](docs/README.md): product scope, architecture, requirements, and implementation plan.
+- [Software Requirements Specification](docs/requirements/software-requirements-specification.md): business scope, testable requirements, security, and release acceptance.
 - [First vertical slice](docs/engineering/first-vertical-slice.md): the initial implementation target.
+- [Business implementation plan](docs/engineering/implementation-plan.md) and [task backlog](docs/engineering/implementation-backlog.md): delivery gates, dependencies, acceptance criteria and GitHub tasks.
 - [API draft](docs/engineering/api-contract.openapi.yaml): proposed orchestration endpoints.
 - [Acceptance criteria](docs/demo/evaluation-and-acceptance.md): evidence required for the demo.
+- [Security validation plan](docs/engineering/security-validation-plan.md): proposed adversarial tests and production evidence gates.
 - [Claims and limitations](docs/compliance/claims-and-limitations.md): prototype and standards boundaries.
 
 The demo is designed for synthetic data and simulated jurisdictions.
@@ -20,12 +24,16 @@ It does not establish legal KYC compliance, government approval, or production i
 
 ## Repository checks
 
-Use Node.js 22 with pnpm, and Python 3.11 or newer:
+The backend needs JDK 25 (Eclipse Temurin 25.0.5 or newer) with no other
+prerequisites besides Docker for integration tests; the frontend needs
+Node.js 22 with pnpm; repository validation needs Python 3.11 or newer.
 
 ```sh
-pnpm install
-pnpm typecheck
-pnpm test
+cd backend && ./mvnw verify
+./scripts/smoke-two-instance.sh
+pnpm --dir frontend install
+pnpm --dir frontend run build
+pnpm --dir frontend run lint
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python scripts/check_repository.py
@@ -33,9 +41,9 @@ python3 -m venv .venv
 
 The same checks run in GitHub Actions (`Application checks` and
 `Repository checks` workflows).
-They validate TypeScript compilation, unit tests, public file boundaries,
-local Markdown links, JSON and YAML syntax, and local references in the API
-draft.
+They validate the Java build and integration tests, the frontend build and
+lint, public file boundaries, local Markdown links, JSON and YAML syntax,
+and local references in the API draft.
 
 ## Contributing and reporting problems
 

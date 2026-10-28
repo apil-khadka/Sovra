@@ -1,0 +1,201 @@
+openapi: 3.1.0
+info:
+  title: Sovra implemented control-plane API (G1)
+  version: 0.1.0
+  description: >-
+    Exact contract of the implemented backend (SOV-005 through SOV-009).
+    Authentication is a Bearer service-account token except for the three
+    public federation-metadata reads. Error bodies are minimal by design:
+    404s carry empty bodies (never confirm or deny another tenant's
+    objects), 403s carry only a machine-readable reason code.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/health:
+    get:
+      operationId: health
+      summary: Public liveness probe with build identity
+      security: []
+      responses:
+        '200':
+          description: UP with service name and version
+  /api/whoami:
+    get:
+      operationId: whoami
+      summary: Caller identity without secrets
+      responses:
+        '200': { description: accountId, tenantId, name, roles }
+        '401': { description: Missing, unknown, revoked, or expired token }
+  /api/audit/events:
+    get:
+      operationId: listAuditEvents
+      summary: Tenant-scoped decision evidence, newest first
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        '200': { description: Audit rows for the caller's tenant }
+        '401': { description: Anonymous }
+        '403': { description: Lacks AUDIT_READER/TRUST_ADMIN }
+  /api/trust/snapshots/current:
+    get:
+      operationId: currentSnapshot
+      summary: Public active trust snapshot (issuers, keys, epochs, RP policies)
+      security: []
+      responses:
+        '200': { description: Active snapshot with version }
+        '404': { description: No active snapshot (empty body) }
+  /api/trust/proposals:
+    post:
+      operationId: proposeTrustChange
+      summary: Maker step of the two-person trust change
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuers, policies]
+              properties:
+                issuers: { type: array, items: { type: object } }
+                policies: { type: array, items: { type: object } }
+                note: { type: string }
+      responses:
+        '201': { description: version + proposalId }
+        '400': { description: Profile validation failure }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+  /api/trust/proposals/{id}/approve:
+    post:
+      operationId: approveTrustChange
+      summary: Checker step; the checker cannot be the maker
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Approved }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN, or self-approval }
+        '404': { description: Unknown proposal (empty body) }
+        '409': { description: Already decided }
+  /api/trust/snapshots/{version}/activate:
+    post:
+      operationId: activateSnapshot
+      summary: Move the active snapshot forward to an approved version
+      parameters:
+        - name: version
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: Activated }
+        '400': { description: No approved proposal, or not forward }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+  /api/issuance/credentials:
+    post:
+      operationId: issueCredential
+      summary: >-
+        Issue a synthetic credential. Retries with the same idempotency
+        key and request replay the original response byte-for-byte.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,128}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuerId, vct, holderJwk, holderProof, claims, expiresAt]
+              properties:
+                issuerId: { type: string }
+                vct: { type: string }
+                holderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+                holderProof:
+                  type: string
+                  description: >-
+                    ES256 JWS by the holder key over the canonical proof
+                    message (label, idempotency key, vct, holder
+                    thumbprint, exact claims)
+                claims:
+                  type: object
+                  description: 'Exactly {adultOver18: true} at G1'
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: More than 1 minute out, at most 366 days
+      responses:
+        '201': { description: credentialId, artifact (compact JWS), status, expiresAt, trustSnapshot }
+        '400': { description: Invalid request, scope, proof, or validity }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '422': { description: Same key, different request }
+        '503': { description: No active trust snapshot governs issuance }
+  /api/issuance/credentials/{id}:
+    get:
+      operationId: getCredential
+      summary: Credential metadata and status (no artifact, no holder binding)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Metadata }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/ISSUER_OPS }
+        '404': { description: Unknown or other-tenant credential (empty body) }
+  /api/issuance/credentials/{id}/status:
+    get:
+      operationId: credentialStatus
+      summary: Status evidence with fetch time and max age
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{status: VALID|REVOKED|UNKNOWN, fetchedAt, maxAgeSeconds}' }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/ISSUER_OPS }
+  /api/issuance/credentials/{id}/revoke:
+    post:
+      operationId: revokeCredential
+      summary: Terminal revocation (VALID becomes REVOKED, never the reverse)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: credentialId + status }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown or other-tenant credential (empty body) }
+  /api/issuance/jwks.json:
+    get:
+      operationId: issuerKeys
+      summary: Public verification keys of authorized issuers
+      security: []
+      responses:
+        '200': { description: JWKS with public keys only }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Service-account token; tenant and roles come from the token, never from headers

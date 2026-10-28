@@ -6,9 +6,9 @@ info:
     Custom illustrative control-plane API for synthetic Sovra demo.
     This is not normative VC/OID protocol conformance evidence.
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:8080/v1
 paths:
-  /api/plans:
+  /plans:
     post:
       operationId: proposePlan
       summary: Propose an evidence mapping using live eligible Meta model
@@ -26,7 +26,7 @@ paths:
               schema: { $ref: '#/components/schemas/CandidatePlan' }
         '422': { description: Input or source validation failure }
         '503': { description: Model/discovery unavailable }
-  /api/plans/{planId}/guard:
+  /plans/{planId}/guard:
     post:
       operationId: validatePlan
       parameters:
@@ -40,7 +40,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GuardVerdict' }
-  /api/verification-sessions:
+  /verification-sessions:
     post:
       operationId: createVerificationSession
       description: Requires separately validated and approved plan; server issues nonce/audience/expiry
@@ -59,7 +59,7 @@ paths:
       responses:
         '201': { description: Session created awaiting holder consent }
         '403': { description: Plan not approved }
-  /api/verification-sessions/{sessionId}/present:
+  /verification-sessions/{sessionId}/present:
     post:
       operationId: presentEvidence
       description: Requires consent and challenge-bound holder proof; only credential-safe bytes
@@ -124,3 +124,16 @@ components:
         accepted_for_consideration: { type: boolean }
         code: { type: string }
         reason: { type: string }
+    Envelope:
+      type: object
+      description: >-
+        Runtime error envelope (R5). `retryable` tells callers whether
+        retrying later can succeed; rejected plans and invalid proofs
+        never become valid on retry.
+      required: [code, httpStatus, retryable, reason, correlationId]
+      properties:
+        code: { type: string }
+        httpStatus: { type: integer }
+        retryable: { type: boolean }
+        reason: { type: string }
+        correlationId: { type: string }

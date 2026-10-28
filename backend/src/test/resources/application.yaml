@@ -1,0 +1,54 @@
+# Test overrides. This file SHADOWS the main application.yaml (same
+# classpath location wins wholesale), so it repeats every main setting
+# plus test-only values. If the main file gains a key, mirror it here.
+server:
+  port: 8080
+
+spring:
+  application:
+    name: sovra-backend
+  datasource:
+    url: ${SOVRA_DB_URL:jdbc:postgresql://localhost:5432/sovra}
+    username: ${SOVRA_DB_USER:sovra}
+    password: ${SOVRA_DB_PASSWORD:changeme}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    # Migrations run as the schema owner; the app itself connects as the
+    # least-privilege role. Splitting migrate from serve into separate
+    # jobs is SOV-027 platform work; the roles already differ here.
+    user: ${SOVRA_DB_ADMIN_USER:sovra}
+    password: ${SOVRA_DB_ADMIN_PASSWORD:changeme}
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  # Virtual threads for blocking JDBC I/O; does not speed up single computations.
+  threads:
+    virtual:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+sovra:
+  # Injected from the Maven build; see pom.xml resource filtering.
+  version: "@project.version@"
+  # Signing backend: local-dev (G1 synthetic double, needs both arming
+  # flags below) or kms (production; arrives with the G2 provider pick).
+  signer: local-dev
+  synthetic-issuers:
+    enabled: true
+    acknowledge-non-production: true

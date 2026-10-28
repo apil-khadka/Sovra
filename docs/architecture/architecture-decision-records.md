@@ -1,11 +1,12 @@
-# Architecture decision records (candidate decisions)
+# Architecture decision records
 
-The statuses below indicate *design choices*, not implemented or independently audited properties. They reconcile the October 26 architecture review and October 27 AI-native product decision.
+The statuses below indicate *design choices*, not implemented or independently audited properties.
+They reconcile the October 26 architecture review, October 27 AI-native product decision, and subsequent selection of a Java backend for the long-term business.
 
 | ADR | Status | Decision and rationale | Revisit when |
 | --- | --- | --- | --- |
 | 001 Federated authority | Adopted premise | Country issuer domains own sources and signing authority; public metadata federation; no global citizen data store | Genuine multi-country governance offered |
-| 002 Few deployables | Proposed MVP | Modular TS backend; two country instances with separate data/config/keys; avoid default microservice sprawl | Independent scaling/team ownership justified |
+| 002 Few deployables | Accepted direction | Modular Java/Spring backend; issuer instances keep separate data/config/keys; small number of deployables | Independent scaling/team ownership justified |
 | 003 Narrow attestations | Proposed MVP | Use signed `age_over_18` attestations, **not** UI-redacted JWTs or fake ZK | Tested SD-JWT or proof profile available |
 | 004 Standards honesty | Proposed MVP | First build explicit demo signed-proof API; only claim OID4VCI/VP conformance when tested end-to-end against chosen profile | Reliable interoperable SDK confirmed |
 | 005 Trust scope | Required design | Trust decision must bind issuer + credential type + authorization scope + trust epoch + purpose | Real issuer accreditation available |
@@ -16,5 +17,22 @@ The statuses below indicate *design choices*, not implemented or independently a
 | 010 Observability | Proposed MVP | Sanitize tool/correlation traces; metric counts and rejection reasons | Real user data introduced |
 | 011 Evidence vs KYC | Required design | Return verifiable evidence, **not** a regulator's CDD verdict | Regulated RP contract and legal review |
 | 012 Build AI-native | Proposed differentiator | Test *unseen* issuer schema + policy mapping with tool grounding against static baseline | Model incapable of reliable mapping on tests |
+| 021 Java backend | Accepted direction | Java 25, the latest released LTS, with Spring Boot and PostgreSQL; security and maintainability take priority; supersedes the TypeScript backend target | Runtime/support requirements or verified implementation evidence require a change |
+| 022 Spring AI | Selected integration direction | Use Spring AI behind the advisory planner boundary; validate the exact Meta endpoint and keep all authorization deterministic | Selected provider fails the live contract test |
+| 023 Security assurance evidence | Proposed production gate | Target applicable OWASP ASVS 5.0.0 requirements through Level 3, adversarial boundary tests, and independent review before real sensitive data | Threat model or deployment/data scope changes |
+| 024 Local document custody | Selected business scope | Issuer-local images, extraction/review records, and encryption authority; shared discovery/developer control contains no citizen/source-record index | Approved operating, processing, or jurisdiction model changes |
+| 025 Document encryption | Proposed crypto profile | Reviewed per-object-version envelope encryption/AEAD with KMS/HSM wrapping, authenticated context, and no plaintext before verification; hashes alone are insufficient | Independent profile/key-lifecycle review identifies a better supported design |
+| 026 Identity lifecycle | Required design | Opaque local record IDs, evidence/holder validation, reviewed source revisions, and separately issued credentials; ID creation/OCR is not identity proof | Chosen assurance/protocol profile requires a documented change |
+| 027 Developer platform | Selected business scope | Standard-described custom APIs, Java/TypeScript SDKs, organization/app onboarding, and issuer/holder/RP/federation dashboards using the same authorization boundaries | API/profile/customer integration evidence requires a scope change |
+| 028 Privileged authority | Required production design | Phishing-resistant privileged enrollment/recovery, bounded elevation, independent high-impact approval and separate workload/deploy/migration/key/audit identities; inventory remaining root overrides | Provider, issuer governance or administrative threat boundary changes |
+| 029 Security-preserving recovery | Required production design | Fence obsolete writers and reconcile or invalidate ambiguous replay/revocation/trust/approval state before serving; rollback and failover retain locality and current authority | Store topology, recovery mechanism or approved RPO/RTO changes |
+| 030 Cache and key-copy authority | Required production design | Declare and test token/grant/DEK/permission cache bounds, independent restored-key copies and control/data-plane limitations; current deny policy cannot be bypassed by fallback | Provider behavior, cache policy or key lifecycle changes |
+| 031 Runtime and artifact trust | Required production design | Isolate hostile processing outside the Java runtime; admit only approved source/builder/digest/configuration/runtime identity and assess host/root visibility and conditional attestation | Runtime, build system, provider or accepted host threat changes |
+| 032 Mission-critical evidence | Required production gate | Semantic readiness and isolated representative staging; all applicable SEC, MC-01 through MC-10 and ASVS evidence plus independent review before real data/customer operation | Threat model, deployment or release scope changes |
+| 033 Full proof profile | Proposed G0 | [SOV-001](decisions/SOV-001-proof-profile.md): OID4VCI/VP 1.0 Final + RFC 9901 SD-JWT + SD-JWT VC draft-22, ES256, KeyBinding JWT; walt-id v1.2.0 conditional on registry, conformance, and review evidence | Independent review rejects the profile or a library condition fails |
+| 034 Locality/custody/root boundary | Proposed G0 | [SOV-002](decisions/SOV-002-locality-custody-boundaries.md): hybrid holder custody, provider rules with deferred pick, mandatory TEE attestation before real data | Independent, legal, or issuer-authority review requires changes |
+| 035 Provider/key/cache contracts | Proposed G0 | [SOV-004](decisions/SOV-004-provider-key-cache-contracts.md): walt-id v1.2.0 coordinates on maven.waltid.dev, ES256/AES-256-GCM envelope, narrow signer interfaces, 2-person approvals, bounded caches with deny-wins | Independent review rejects the contracts or registry/coordinates change |
 
-See the private local review in `.intel/sources/02-trustmesh-architecture-review-v2-2026-10-26.md` (ignored by Git, not part of the public repository) for earlier G01–G18 gap records, consistency contracts, and infrastructure and production alternatives.
+See the [Java/Spring baseline](java-spring-baseline.md) for the verified version candidates, dependency/support boundaries, and migration gates.
+The [security validation plan](../engineering/security-validation-plan.md) defines required tests and evidence; neither document claims that the Java backend exists or has passed security assessment.
+The [implementation backlog](../engineering/implementation-backlog.md) assigns these design requirements to dependency-ordered work with explicit acceptance criteria.

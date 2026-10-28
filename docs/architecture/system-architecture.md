@@ -22,9 +22,24 @@ flowchart LR
   V -- issuer and status lookup --> R
 ```
 
-## Suggested implementation shape
+## Selected implementation direction
 
-Start with a **TypeScript modular monorepo** and a few deployable processes, not enterprise microservices. Suggested directories: `apps/web` (holder/verifier demo), `apps/country-node` (instantiated with separate configs, signing keys, databases), `apps/federation` (issuer trust metadata), `apps/verifier` (verification and replay protection); `packages/credentials`, `packages/policy`, `packages/ai`, `packages/shared`; `tests/fixtures` and end-to-end tests. Logical boundaries matter more than number of Docker containers.
+Use **Java 25 LTS, Spring Boot, Spring Security, Spring AI, and PostgreSQL** for the selected business backend.
+The [Java/Spring baseline](java-spring-baseline.md) records verified version candidates and the required security and interoperability gates.
+This supersedes the TypeScript backend target; the current TypeScript libraries and tests remain prototype artifacts until the Java migration is implemented and verified.
+
+Keep issuer, verifier, trust metadata, consent, and advisory planner modules behind explicit interfaces, with a small number of deployable processes.
+Issuer instances retain separate configuration, signing permissions, and databases for their authority boundaries.
+The browser UI can remain React/TypeScript and communicate through versioned API contracts.
+Logical trust boundaries matter more than the number of containers.
+
+## Issuer-local document and developer workflows
+
+The business scope also includes an issuer-local encrypted document vault, constrained extraction/review workers, enrollment and source revision workflows, and role-specific dashboards.
+The [document lifecycle](federated-document-lifecycle.md) separates source integrity, candidate extracted values, identity/holder validation, and approved issuer claims.
+Shared federation/developer services publish approved organizational/capability metadata; subject documents, personal extraction values, digests, and encryption authority stay at the owning node.
+The [developer platform](../engineering/developer-platform.md) describes standard mechanisms and Sovra-specific API resources, SDK contracts, and dashboard responsibilities.
+Its [issuer-node API draft](../engineering/issuer-node-api.openapi.yaml) is a design artifact, not a running or conformant credential service.
 
 ## Trust boundaries
 
@@ -33,6 +48,15 @@ Start with a **TypeScript modular monorepo** and a few deployable processes, not
 3. Registry publishes **public issuer metadata** and trusted accreditation/keys/status endpoints, not identity records.
 4. Planner receives policies, schema metadata, capability descriptions and *non-sensitive* request context; it must not receive raw passport scans, biometrics or unnecessary PII.
 5. Verifier checks proofs locally and applies its own decision policy. Signed claims are evidence, not automatic legal compliance.
+
+## Required production control boundaries
+
+The deployment separates signing, decryption, hostile-file workers, review, deployment/migration and audit identities even where application modules share a repository.
+Privileged access uses phishing-resistant enrollment/recovery and bounded elevation; ultimate host/root powers remain an explicit deployment decision.
+Recovery fences old writers and preserves or invalidates replay/revocation/trust/approval state before traffic resumes.
+Key-copy/cache inventories, artifact admission and semantic readiness are part of the architecture, with measured SEC/MC evidence required for real data.
+The [implementation plan](../engineering/implementation-plan.md) and [task backlog](../engineering/implementation-backlog.md) define the gates and dependencies.
+The [consistency contract](consistency-and-failure-modes.md) defines security-preserving outage, rollback and recovery behavior.
 
 ## Minimal happy path
 
