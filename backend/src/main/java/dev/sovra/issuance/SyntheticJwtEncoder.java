@@ -18,9 +18,9 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class SyntheticJwtEncoder implements CredentialEncoder {
 
-  static final String CONTENT_TYPE = "vnd.sovra.synthetic-credential+jwt";
-  static final String PROFILE = "sovra-g1-synthetic/0.2";
-  static final String ADULT_VCT = "https://sovra.example/vct/adult-status/1";
+  public static final String CONTENT_TYPE = "vnd.sovra.synthetic-credential+jwt";
+  public static final String PROFILE = "sovra-g1-synthetic/0.2";
+  public static final String ADULT_VCT = "https://sovra.example/vct/adult-status/1";
 
   private final IssuerSigner signer;
   private final ObjectMapper mapper;

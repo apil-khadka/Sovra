@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   ConsentApiError,
+  exportPrivateKey,
   fetchPresentation,
   fetchReview,
   generateHolder,
@@ -96,6 +97,16 @@ export default function ConsentView() {
     setStage({ kind: 'idle' })
   }
 
+  async function onCopyKey() {
+    if (holder === null) return
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(await exportPrivateKey(holder)))
+      setKeyStatus('Private JWK copied: paste it into the verify view.')
+    } catch {
+      setKeyStatus('This browser refused clipboard access.')
+    }
+  }
+
   const holderMatches =
     stage.kind === 'review' && holder !== null
       ? holder.thumbprint === stage.review.holderThumbprint
@@ -146,6 +157,11 @@ export default function ConsentView() {
             </button>
             {holder !== null && (
               <code className="mono wrap">holder: {holder.thumbprint}</code>
+            )}
+            {holder !== null && (
+              <button type="button" onClick={() => void onCopyKey()}>
+                Copy private JWK
+              </button>
             )}
             {keyStatus !== '' && <p>{keyStatus}</p>}
           </div>

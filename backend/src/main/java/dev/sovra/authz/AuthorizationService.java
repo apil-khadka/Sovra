@@ -21,21 +21,25 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 3;
+  static final long RULES_VERSION = 4;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
-      Map.of(
-          Action.ISSUE_CREDENTIAL, Set.of("ISSUER_OPS"),
-          Action.READ_CREDENTIAL, Set.of("TENANT_MEMBER", "ISSUER_OPS"),
-          Action.PROPOSE_TRUST_CHANGE, Set.of("TRUST_ADMIN"),
-          Action.APPROVE_TRUST_CHANGE, Set.of("TRUST_ADMIN"),
-          Action.ACTIVATE_TRUST_SNAPSHOT, Set.of("TRUST_ADMIN"),
-          Action.READ_AUDIT, Set.of("AUDIT_READER", "TRUST_ADMIN"),
-          Action.REQUEST_PROOF, Set.of("RP_CLIENT"),
-          Action.READ_CONSENT, Set.of("TENANT_MEMBER", "RP_CLIENT"),
+      Map.ofEntries(
+          Map.entry(Action.ISSUE_CREDENTIAL, Set.of("ISSUER_OPS")),
+          Map.entry(Action.READ_CREDENTIAL, Set.of("TENANT_MEMBER", "ISSUER_OPS")),
+          Map.entry(Action.PROPOSE_TRUST_CHANGE, Set.of("TRUST_ADMIN")),
+          Map.entry(Action.APPROVE_TRUST_CHANGE, Set.of("TRUST_ADMIN")),
+          Map.entry(Action.ACTIVATE_TRUST_SNAPSHOT, Set.of("TRUST_ADMIN")),
+          Map.entry(Action.READ_AUDIT, Set.of("AUDIT_READER", "TRUST_ADMIN")),
+          Map.entry(Action.REQUEST_PROOF, Set.of("RP_CLIENT")),
+          Map.entry(Action.READ_CONSENT, Set.of("TENANT_MEMBER", "RP_CLIENT")),
           // Transport authentication only: the holder key proof carries the
           // decision authority, so either tenant agent may deliver it.
-          Action.DECIDE_CONSENT, Set.of("TENANT_MEMBER", "RP_CLIENT"));
+          Map.entry(Action.DECIDE_CONSENT, Set.of("TENANT_MEMBER", "RP_CLIENT")),
+          // Verification runs for the relying party that will consume the
+          // decision; either tenant agent may retrieve a stored decision.
+          Map.entry(Action.VERIFY_PRESENTATION, Set.of("RP_CLIENT")),
+          Map.entry(Action.READ_VERIFICATION, Set.of("TENANT_MEMBER", "RP_CLIENT")));
 
   private final ServiceAccountRepository accounts;
   private final EmergencyFlagService emergency;

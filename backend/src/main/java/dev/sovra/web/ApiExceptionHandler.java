@@ -11,6 +11,9 @@ import dev.sovra.issuance.SigningRefusedException;
 import dev.sovra.issuance.TrustUnavailableException;
 import dev.sovra.tenancy.TenantRequiredException;
 import dev.sovra.trust.AlreadyDecidedException;
+import dev.sovra.verification.InvalidVerificationException;
+import dev.sovra.verification.VerificationConflictException;
+import dev.sovra.verification.VerificationNotFoundException;
 import dev.sovra.trust.InvalidProposalException;
 import dev.sovra.trust.ProposalNotFoundException;
 import java.util.Map;
@@ -38,7 +41,8 @@ public class ApiExceptionHandler {
     TenantMismatchException.class,
     ProposalNotFoundException.class,
     CredentialNotFoundException.class,
-    ConsentNotFoundException.class
+    ConsentNotFoundException.class,
+    VerificationNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -54,6 +58,7 @@ public class ApiExceptionHandler {
     InvalidProposalException.class,
     InvalidIssuanceException.class,
     InvalidConsentException.class,
+    InvalidVerificationException.class,
     MethodArgumentNotValidException.class,
     MissingRequestHeaderException.class,
     HttpMessageNotReadableException.class,
@@ -67,6 +72,12 @@ public class ApiExceptionHandler {
   public ResponseEntity<Map<String, String>> idempotencyConflict() {
     return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
         .body(Map.of("error", "idempotency_conflict"));
+  }
+
+  @ExceptionHandler(VerificationConflictException.class)
+  public ResponseEntity<Map<String, String>> verificationConflict() {
+    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+        .body(Map.of("error", "verification_conflict"));
   }
 
   @ExceptionHandler(TrustUnavailableException.class)

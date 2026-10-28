@@ -98,8 +98,13 @@ export async function signConsent(
   review: ConsentReview,
   decision: 'approve' | 'deny',
 ): Promise<string> {
+  return signMessage(holder, consentMessage(review, decision))
+}
+
+/** ES256 JWS over an arbitrary canonical message (consent, presentation). */
+export async function signMessage(holder: HolderKey, message: string): Promise<string> {
   const header = base64UrlEncodeText('{"alg":"ES256"}')
-  const payload = base64UrlEncodeText(consentMessage(review, decision))
+  const payload = base64UrlEncodeText(message)
   const signature = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
     holder.privateKey,
@@ -109,6 +114,29 @@ export async function signConsent(
   const raw = new Uint8Array(signature)
   if (raw.length !== 64) throw new Error('unexpected signature size')
   return `${header}.${payload}.${base64Url(raw)}`
+}
+
+/** Export the private half so the verifier demo can import the same key. */
+export async function exportPrivateKey(holder: HolderKey): Promise<JsonWebKey> {
+  return crypto.subtle.exportKey('jwk', holder.privateKey)
+}
+
+/** Import a previously exported holder private key. */
+export async function importHolder(privateJwk: JsonWebKey): Promise<HolderKey> {
+  const privateKey = await crypto.subtle.importKey(
+    'jwk',
+    privateJwk,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true,
+    ['sign'],
+  )
+  const full = await crypto.subtle.exportKey('jwk', privateKey)
+  const publicJwk: JsonWebKey = { kty: 'EC', crv: 'P-256', x: full.x, y: full.y }
+  return { privateKey, jwk: publicJwk, thumbprint: await thumbprint(publicJwk) }
+}
+
+export function randomNonce(): string {
+  return base64Url(crypto.getRandomValues(new Uint8Array(24)))
 }
 
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {

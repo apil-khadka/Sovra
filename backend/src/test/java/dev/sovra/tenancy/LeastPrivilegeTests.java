@@ -340,6 +340,75 @@ class LeastPrivilegeTests extends SovraPostgresBase {
   }
 
   @Test
+  void appRoleSeesOnlyOwnTenantDecisions() throws Exception {
+    TestAccount accountA = TestAccounts.create(owner, "ver-a", Set.of("RP_CLIENT"));
+    TestAccount accountB = TestAccounts.create(owner, "ver-b", Set.of("RP_CLIENT"));
+    UUID idA = seedVerificationDecision(accountA);
+    UUID idB = seedVerificationDecision(accountB);
+
+    setTenant(accountA.tenantId());
+    assertThat(decisionIds()).containsExactly(idA);
+    setTenant(accountB.tenantId());
+    assertThat(decisionIds()).containsExactly(idB);
+  }
+
+  @Test
+  void appRoleCannotRewriteDecisions() throws Exception {
+    TestAccount account = TestAccounts.create(owner, "ver-frozen", Set.of("RP_CLIENT"));
+    UUID id = seedVerificationDecision(account);
+    setTenant(account.tenantId());
+    // Stored decisions are immutable: no outcome, reason, or response
+    // rewrite, and no deletion — follow-ups are separate records.
+    assertThatThrownBy(
+            () -> {
+              try (Statement stmt = app.createStatement()) {
+                stmt.executeUpdate(
+                    "UPDATE verification_decision SET outcome = 'ACCEPTED' WHERE id = '" + id
+                        + "'");
+              }
+            })
+        .isInstanceOf(PSQLException.class)
+        .hasMessageContaining("permission denied");
+    assertThatThrownBy(
+            () -> {
+              try (Statement stmt = app.createStatement()) {
+                stmt.executeUpdate("DELETE FROM verification_decision WHERE id = '" + id + "'");
+              }
+            })
+        .isInstanceOf(PSQLException.class)
+        .hasMessageContaining("permission denied");
+  }
+
+  private UUID seedVerificationDecision(TestAccount account) {
+    UUID requestId = seedProofRequest(account);
+    UUID credentialId =
+        owner.queryForObject(
+            "SELECT credential_id FROM proof_request WHERE id = ?", UUID.class, requestId);
+    return owner.queryForObject(
+        "INSERT INTO verification_decision (tenant_id, request_id, credential_id, nonce,"
+            + " request_hash, rp_id, audience, outcome, reason_code, response_body,"
+            + " trust_snapshot_version, decided_by)"
+            + " VALUES (?, ?, ?, '0123456789abcdef0123456789abcdef', 'hash', 'rp', 'aud',"
+            + " 'REJECTED', 'CONSENT_NOT_APPROVED', '{}', 1, 't')"
+            + " RETURNING id",
+        UUID.class,
+        account.tenantId(),
+        requestId,
+        credentialId);
+  }
+
+  private List<UUID> decisionIds() throws Exception {
+    try (Statement stmt = app.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT id FROM verification_decision")) {
+      List<UUID> ids = new ArrayList<>();
+      while (rs.next()) {
+        ids.add(rs.getObject(1, UUID.class));
+      }
+      return ids;
+    }
+  }
+
+  @Test
   void appRoleCanReadAccountsForAuthentication() throws Exception {
     TestAccounts.create(owner, "readable", Set.of("TENANT_MEMBER"));
     try (Statement stmt = app.createStatement();

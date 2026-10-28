@@ -43,6 +43,32 @@ public final class HolderProofs {
     }
   }
 
+  /**
+   * Verifies an ES256 compact JWS signature over its own signing input,
+   * without comparing the payload. Callers check the decoded payload
+   * field by field after this returns the split parts.
+   */
+  public static String[] verifySignature(ECPublicKey key, String jws) {
+    try {
+      String[] parts = jws.split("\\.", -1);
+      if (parts.length != 3) {
+        throw new HolderProofException("signature container is malformed");
+      }
+      Signature signature = Signature.getInstance("SHA256withECDSA");
+      signature.initVerify(key);
+      signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
+      byte[] der = ECDSA.transcodeSignatureToDER(Base64URL.from(parts[2]).decode());
+      if (!signature.verify(der)) {
+        throw new HolderProofException("signature is invalid");
+      }
+      return parts;
+    } catch (HolderProofException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new HolderProofException("signature is invalid", e);
+    }
+  }
+
   /** Verifies an ES256 JWS whose payload is exactly {@code expectedMessage}. */
   public static void verifyEs256(
       ECPublicKey holderKey, String proof, String expectedMessage, ObjectMapper mapper) {

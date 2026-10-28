@@ -307,6 +307,69 @@ paths:
         '401': { description: Anonymous }
         '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
         '404': { description: No verified consent, or other-tenant request (empty body) }
+  /api/verification/presentations:
+    post:
+      operationId: verifyPresentation
+      summary: >-
+        Evaluate one presentation against an approved proof request and
+        commit an immutable ACCEPTED, REJECTED, or UNKNOWN decision with
+        its audit row. Checks signature, issuer/key scope, type/claims,
+        holder, time, status, audience, consent, policy, and the fresh
+        nonce before acceptance. The same nonce replays the stored
+        response byte-for-byte; a fresh nonce permits a new attempt;
+        the same nonce with different content conflicts without
+        rewriting the stored decision.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, nonce, audience, holderJwk, bindingProof]
+              properties:
+                requestId:
+                  type: string
+                  format: uuid
+                nonce:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{16,128}$'
+                  description: Verifier-chosen fresh value; one decision per nonce
+                audience:
+                  type: string
+                  description: Session audience; must equal the consented audience
+                holderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+                bindingProof:
+                  type: string
+                  description: >-
+                    ES256 JWS by the holder key over the canonical
+                    presentation message (label, request id, nonce,
+                    audience, holder thumbprint)
+      responses:
+        '200': { description: '{decisionId, requestId, outcome, reasonCode, synthetic, profile, trustSnapshot, decidedAt}' }
+        '400': { description: Malformed submission envelope }
+        '401': { description: Anonymous }
+        '403': { description: Lacks RP_CLIENT }
+        '404': { description: Unknown or other-tenant request (empty body) }
+        '422': { description: Nonce already decided different content (original preserved) }
+  /api/verification/decisions/{id}:
+    get:
+      operationId: getVerificationDecision
+      summary: >-
+        Authorized retrieval of an already committed verification
+        decision; retrieval never creates or rewrites a decision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Stored decision with outcome and reason }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '404': { description: Unknown or other-tenant decision (empty body) }
 components:
   securitySchemes:
     bearerAuth:

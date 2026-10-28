@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import ConsentView from './ConsentView'
+import VerifyView from './VerifyView'
 
 interface Health {
   status: string
@@ -14,7 +15,7 @@ type State =
 
 export default function App() {
   const [state, setState] = useState<State>({ kind: 'loading' })
-  const [view, setView] = useState<'status' | 'consent'>('status')
+  const [view, setView] = useState<'status' | 'consent' | 'verify'>('status')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -45,6 +46,9 @@ export default function App() {
         <button type="button" onClick={() => setView('consent')} aria-pressed={view === 'consent'}>
           Holder consent
         </button>
+        <button type="button" onClick={() => setView('verify')} aria-pressed={view === 'verify'}>
+          Verify presentation
+        </button>
       </nav>
       {view === 'status' && (
         <>
@@ -65,6 +69,7 @@ export default function App() {
         </>
       )}
       {view === 'consent' && <ConsentView />}
+      {view === 'verify' && <VerifyView />}
     </main>
   )
 }
