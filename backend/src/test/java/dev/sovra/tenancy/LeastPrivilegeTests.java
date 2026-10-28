@@ -266,6 +266,69 @@ class LeastPrivilegeTests extends SovraPostgresBase {
   }
 
   @Test
+  void appRoleMayBumpCredentialStatusVersion() throws Exception {
+    TestAccount account = TestAccounts.create(owner, "status-ver", Set.of("ISSUER_OPS"));
+    UUID id = seedCredential(account);
+    setTenant(account.tenantId());
+    // The terminal revocation flip and its version bump are the only
+    // credential writes; artifact and identity columns stay frozen.
+    try (Statement stmt = app.createStatement()) {
+      int updated =
+          stmt.executeUpdate(
+              "UPDATE credential_artifact SET status = 'REVOKED',"
+                  + " status_version = status_version + 1 WHERE id = '" + id + "'");
+      assertThat(updated).isEqualTo(1);
+    }
+    Long version =
+        owner.queryForObject(
+            "SELECT status_version FROM credential_artifact WHERE id = ?", Long.class, id);
+    assertThat(version).isEqualTo(2);
+  }
+
+  @Test
+  void appRoleRevocationsAreTerminalByGrants() throws Exception {
+    TestAccount account = TestAccounts.create(owner, "rev-term", Set.of("ISSUER_OPS"));
+    setTenant(account.tenantId());
+    // Reads see the live revocation state every caller honors.
+    try (Statement stmt = app.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM issuer_key_revocation")) {
+      rs.next();
+      assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(0);
+    }
+    // New revocations append; nothing rewrites or removes one.
+    try (Statement stmt = app.createStatement()) {
+      int inserted =
+          stmt.executeUpdate(
+              "INSERT INTO issuer_key_revocation"
+                  + " (issuer_id, key_id, key_version, revoked_by, reason)"
+                  + " VALUES ('test-issuer', 'test-key', 1, 'least-privilege', 'drill')");
+      assertThat(inserted).isEqualTo(1);
+    }
+    try {
+      assertThatThrownBy(
+              () -> {
+                try (Statement stmt = app.createStatement()) {
+                  stmt.executeUpdate(
+                      "UPDATE issuer_key_revocation SET reason = 'x'"
+                          + " WHERE issuer_id = 'test-issuer'");
+                }
+              })
+          .isInstanceOf(PSQLException.class)
+          .hasMessageContaining("permission denied");
+      assertThatThrownBy(
+              () -> {
+                try (Statement stmt = app.createStatement()) {
+                  stmt.executeUpdate("DELETE FROM issuer_key_revocation");
+                }
+              })
+          .isInstanceOf(PSQLException.class)
+          .hasMessageContaining("permission denied");
+    } finally {
+      owner.update("DELETE FROM issuer_key_revocation WHERE issuer_id = 'test-issuer'");
+    }
+  }
+
+  @Test
   void appRoleSeesOnlyOwnTenantProofRequests() throws Exception {
     TestAccount accountA = TestAccounts.create(owner, "cons-a", Set.of("RP_CLIENT"));
     TestAccount accountB = TestAccounts.create(owner, "cons-b", Set.of("RP_CLIENT"));

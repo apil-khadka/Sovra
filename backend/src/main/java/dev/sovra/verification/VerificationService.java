@@ -108,6 +108,8 @@ public class VerificationService {
       boolean synthetic,
       String profile,
       long trustSnapshot,
+      String keyRef,
+      long statusVersion,
       Instant decidedAt) {}
 
   /**
@@ -156,11 +158,12 @@ public class VerificationService {
       tenant.update(
           "INSERT INTO verification_decision (id, tenant_id, request_id, credential_id, nonce,"
               + " request_hash, rp_id, audience, outcome, reason_code, response_body,"
-              + " trust_snapshot_version, decided_at, decided_by)"
-              + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              + " trust_snapshot_version, key_ref, status_version, decided_at, decided_by)"
+              + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           decisionId, caller.tenantId(), request.requestId(), stored.credentialId(),
           request.nonce(), validated.hash(), stored.rpId(), request.audience(),
           evaluated.outcome(), evaluated.reason(), response, evaluated.snapshot(),
+          evaluated.keyRef(), evaluated.statusVersion(),
           java.sql.Timestamp.from(now), caller.name());
       connection.releaseSavepoint(savepoint);
     } catch (DuplicateKeyException e) {
@@ -203,7 +206,8 @@ public class VerificationService {
     }
     List<DecisionView> rows =
         tenant.query(
-            "SELECT id, request_id, outcome, reason_code, trust_snapshot_version, decided_at"
+            "SELECT id, request_id, outcome, reason_code, trust_snapshot_version, key_ref,"
+                + " status_version, decided_at"
                 + " FROM verification_decision WHERE id = ? AND tenant_id = ?",
             (rs, row) ->
                 new DecisionView(
@@ -214,6 +218,8 @@ public class VerificationService {
                     true,
                     PROFILE,
                     rs.getLong("trust_snapshot_version"),
+                    rs.getString("key_ref"),
+                    rs.getLong("status_version"),
                     rs.getTimestamp("decided_at").toInstant()),
             decisionId,
             caller.tenantId());
@@ -250,9 +256,16 @@ public class VerificationService {
 
   private record Credential(
       UUID id, String issuerId, String vct, String holderThumbprint, Instant expiresAt,
-      String artifact) {}
+      String artifact, String keyRef) {}
 
-  private record Evaluated(String outcome, String reason, long snapshot) {}
+  /**
+   * Consulted evidence versions: snapshot, key reference, and status
+   * version actually behind the outcome. Versions stay zero-valued
+   * until their dependency is consulted, so a stale or missing
+   * authority is recorded as exactly that (SOV-012).
+   */
+  private record Evaluated(String outcome, String reason, long snapshot, String keyRef,
+      long statusVersion) {}
 
   private record DecisionRow(String requestHash, String responseBody) {}
 
@@ -290,29 +303,35 @@ public class VerificationService {
   private Evaluated evaluate(VerifyRequest request, StoredRequest stored, Credential credential) {
     Instant now = clock.instant();
     if (!"APPROVED".equals(stored.state()) || stored.consentArtifact() == null) {
-      return new Evaluated(OUTCOME_REJECTED, "CONSENT_NOT_APPROVED", 0);
+      return new Evaluated(OUTCOME_REJECTED, "CONSENT_NOT_APPROVED", 0, "", 0);
     }
     if (!stored.expiresAt().isAfter(now)) {
-      return new Evaluated(OUTCOME_REJECTED, "CONSENT_EXPIRED", 0);
+      return new Evaluated(OUTCOME_REJECTED, "CONSENT_EXPIRED", 0, "", 0);
     }
     if (!credential.expiresAt().isAfter(now)) {
-      return new Evaluated(OUTCOME_REJECTED, "CREDENTIAL_EXPIRED", 0);
+      return new Evaluated(OUTCOME_REJECTED, "CREDENTIAL_EXPIRED", 0, "", 0);
     }
     StatusEvidenceFetcher.StatusEvidence evidence = fetchStatus(credential.id());
     if (evidence == null) {
-      return new Evaluated(OUTCOME_UNKNOWN, "STATUS_UNAVAILABLE", 0);
+      return new Evaluated(OUTCOME_UNKNOWN, "STATUS_UNAVAILABLE", 0, "", 0);
+    }
+    if (!evidence.fresh(now)) {
+      // Stale evidence is recorded with its version but never decides.
+      return new Evaluated(OUTCOME_UNKNOWN, "STATUS_STALE", 0, "", evidence.version());
     }
     if (evidence.status() == StatusEvidenceFetcher.Status.REVOKED) {
-      return new Evaluated(OUTCOME_REJECTED, "CREDENTIAL_REVOKED", 0);
+      return new Evaluated(OUTCOME_REJECTED, "CREDENTIAL_REVOKED", 0, "", evidence.version());
     }
     if (evidence.status() == StatusEvidenceFetcher.Status.UNKNOWN) {
-      return new Evaluated(OUTCOME_UNKNOWN, "STATUS_UNKNOWN", 0);
+      return new Evaluated(OUTCOME_UNKNOWN, "STATUS_UNKNOWN", 0, "", evidence.version());
     }
-    Optional<TrustService.SnapshotView> current = snapshots.current();
+    Optional<TrustService.SnapshotView> current = fetchSnapshot();
     if (current.isEmpty()) {
-      return new Evaluated(OUTCOME_UNKNOWN, "TRUST_UNAVAILABLE", 0);
+      return new Evaluated(OUTCOME_UNKNOWN, "TRUST_UNAVAILABLE", 0, "", evidence.version());
     }
     TrustService.SnapshotView snapshot = current.get();
+    String keyRef = credential.keyRef();
+    long statusVersion = evidence.version();
     try {
       SyntheticArtifactVerifier.verify(
           credential.artifact(),
@@ -321,24 +340,29 @@ public class VerificationService {
               credential.id(), credential.expiresAt()),
           snapshot, tenant, mapper, now);
     } catch (SyntheticArtifactVerifier.ArtifactFailure e) {
-      return new Evaluated(OUTCOME_REJECTED, e.reason(), snapshot.version());
+      return new Evaluated(OUTCOME_REJECTED, e.reason(), snapshot.version(), keyRef,
+          statusVersion);
     }
     if (!policyAllows(snapshot, stored, credential)) {
-      return new Evaluated(OUTCOME_REJECTED, "POLICY_DENIED", snapshot.version());
+      return new Evaluated(OUTCOME_REJECTED, "POLICY_DENIED", snapshot.version(), keyRef,
+          statusVersion);
     }
     ECPublicKey holderKey;
     try {
       holderKey = HolderProofs.parseP256Key(request.holderJwk());
     } catch (HolderProofException e) {
-      return new Evaluated(OUTCOME_REJECTED, "HOLDER_KEY_INVALID", snapshot.version());
+      return new Evaluated(OUTCOME_REJECTED, "HOLDER_KEY_INVALID", snapshot.version(), keyRef,
+          statusVersion);
     }
     String thumbprint = LocalDevSigner.thumbprint(
         holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
     if (!credential.holderThumbprint().equals(thumbprint)) {
-      return new Evaluated(OUTCOME_REJECTED, "HOLDER_MISMATCH", snapshot.version());
+      return new Evaluated(OUTCOME_REJECTED, "HOLDER_MISMATCH", snapshot.version(), keyRef,
+          statusVersion);
     }
     if (!stored.audience().equals(request.audience())) {
-      return new Evaluated(OUTCOME_REJECTED, "AUDIENCE_MISMATCH", snapshot.version());
+      return new Evaluated(OUTCOME_REJECTED, "AUDIENCE_MISMATCH", snapshot.version(), keyRef,
+          statusVersion);
     }
     try {
       HolderProofs.verifyEs256(
@@ -348,9 +372,10 @@ public class VerificationService {
               request.requestId(), request.nonce(), request.audience(), thumbprint),
           mapper);
     } catch (HolderProofException e) {
-      return new Evaluated(OUTCOME_REJECTED, "BINDING_INVALID", snapshot.version());
+      return new Evaluated(OUTCOME_REJECTED, "BINDING_INVALID", snapshot.version(), keyRef,
+          statusVersion);
     }
-    return new Evaluated(OUTCOME_ACCEPTED, "OK", snapshot.version());
+    return new Evaluated(OUTCOME_ACCEPTED, "OK", snapshot.version(), keyRef, statusVersion);
   }
 
   /**
@@ -377,6 +402,19 @@ public class VerificationService {
       return status.fetch(credentialId);
     } catch (RuntimeException e) {
       return null;
+    }
+  }
+
+  /**
+   * Stale or unreachable trust authority fails closed (SOV-004 section
+   * 5): a provider outage records UNKNOWN, exactly like a missing
+   * snapshot, and never an acceptance.
+   */
+  private Optional<TrustService.SnapshotView> fetchSnapshot() {
+    try {
+      return snapshots.current();
+    } catch (RuntimeException e) {
+      return Optional.empty();
     }
   }
 
@@ -442,7 +480,7 @@ public class VerificationService {
   private Credential loadCredential(UUID credentialId) {
     List<Credential> rows =
         tenant.query(
-            "SELECT id, issuer_id, vct, holder_thumbprint, expires_at, artifact"
+            "SELECT id, issuer_id, vct, holder_thumbprint, expires_at, artifact, key_ref"
                 + " FROM credential_artifact WHERE id = ?",
             (rs, row) ->
                 new Credential(
@@ -451,7 +489,8 @@ public class VerificationService {
                     rs.getString("vct"),
                     rs.getString("holder_thumbprint"),
                     rs.getTimestamp("expires_at").toInstant(),
-                    rs.getString("artifact")),
+                    rs.getString("artifact"),
+                    rs.getString("key_ref")),
             credentialId);
     if (rows.isEmpty()) {
       throw new VerificationNotFoundException();
@@ -469,6 +508,8 @@ public class VerificationService {
     body.put("synthetic", Boolean.TRUE);
     body.put("profile", PROFILE);
     body.put("trustSnapshot", evaluated.snapshot());
+    body.put("keyRef", evaluated.keyRef());
+    body.put("statusVersion", evaluated.statusVersion());
     body.put("decidedAt", decidedAt.toString());
     try {
       return mapper.writeValueAsString(body);
@@ -484,6 +525,8 @@ public class VerificationService {
     detail.put("outcome", evaluated.outcome());
     detail.put("reason", evaluated.reason());
     detail.put("snapshot", String.valueOf(evaluated.snapshot()));
+    detail.put("key", evaluated.keyRef());
+    detail.put("status_version", String.valueOf(evaluated.statusVersion()));
     return detail;
   }
 }

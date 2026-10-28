@@ -4,6 +4,8 @@ import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.TenantMismatchException;
 import dev.sovra.consent.ConsentNotFoundException;
 import dev.sovra.consent.InvalidConsentException;
+import dev.sovra.guard.GuardRejectedException;
+import dev.sovra.guard.MalformedPlanException;
 import dev.sovra.issuance.CredentialNotFoundException;
 import dev.sovra.issuance.IdempotencyConflictException;
 import dev.sovra.issuance.InvalidIssuanceException;
@@ -11,6 +13,8 @@ import dev.sovra.issuance.SigningRefusedException;
 import dev.sovra.issuance.TrustUnavailableException;
 import dev.sovra.tenancy.TenantRequiredException;
 import dev.sovra.trust.AlreadyDecidedException;
+import dev.sovra.trust.IssuerKeyConflictException;
+import dev.sovra.trust.IssuerKeyNotFoundException;
 import dev.sovra.verification.InvalidVerificationException;
 import dev.sovra.verification.VerificationConflictException;
 import dev.sovra.verification.VerificationNotFoundException;
@@ -42,7 +46,8 @@ public class ApiExceptionHandler {
     ProposalNotFoundException.class,
     CredentialNotFoundException.class,
     ConsentNotFoundException.class,
-    VerificationNotFoundException.class
+    VerificationNotFoundException.class,
+    IssuerKeyNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -59,6 +64,8 @@ public class ApiExceptionHandler {
     InvalidIssuanceException.class,
     InvalidConsentException.class,
     InvalidVerificationException.class,
+    GuardRejectedException.class,
+    MalformedPlanException.class,
     MethodArgumentNotValidException.class,
     MissingRequestHeaderException.class,
     HttpMessageNotReadableException.class,
@@ -89,6 +96,12 @@ public class ApiExceptionHandler {
   @ExceptionHandler(AlreadyDecidedException.class)
   public ResponseEntity<Map<String, String>> conflict() {
     return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "already_decided"));
+  }
+
+  @ExceptionHandler(IssuerKeyConflictException.class)
+  public ResponseEntity<Map<String, String>> issuerKeyConflict() {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(Map.of("error", "issuer_key_conflict"));
   }
 
   @ExceptionHandler(TenantRequiredException.class)

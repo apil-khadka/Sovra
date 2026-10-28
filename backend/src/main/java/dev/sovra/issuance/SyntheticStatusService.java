@@ -30,15 +30,16 @@ public class SyntheticStatusService implements StatusEvidenceFetcher {
 
   @Override
   public StatusEvidence fetch(UUID credentialId) {
-    List<String> rows =
+    record Row(String status, long version) {}
+    List<Row> rows =
         tenant.query(
-            "SELECT status FROM credential_artifact WHERE id = ?",
-            (rs, row) -> rs.getString(1),
+            "SELECT status, status_version FROM credential_artifact WHERE id = ?",
+            (rs, row) -> new Row(rs.getString(1), rs.getLong(2)),
             credentialId);
     if (rows.size() != 1) {
-      return new StatusEvidence(Status.UNKNOWN, clock.instant(), MAX_AGE);
+      return new StatusEvidence(Status.UNKNOWN, 0, clock.instant(), MAX_AGE);
     }
-    Status status = "REVOKED".equals(rows.get(0)) ? Status.REVOKED : Status.VALID;
-    return new StatusEvidence(status, clock.instant(), MAX_AGE);
+    Status status = "REVOKED".equals(rows.get(0).status()) ? Status.REVOKED : Status.VALID;
+    return new StatusEvidence(status, rows.get(0).version(), clock.instant(), MAX_AGE);
   }
 }

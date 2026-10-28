@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 4;
+  static final long RULES_VERSION = 5;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
       Map.ofEntries(
@@ -39,7 +39,15 @@ public class AuthorizationService {
           // Verification runs for the relying party that will consume the
           // decision; either tenant agent may retrieve a stored decision.
           Map.entry(Action.VERIFY_PRESENTATION, Set.of("RP_CLIENT")),
-          Map.entry(Action.READ_VERIFICATION, Set.of("TENANT_MEMBER", "RP_CLIENT")));
+          Map.entry(Action.READ_VERIFICATION, Set.of("TENANT_MEMBER", "RP_CLIENT")),
+          // Key lifecycle is trust administration. Registration alone
+          // never widens trust — only a two-person snapshot activation
+          // authorizes a new key — and revocation only narrows it.
+          Map.entry(Action.REGISTER_ISSUER_KEY, Set.of("TRUST_ADMIN")),
+          Map.entry(Action.REVOKE_ISSUER_KEY, Set.of("TRUST_ADMIN")),
+          // Either tenant agent may validate a candidate plan; the
+          // verdict authorizes nothing by itself (INV-05).
+          Map.entry(Action.VALIDATE_PLAN, Set.of("TENANT_MEMBER", "RP_CLIENT")));
 
   private final ServiceAccountRepository accounts;
   private final EmergencyFlagService emergency;

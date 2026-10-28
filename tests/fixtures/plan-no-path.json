@@ -5,6 +5,8 @@
   "credential_type": "",
   "claim_paths": [],
   "evidence": [],
+  "policy_id": "rp-au-demo-v1",
+  "policy_version": "1",
   "recommendation": "NO_PATH",
   "unresolved_issues": [
     "No trusted issuer supports the requested outcome."

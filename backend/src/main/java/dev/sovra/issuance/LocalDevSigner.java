@@ -180,15 +180,7 @@ public class LocalDevSigner implements IssuerSigner {
   }
 
   private boolean registryActive() {
-    List<String> rows =
-        global.query(
-            "SELECT status FROM issuer_signing_key"
-                + " WHERE issuer_id = ? AND key_id = ? AND key_version = ?",
-            (rs, row) -> rs.getString(1),
-            ISSUER_ID,
-            KEY_ID,
-            KEY_VERSION);
-    return rows.size() == 1 && "ACTIVE".equals(rows.get(0));
+    return dev.sovra.trust.IssuerKeys.active(global, ISSUER_ID, KEY_ID, KEY_VERSION);
   }
 
   private boolean snapshotAuthorizes() {
@@ -202,6 +194,7 @@ public class LocalDevSigner implements IssuerSigner {
                         issuer ->
                             ISSUER_ID.equals(issuer.issuerId())
                                 && KEY_ID.equals(issuer.keyId())
+                                && KEY_VERSION == issuer.keyVersion()
                                 && "ACTIVE".equals(issuer.status())
                                 && !issuer.validFrom().isAfter(now)
                                 && !issuer.validThrough().isBefore(now)))

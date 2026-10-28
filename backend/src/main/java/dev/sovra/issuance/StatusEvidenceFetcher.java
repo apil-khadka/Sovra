@@ -18,5 +18,16 @@ public interface StatusEvidenceFetcher {
     UNKNOWN
   }
 
-  record StatusEvidence(Status status, Instant fetchedAt, Duration maxAge) {}
+  /**
+   * Version counts terminal revocations: 1 while never revoked, bumped
+   * on every revocation. Decisions record it as their status evidence
+   * version, so a revocation race leaves an exact audit trail.
+   */
+  record StatusEvidence(Status status, long version, Instant fetchedAt, Duration maxAge) {
+
+    /** Declared freshness bound (SOV-001 section 4: 15 minutes). */
+    public boolean fresh(Instant now) {
+      return fetchedAt.plus(maxAge).isAfter(now);
+    }
+  }
 }

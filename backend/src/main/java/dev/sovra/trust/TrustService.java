@@ -62,7 +62,7 @@ public class TrustService {
     long version = active.get(0);
     List<IssuerView> issuers =
         global.query(
-            "SELECT issuer_id, display_name, scope, credential_types, key_id,"
+            "SELECT issuer_id, display_name, scope, credential_types, key_id, key_version,"
                 + " public_key_jwk, valid_from, valid_through, status"
                 + " FROM issuer_record WHERE snapshot_version = ?",
             (rs, row) ->
@@ -72,6 +72,7 @@ public class TrustService {
                     rs.getString("scope"),
                     List.of((String[]) rs.getArray("credential_types").getArray()),
                     rs.getString("key_id"),
+                    rs.getInt("key_version"),
                     readTree(rs.getString("public_key_jwk")),
                     rs.getTimestamp("valid_from").toInstant(),
                     rs.getTimestamp("valid_through").toInstant(),
@@ -126,14 +127,16 @@ public class TrustService {
     for (IssuerInput issuer : input.issuers()) {
       global.update(
           "INSERT INTO issuer_record (snapshot_version, issuer_id, display_name, scope,"
-              + " credential_types, key_id, public_key_jwk, valid_from, valid_through, status)"
-              + " VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?)",
+              + " credential_types, key_id, key_version, public_key_jwk, valid_from,"
+              + " valid_through, status)"
+              + " VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?)",
           version,
           issuer.issuerId(),
           issuer.displayName(),
           issuer.scope(),
           issuer.credentialTypes().toArray(new String[0]),
           issuer.keyId(),
+          issuer.keyVersion(),
           issuer.publicKeyJwk().toString(),
           java.sql.Timestamp.from(issuer.validFrom()),
           java.sql.Timestamp.from(issuer.validThrough()),
@@ -246,6 +249,7 @@ public class TrustService {
       String scope,
       List<String> credentialTypes,
       String keyId,
+      int keyVersion,
       JsonNode publicKeyJwk,
       Instant validFrom,
       Instant validThrough,
@@ -264,6 +268,7 @@ public class TrustService {
       String scope,
       List<String> credentialTypes,
       String keyId,
+      int keyVersion,
       JsonNode publicKeyJwk,
       Instant validFrom,
       Instant validThrough,

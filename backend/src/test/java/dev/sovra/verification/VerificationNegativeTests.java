@@ -126,8 +126,8 @@ class VerificationNegativeTests extends SovraAppRoleBase {
     TrustService.SnapshotView current = trust.currentSnapshot().orElseThrow();
     List<TrustService.IssuerInput> issuers = current.issuers().stream()
         .map(i -> new TrustService.IssuerInput(i.issuerId(), i.displayName(), i.scope(),
-            i.credentialTypes(), i.keyId(), i.publicKeyJwk(), i.validFrom(), i.validThrough(),
-            i.status()))
+            i.credentialTypes(), i.keyId(), i.keyVersion(), i.publicKeyJwk(), i.validFrom(),
+            i.validThrough(), i.status()))
         .toList();
     // A policy naming a different RP: this request's RP is not covered.
     TrustService.PolicyInput restrictive = new TrustService.PolicyInput(

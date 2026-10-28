@@ -3,7 +3,7 @@ info:
   title: Sovra implemented control-plane API (G1)
   version: 0.1.0
   description: >-
-    Exact contract of the implemented backend (SOV-005 through SOV-010).
+    Exact contract of the implemented backend (SOV-005 through SOV-012 plus SOV-014).
     Authentication is a Bearer service-account token except for the three
     public federation-metadata reads. Error bodies are minimal by design:
     404s carry empty bodies (never confirm or deny another tenant's
@@ -60,7 +60,13 @@ paths:
               type: object
               required: [issuers, policies]
               properties:
-                issuers: { type: array, items: { type: object } }
+                issuers:
+                  type: array
+                  items:
+                    type: object
+                    description: >-
+                      Issuer row; keyVersion pins the exact authorized
+                      key version (defaults to 1)
                 policies: { type: array, items: { type: object } }
                 note: { type: string }
       responses:
@@ -98,6 +104,60 @@ paths:
         '400': { description: No approved proposal, or not forward }
         '401': { description: Anonymous }
         '403': { description: Lacks TRUST_ADMIN }
+  /api/trust/keys:
+    post:
+      operationId: registerIssuerKey
+      summary: >-
+        Publish an issuer key version. Registration alone never widens
+        trust: only a later two-person snapshot activation authorizes
+        the key. Byte-identical re-registration is idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuerId, keyId, keyVersion, publicKeyJwk]
+              properties:
+                issuerId: { type: string }
+                keyId: { type: string }
+                keyVersion: { type: integer, minimum: 1 }
+                publicKeyJwk:
+                  type: object
+                  description: P-256 public JWK with kid equal to keyId, no private material
+      responses:
+        '201': { description: Key view with status ACTIVE and keyVersion }
+        '400': { description: Malformed identity, version, or JWK }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '409': { description: Same identity already names a different key }
+  /api/trust/keys/revoke:
+    post:
+      operationId: revokeIssuerKey
+      summary: >-
+        Terminally revoke an issuer key version. The revocation row is
+        append-only, so concurrent revokes converge on one instant;
+        signing, issuance, and verification honor it live.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuerId, keyId, keyVersion, reason]
+              properties:
+                issuerId: { type: string }
+                keyId: { type: string }
+                keyVersion: { type: integer, minimum: 1 }
+                reason:
+                  type: string
+                  description: Containment reason, 1 to 256 chars, recorded in audit
+      responses:
+        '200': { description: Key view with status REVOKED and revokedAt }
+        '400': { description: Malformed identity or missing reason }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown key identity (empty body) }
   /api/issuance/credentials:
     post:
       operationId: issueCredential
@@ -160,14 +220,14 @@ paths:
   /api/issuance/credentials/{id}/status:
     get:
       operationId: credentialStatus
-      summary: Status evidence with fetch time and max age
+      summary: Status evidence with version, fetch time, and max age
       parameters:
         - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
       responses:
-        '200': { description: '{status: VALID|REVOKED|UNKNOWN, fetchedAt, maxAgeSeconds}' }
+        '200': { description: '{status: VALID|REVOKED|UNKNOWN, version, fetchedAt, maxAgeSeconds}' }
         '400': { description: Malformed id }
         '401': { description: Anonymous }
         '403': { description: Lacks TENANT_MEMBER/ISSUER_OPS }
@@ -198,16 +258,19 @@ paths:
       operationId: createProofRequest
       summary: >-
         Open a consent-bound proof request against a usable credential.
-        Binds RP, audience, purpose, exact claims, plan hash, challenge,
-        holder, and expiry; the stored request is immutable, so later
-        scope edits invalidate consent instead of widening it.
+        The deterministic plan guard must accept the candidate plan
+        and the bound hash must equal its canonical hash before any
+        request is created. Binds RP, audience, purpose, exact claims,
+        plan hash, challenge, holder, and expiry; the stored request
+        is immutable, so later scope edits invalidate consent instead
+        of widening it.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [rpId, audience, purpose, credentialId, claims, planHash, challenge, expiresAt]
+              required: [rpId, audience, purpose, credentialId, claims, plan, policyId, policyVersion, planHash, challenge, expiresAt]
               properties:
                 rpId: { type: string }
                 audience: { type: string }
@@ -216,10 +279,15 @@ paths:
                 claims:
                   type: object
                   description: 'Exactly {adultOver18: true} at G1'
+                plan:
+                  type: object
+                  description: Candidate plan (snake_case guard schema); must be guard-accepted
+                policyId: { type: string }
+                policyVersion: { type: string }
                 planHash:
                   type: string
                   pattern: '^[0-9a-f]{64}$'
-                  description: SHA-256 hex of the approved plan
+                  description: Canonical SHA-256 hex of the approved plan
                 challenge:
                   type: string
                   pattern: '^[A-Za-z0-9_-]{16,128}$'
@@ -230,7 +298,7 @@ paths:
                   description: More than 1 minute out, at most 24 hours
       responses:
         '201': { description: Bound request in PENDING state with trustSnapshot }
-        '400': { description: Invalid request, scope, claims, credential, or validity }
+        '400': { description: Invalid request, scope, claims, credential, validity, guard rejection, or plan hash mismatch }
         '401': { description: Anonymous }
         '403': { description: Lacks RP_CLIENT }
         '503': { description: No active trust snapshot governs consent }
@@ -314,11 +382,13 @@ paths:
         Evaluate one presentation against an approved proof request and
         commit an immutable ACCEPTED, REJECTED, or UNKNOWN decision with
         its audit row. Checks signature, issuer/key scope, type/claims,
-        holder, time, status, audience, consent, policy, and the fresh
-        nonce before acceptance. The same nonce replays the stored
-        response byte-for-byte; a fresh nonce permits a new attempt;
-        the same nonce with different content conflicts without
-        rewriting the stored decision.
+        holder, time, status freshness, audience, consent, policy, and
+        the fresh nonce before acceptance; stale evidence and provider
+        outages record UNKNOWN. Every decision records the actual
+        authority, key, and status versions behind it. The same nonce
+        replays the stored response byte-for-byte; a fresh nonce permits
+        a new attempt; the same nonce with different content conflicts
+        without rewriting the stored decision.
       requestBody:
         required: true
         content:
@@ -347,7 +417,7 @@ paths:
                     presentation message (label, request id, nonce,
                     audience, holder thumbprint)
       responses:
-        '200': { description: '{decisionId, requestId, outcome, reasonCode, synthetic, profile, trustSnapshot, decidedAt}' }
+        '200': { description: '{decisionId, requestId, outcome, reasonCode, synthetic, profile, trustSnapshot, keyRef, statusVersion, decidedAt}' }
         '400': { description: Malformed submission envelope }
         '401': { description: Anonymous }
         '403': { description: Lacks RP_CLIENT }
@@ -365,11 +435,39 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses:
-        '200': { description: Stored decision with outcome and reason }
+        '200': { description: Stored decision with outcome, reason, keyRef, and statusVersion }
         '400': { description: Malformed id }
         '401': { description: Anonymous }
         '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
         '404': { description: Unknown or other-tenant decision (empty body) }
+  /api/guard/validate:
+    post:
+      operationId: validatePlan
+      summary: >-
+        Adjudicate one untrusted candidate plan against live trust
+        state and the RP-selected policy binding, before any holder
+        request is created. Rejections return 200 with an explicit
+        non-accepted verdict; only a malformed envelope is a 400.
+        The verdict authorizes nothing by itself.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan, policyId, policyVersion]
+              properties:
+                plan:
+                  type: object
+                  description: Candidate plan in the snake_case guard schema
+                policyId: { type: string }
+                policyVersion: { type: string }
+      responses:
+        '200': { description: '{accepted, code, reason, rulesVersion, snapshotVersion}' }
+        '400': { description: Malformed plan envelope or policy binding }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '503': { description: No active trust snapshot governs adjudication }
 components:
   securitySchemes:
     bearerAuth:

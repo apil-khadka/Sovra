@@ -26,9 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class TrustController {
 
   private final TrustService trust;
+  private final IssuerKeyService keys;
 
-  public TrustController(TrustService trust) {
+  public TrustController(TrustService trust, IssuerKeyService keys) {
     this.trust = trust;
+    this.keys = keys;
   }
 
   @GetMapping("/snapshots/current")
@@ -73,6 +75,33 @@ public class TrustController {
     return ResponseEntity.ok(Map.of("version", String.valueOf(version)));
   }
 
+  @PostMapping("/keys")
+  public ResponseEntity<IssuerKeyService.KeyView> registerKey(
+      @Valid @RequestBody RegisterKeyRequest request) {
+    var caller =
+        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+    IssuerKeyService.KeyView view =
+        keys.register(
+            caller,
+            new IssuerKeyService.RegisterRequest(
+                request.issuerId(), request.keyId(), request.keyVersion(),
+                request.publicKeyJwk()));
+    return ResponseEntity.status(HttpStatus.CREATED).body(view);
+  }
+
+  @PostMapping("/keys/revoke")
+  public ResponseEntity<IssuerKeyService.KeyView> revokeKey(
+      @Valid @RequestBody RevokeKeyRequest request) {
+    var caller =
+        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+    IssuerKeyService.KeyView view =
+        keys.revoke(
+            caller,
+            new IssuerKeyService.RevokeRequest(
+                request.issuerId(), request.keyId(), request.keyVersion(), request.reason()));
+    return ResponseEntity.ok(view);
+  }
+
   public record ProposalRequest(
       List<IssuerRequest> issuers, List<PolicyRequest> policies, String note) {
     public ProposalRequest {
@@ -87,6 +116,7 @@ public class TrustController {
       @NotEmpty String scope,
       @NotEmpty List<String> credentialTypes,
       @NotEmpty String keyId,
+      Integer keyVersion,
       @NotNull JsonNode publicKeyJwk,
       @NotNull Instant validFrom,
       @NotNull Instant validThrough,
@@ -94,7 +124,8 @@ public class TrustController {
 
     TrustService.IssuerInput toInput() {
       return new TrustService.IssuerInput(
-          issuerId, displayName, scope, credentialTypes, keyId, publicKeyJwk, validFrom,
+          issuerId, displayName, scope, credentialTypes, keyId,
+          keyVersion == null ? 1 : keyVersion, publicKeyJwk, validFrom,
           validThrough, status);
     }
   }
@@ -109,4 +140,16 @@ public class TrustController {
       return new TrustService.PolicyInput(rpId, purpose, allowedTypes, maxAssurance);
     }
   }
+
+  public record RegisterKeyRequest(
+      @NotNull String issuerId,
+      @NotNull String keyId,
+      @NotNull Integer keyVersion,
+      @NotNull JsonNode publicKeyJwk) {}
+
+  public record RevokeKeyRequest(
+      @NotNull String issuerId,
+      @NotNull String keyId,
+      @NotNull Integer keyVersion,
+      @NotNull String reason) {}
 }

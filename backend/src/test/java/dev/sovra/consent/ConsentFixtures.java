@@ -6,12 +6,18 @@ import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.util.Base64URL;
 import dev.sovra.TestAccounts.TestAccount;
+import dev.sovra.guard.CandidatePlan;
+import dev.sovra.guard.EvidenceCitation;
+import dev.sovra.guard.GuardPolicies;
+import dev.sovra.guard.PlanGuard;
+import dev.sovra.guard.Recommendation;
 import dev.sovra.issuance.IssuanceFixtures;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.MediaType;
@@ -40,15 +46,52 @@ public final class ConsentFixtures {
   }
 
   public static Map<String, Object> createBody(UUID credentialId) {
+    CandidatePlan plan = validPlan();
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("rpId", RP_ID);
     body.put("audience", AUDIENCE);
     body.put("purpose", PURPOSE);
     body.put("credentialId", credentialId.toString());
     body.put("claims", Map.of("adultOver18", Boolean.TRUE));
-    body.put("planHash", planHash());
+    body.put("plan", planBody(plan));
+    body.put("policyId", plan.policyId());
+    body.put("policyVersion", plan.policyVersion());
+    body.put("planHash", PlanGuard.canonicalHash(plan));
     body.put("challenge", challenge());
     body.put("expiresAt", Instant.now().plusSeconds(3600).toString());
+    return body;
+  }
+
+  /** Guard-accepted G1 plan against the live synthetic issuer and policy. */
+  public static CandidatePlan validPlan() {
+    String planId = "pln_test_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+    return new CandidatePlan(
+        planId,
+        "age_over_18",
+        IssuanceFixtures.ISSUER_ID,
+        IssuanceFixtures.ADULT_VCT,
+        List.of("adultOver18"),
+        List.of(new EvidenceCitation(GuardPolicies.POLICY_ID, GuardPolicies.SECTION_ID)),
+        GuardPolicies.POLICY_ID,
+        GuardPolicies.POLICY_VERSION,
+        Recommendation.CANDIDATE_ONLY);
+  }
+
+  /** Snake-case wire form, mirroring the frozen corpus shape. */
+  public static Map<String, Object> planBody(CandidatePlan plan) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("plan_id", plan.planId());
+    body.put("requested_outcome", plan.requestedOutcome());
+    body.put("candidate_issuer_id", plan.candidateIssuerId());
+    body.put("credential_type", plan.credentialType());
+    body.put("claim_paths", plan.claimPaths());
+    body.put("evidence",
+        plan.evidence().stream()
+            .map(c -> Map.of("document_id", c.documentId(), "section_id", c.sectionId()))
+            .toList());
+    body.put("policy_id", plan.policyId());
+    body.put("policy_version", plan.policyVersion());
+    body.put("recommendation", plan.recommendation().name());
     return body;
   }
 

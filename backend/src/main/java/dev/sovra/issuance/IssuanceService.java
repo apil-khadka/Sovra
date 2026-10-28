@@ -97,7 +97,7 @@ public class IssuanceService {
       String status,
       long trustSnapshot) {}
 
-  public record StatusView(String status, Instant fetchedAt, long maxAgeSeconds) {}
+  public record StatusView(String status, long version, Instant fetchedAt, long maxAgeSeconds) {}
 
   /**
    * Issues a credential or replays the original response byte-for-byte.
@@ -364,16 +364,14 @@ public class IssuanceService {
     if (!issuer.credentialTypes().contains(request.vct())) {
       throw new InvalidIssuanceException("credential type is outside issuer scope");
     }
-    List<String> registry =
-        tenant.query(
-            "SELECT status FROM issuer_signing_key"
-                + " WHERE issuer_id = ? AND key_id = ? AND key_version = 1",
-            (rs, row) -> rs.getString(1),
-            request.issuerId(), issuer.keyId());
-    if (registry.size() != 1 || !"ACTIVE".equals(registry.get(0))) {
+    // The snapshot pins the exact authorized key version; the live
+    // registry check honors compromise and retirement (SOV-012).
+    if (!dev.sovra.trust.IssuerKeys.active(
+        tenant, request.issuerId(), issuer.keyId(), issuer.keyVersion())) {
       throw new InvalidIssuanceException("issuer signing key is not active");
     }
-    return new IssuerAuthorization(new KeyRef(request.issuerId(), issuer.keyId(), 1));
+    return new IssuerAuthorization(
+        new KeyRef(request.issuerId(), issuer.keyId(), issuer.keyVersion()));
   }
 
   public CredentialView get(ServiceAccountPrincipal caller, UUID credentialId) {
@@ -419,7 +417,8 @@ public class IssuanceService {
     }
     var evidence = status.fetch(credentialId);
     return new StatusView(
-        evidence.status().name(), evidence.fetchedAt(), evidence.maxAge().toSeconds());
+        evidence.status().name(), evidence.version(), evidence.fetchedAt(),
+        evidence.maxAge().toSeconds());
   }
 
   /** Terminal revocation: VALID becomes REVOKED, never the reverse. */
@@ -443,16 +442,20 @@ public class IssuanceService {
       throw new CredentialNotFoundException();
     }
     if ("VALID".equals(rows.get(0))) {
+      // The status predicate makes concurrent revokes converge: only
+      // the first flip bumps the version; losers re-read REVOKED.
       tenant.update(
-          "UPDATE credential_artifact SET status = 'REVOKED', status_updated_at = ?"
-              + " WHERE id = ? AND tenant_id = ?",
+          "UPDATE credential_artifact SET status = 'REVOKED', status_updated_at = ?,"
+              + " status_version = status_version + 1"
+              + " WHERE id = ? AND tenant_id = ? AND status = 'VALID'",
           java.sql.Timestamp.from(clock.instant()), credentialId, caller.tenantId());
     }
     audit.record(caller, Action.ISSUE_CREDENTIAL, resource, decision, "",
         Map.of("credential", credentialId.toString(), "revoked", "true"));
     var evidence = status.fetch(credentialId);
     return new StatusView(
-        evidence.status().name(), evidence.fetchedAt(), evidence.maxAge().toSeconds());
+        evidence.status().name(), evidence.version(), evidence.fetchedAt(),
+        evidence.maxAge().toSeconds());
   }
 
   /** Public federation metadata: verification keys of authorized issuers. */

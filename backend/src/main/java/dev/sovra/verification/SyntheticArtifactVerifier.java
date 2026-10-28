@@ -8,7 +8,6 @@ import dev.sovra.trust.TrustService;
 import java.nio.charset.StandardCharsets;
 import java.security.interfaces.ECPublicKey;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.core.JacksonException;
@@ -119,13 +118,8 @@ public final class SyntheticArtifactVerifier {
 
   private static boolean signingKeyActive(
       JdbcTemplate tenant, Expected expected, TrustService.IssuerView issuer) {
-    List<String> rows =
-        tenant.query(
-            "SELECT status FROM issuer_signing_key"
-                + " WHERE issuer_id = ? AND key_id = ? AND key_version = 1",
-            (rs, row) -> rs.getString(1),
-            expected.issuerId(), issuer.keyId());
-    return rows.size() == 1 && "ACTIVE".equals(rows.get(0));
+    return dev.sovra.trust.IssuerKeys.active(
+        tenant, expected.issuerId(), issuer.keyId(), issuer.keyVersion());
   }
 
   private static ECPublicKey issuerKey(JsonNode jwk) {

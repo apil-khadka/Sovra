@@ -208,6 +208,35 @@ class AuthzMatrixTests extends SovraPostgresBase {
   }
 
   @Test
+  void emergencyFreezeDeniesDespiteWarmPermitCache() {
+    // A permitted read warms the 60-second grant cache first; the
+    // freeze is checked before the cache, so it still denies (SOV-012).
+    TestAccount reader = TestAccounts.create(owner, "warm-reader", Set.of("AUDIT_READER"));
+    client.get().uri("/api/audit/events").headers(reader.headers()).retrieve().toBodilessEntity();
+    owner.update("UPDATE emergency_flag SET enabled = TRUE WHERE id = 1");
+    emergency.clearCache();
+    try {
+      assertThatThrownBy(
+              () ->
+                  client
+                      .get()
+                      .uri("/api/audit/events")
+                      .headers(reader.headers())
+                      .retrieve()
+                      .toBodilessEntity())
+          .isInstanceOf(HttpClientErrorException.Forbidden.class)
+          .satisfies(
+              e ->
+                  assertThat(((HttpClientErrorException) e).getResponseBodyAsString())
+                      .contains("EMERGENCY_FREEZE"));
+    } finally {
+      owner.update("UPDATE emergency_flag SET enabled = FALSE WHERE id = 1");
+      emergency.clearCache();
+    }
+    client.get().uri("/api/audit/events").headers(reader.headers()).retrieve().toBodilessEntity();
+  }
+
+  @Test
   void revocationTakesEffectWithoutCacheDelay() {
     TestAccount account = TestAccounts.create(owner, "doomed", Set.of("AUDIT_READER"));
     client.get().uri("/api/audit/events").headers(account.headers()).retrieve().toBodilessEntity();

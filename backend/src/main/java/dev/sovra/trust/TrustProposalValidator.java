@@ -33,6 +33,9 @@ public final class TrustProposalValidator {
         }
       }
       validateKey(issuer.keyId(), issuer.publicKeyJwk());
+      if (issuer.keyVersion() < 1) {
+        throw new InvalidProposalException("key version starts at 1");
+      }
       if (issuer.validFrom() == null
           || issuer.validThrough() == null
           || !issuer.validFrom().isBefore(issuer.validThrough())) {
@@ -63,7 +66,7 @@ public final class TrustProposalValidator {
   }
 
   /** ES256 (P-256) JWK shape with kid bound to the key record. */
-  private static void validateKey(String keyId, JsonNode jwk) {
+  static void validateKey(String keyId, JsonNode jwk) {
     if (jwk == null || !jwk.isObject()) {
       throw new InvalidProposalException("key must be a JWK object");
     }

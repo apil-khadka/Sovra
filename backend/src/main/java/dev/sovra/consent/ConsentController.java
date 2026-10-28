@@ -44,7 +44,8 @@ public class ConsentController {
             caller,
             new ConsentService.CreateRequest(
                 request.rpId(), request.audience(), request.purpose(),
-                request.credentialId(), request.claims(), request.planHash(),
+                request.credentialId(), request.claims(), request.plan(),
+                request.policyId(), request.policyVersion(), request.planHash(),
                 request.challenge(), request.expiresAt()));
     return ResponseEntity.status(HttpStatus.CREATED).body(view);
   }
@@ -84,6 +85,9 @@ public class ConsentController {
       @NotNull String purpose,
       @NotNull UUID credentialId,
       @NotNull Map<String, Object> claims,
+      @NotNull JsonNode plan,
+      @NotNull String policyId,
+      @NotNull String policyVersion,
       @NotNull String planHash,
       @NotNull String challenge,
       @NotNull Instant expiresAt) {}

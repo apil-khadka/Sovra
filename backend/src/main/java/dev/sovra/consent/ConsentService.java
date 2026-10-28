@@ -9,10 +9,18 @@ import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
 import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
+import dev.sovra.guard.CandidatePlan;
+import dev.sovra.guard.GuardRejectedException;
+import dev.sovra.guard.GuardService;
+import dev.sovra.guard.PlanGuard;
+import dev.sovra.guard.PlanParser;
+import dev.sovra.guard.SelectedPolicy;
 import dev.sovra.issuance.LocalDevSigner;
 import dev.sovra.issuance.TrustSnapshotProvider;
 import dev.sovra.issuance.TrustUnavailableException;
 import dev.sovra.trust.AlreadyDecidedException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.interfaces.ECPublicKey;
 import java.time.Clock;
 import java.time.Duration;
@@ -42,6 +50,11 @@ import tools.jackson.databind.ObjectMapper;
  * every presentation is labelled synthetic. Transport authentication is a
  * tenant service account; holder authority comes from the key proof, never
  * from the caller's roles.
+ *
+ * <p>The deterministic plan guard (SOV-014) runs before any holder
+ * request is created: the candidate plan must be guard-accepted and the
+ * bound plan hash must equal the plan's canonical hash, so the wallet
+ * reviews exactly the plan the guard approved.
  */
 @Service
 public class ConsentService {
@@ -58,6 +71,7 @@ public class ConsentService {
   private final AuthorizationService authz;
   private final AuditService audit;
   private final TrustSnapshotProvider snapshots;
+  private final GuardService guard;
   private final JdbcTemplate tenant;
   private final Clock clock;
   private final ObjectMapper mapper;
@@ -66,12 +80,14 @@ public class ConsentService {
       AuthorizationService authz,
       AuditService audit,
       TrustSnapshotProvider snapshots,
+      GuardService guard,
       JdbcTemplate tenantJdbcTemplate,
       Clock clock,
       ObjectMapper mapper) {
     this.authz = authz;
     this.audit = audit;
     this.snapshots = snapshots;
+    this.guard = guard;
     this.tenant = tenantJdbcTemplate;
     this.clock = clock;
     this.mapper = mapper;
@@ -83,6 +99,9 @@ public class ConsentService {
       String purpose,
       UUID credentialId,
       Map<String, Object> claims,
+      JsonNode plan,
+      String policyId,
+      String policyVersion,
       String planHash,
       String challenge,
       Instant expiresAt) {}
@@ -128,6 +147,7 @@ public class ConsentService {
     }
     Instant now = clock.instant();
     Validated validated = validate(request, now);
+    requireGuardAccepted(caller, request);
     var snapshot = snapshots.current().orElseThrow(TrustUnavailableException::new);
 
     UUID requestId = UUID.randomUUID();
@@ -264,11 +284,32 @@ public class ConsentService {
       String consentArtifact,
       long trustSnapshot) {}
 
+  /**
+   * Guard gate: the candidate plan must parse, be accepted against
+   * live trust state and the RP-selected policy, and hash to the
+   * bound plan hash. Adjudication audits its own VALIDATE_PLAN row,
+   * so the consent audit trail shows the guard verdict first.
+   */
+  private void requireGuardAccepted(ServiceAccountPrincipal caller, CreateRequest request) {
+    CandidatePlan plan = PlanParser.parsePlan(request.plan());
+    SelectedPolicy selected = PlanParser.parseSelected(request.policyId(), request.policyVersion());
+    GuardService.VerdictView verdict = guard.adjudicate(caller, plan, selected);
+    if (!verdict.accepted()) {
+      throw new GuardRejectedException(verdict.code());
+    }
+    if (!MessageDigest.isEqual(
+        request.planHash().getBytes(StandardCharsets.UTF_8),
+        PlanGuard.canonicalHash(plan).getBytes(StandardCharsets.UTF_8))) {
+      throw new InvalidConsentException("plan hash does not match the approved plan");
+    }
+  }
+
   private Validated validate(CreateRequest request, Instant now) {
     if (request == null
         || blank(request.rpId()) || blank(request.audience()) || blank(request.purpose())
         || request.credentialId() == null
         || request.claims() == null
+        || request.plan() == null
         || request.planHash() == null || request.challenge() == null
         || request.expiresAt() == null) {
       throw new InvalidConsentException("proof request is incomplete");

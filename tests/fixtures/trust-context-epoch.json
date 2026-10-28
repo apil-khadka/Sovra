@@ -1,0 +1,63 @@
+{
+  "trusted_issuers": {
+    "np-synthetic-issuer": {
+      "issuer_id": "np-synthetic-issuer",
+      "allowed_credential_types": [
+        "AdultStatusCredential"
+      ],
+      "allowed_claims": [
+        "adultOver18",
+        "birthYear"
+      ],
+      "key_ids": [
+        "np-demo-ed25519-v1"
+      ],
+      "status": "ACTIVE",
+      "valid_from": "2020-01-01T00:00:00Z",
+      "valid_through": "2040-01-01T00:00:00Z"
+    },
+    "suspended-issuer": {
+      "issuer_id": "suspended-issuer",
+      "allowed_credential_types": [
+        "AdultStatusCredential"
+      ],
+      "allowed_claims": [
+        "adultOver18"
+      ],
+      "key_ids": [
+        "suspended-v1"
+      ],
+      "status": "SUSPENDED",
+      "valid_from": "2020-01-01T00:00:00Z",
+      "valid_through": "2040-01-01T00:00:00Z"
+    },
+    "expired-issuer": {
+      "issuer_id": "expired-issuer",
+      "allowed_credential_types": [
+        "AdultStatusCredential"
+      ],
+      "allowed_claims": [
+        "adultOver18"
+      ],
+      "key_ids": [
+        "expired-v1"
+      ],
+      "status": "ACTIVE",
+      "valid_from": "2020-01-01T00:00:00Z",
+      "valid_through": "2021-01-01T00:00:00Z"
+    }
+  },
+  "policies": {
+    "rp-au-demo-v1": {
+      "document_id": "rp-au-demo-v1",
+      "version": "1",
+      "sections": {
+        "age_eligibility": "For this fictional service, request evidence that the holder is at least 18 years old."
+      },
+      "approved_claims": [
+        "adultOver18",
+        "qualifiesAsAdult"
+      ]
+    }
+  }
+}

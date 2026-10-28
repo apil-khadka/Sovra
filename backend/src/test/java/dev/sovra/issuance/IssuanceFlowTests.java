@@ -210,6 +210,7 @@ class IssuanceFlowTests extends SovraAppRoleBase {
                     List.of((String[]) ((java.sql.Array) genesis.get("credential_types"))
                         .getArray()),
                     (String) genesis.get("key_id"),
+                    1,
                     mapper.readTree(String.valueOf(genesis.get("public_key_jwk"))),
                     now.minusSeconds(60),
                     now.plus(java.time.Duration.ofDays(3650)),

@@ -290,7 +290,7 @@ class VerificationFlowTests extends SovraAppRoleBase {
 
     StatusEvidenceFetcher unknown = credentialId ->
         new StatusEvidenceFetcher.StatusEvidence(
-            StatusEvidenceFetcher.Status.UNKNOWN, clock.instant(),
+            StatusEvidenceFetcher.Status.UNKNOWN, 0, clock.instant(),
             java.time.Duration.ofMinutes(15));
     String uncertain = verifyDirect(unknown, principal, stage, VerificationFixtures.nonce());
     JsonNode held = mapper.readTree(uncertain);
