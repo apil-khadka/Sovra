@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 6;
+  static final long RULES_VERSION = 7;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
       Map.ofEntries(
@@ -51,7 +51,15 @@ public class AuthorizationService {
           // Either tenant agent may request planning; the candidate is
           // untrusted until the guard accepts it, and planning tools are
           // read-only (SOV-013).
-          Map.entry(Action.PROPOSE_PLAN, Set.of("TENANT_MEMBER", "RP_CLIENT")));
+          Map.entry(Action.PROPOSE_PLAN, Set.of("TENANT_MEMBER", "RP_CLIENT")),
+          // Alerts are global derived ops state; only audit and trust
+          // administration roles review them (SOV-029).
+          Map.entry(Action.READ_ALERTS, Set.of("AUDIT_READER", "TRUST_ADMIN")),
+          // Telemetry summaries are tenant-scoped to the caller; members
+          // may review their own flow timings and reason counts.
+          Map.entry(
+              Action.READ_TELEMETRY, Set.of("TENANT_MEMBER", "AUDIT_READER", "TRUST_ADMIN")),
+          Map.entry(Action.RUN_CANARY, Set.of("TENANT_MEMBER", "AUDIT_READER", "TRUST_ADMIN")));
 
   private final ServiceAccountRepository accounts;
   private final EmergencyFlagService emergency;

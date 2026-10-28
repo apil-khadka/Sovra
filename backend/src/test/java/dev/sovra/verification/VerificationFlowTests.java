@@ -10,6 +10,7 @@ import dev.sovra.consent.ConsentFixtures;
 import dev.sovra.issuance.IssuanceFixtures;
 import dev.sovra.issuance.StatusEvidenceFetcher;
 import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.ops.TelemetryService;
 import dev.sovra.tenancy.TenantContext;
 import dev.sovra.tenancy.TenantDataSource;
 import dev.sovra.trust.TrustService;
@@ -67,6 +68,8 @@ class VerificationFlowTests extends SovraAppRoleBase {
   @Autowired Clock clock;
 
   @Autowired ObjectMapper mapper;
+
+  @Autowired TelemetryService telemetry;
 
   RestClient client;
   JdbcTemplate owner;
@@ -187,9 +190,9 @@ class VerificationFlowTests extends SovraAppRoleBase {
     // instances would hold; enforcement lives in the database, not in
     // either process.
     VerificationService first = new VerificationService(authz, audit, snapshots, status,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
     VerificationService second = new VerificationService(authz, audit, snapshots, status,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     JsonNode holderJwk = stage.holder().jwk();
     String binding = VerificationFixtures.bindingProof(
@@ -241,7 +244,7 @@ class VerificationFlowTests extends SovraAppRoleBase {
     // trust-dependency outage.
     TrustSnapshotProvider outage = Optional::empty;
     VerificationService instance = new VerificationService(authz, audit, outage, status,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(
         UUID.fromString(stage.requestId()), nonce, ConsentFixtures.AUDIENCE,
@@ -305,7 +308,7 @@ class VerificationFlowTests extends SovraAppRoleBase {
       Stage stage,
       String nonce) throws Exception {
     VerificationService instance = new VerificationService(authz, audit, snapshots, fetcher,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(
         UUID.fromString(stage.requestId()), nonce, ConsentFixtures.AUDIENCE,
         stage.holder().jwk(),

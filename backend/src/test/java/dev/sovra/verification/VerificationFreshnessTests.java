@@ -10,6 +10,7 @@ import dev.sovra.consent.ConsentFixtures;
 import dev.sovra.issuance.IssuanceFixtures;
 import dev.sovra.issuance.StatusEvidenceFetcher;
 import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.ops.TelemetryService;
 import dev.sovra.tenancy.TenantContext;
 import dev.sovra.tenancy.TenantDataSource;
 import dev.sovra.trust.TrustService;
@@ -64,6 +65,8 @@ class VerificationFreshnessTests extends SovraAppRoleBase {
 
   @Autowired Clock clock;
 
+  @Autowired TelemetryService telemetry;
+
   @Autowired ObjectMapper mapper;
 
   RestClient client;
@@ -83,7 +86,7 @@ class VerificationFreshnessTests extends SovraAppRoleBase {
       Stage stage,
       String nonce) throws Exception {
     VerificationService instance = new VerificationService(authz, audit, provider, fetcher,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
     String binding = VerificationFixtures.bindingProof(
         stage.holder(), stage.requestId(), nonce, ConsentFixtures.AUDIENCE, mapper);
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(

@@ -821,6 +821,16 @@ Required closure evidence:
 - Reproducible positive and negative validation, actual configuration/version references and sanitized results.
 - Independent review of security-critical behavior and retest of findings where applicable.
 
+Implementation evidence (G1 synthetic):
+
+- `GET /api/health/ready` (7 live probes, 200/503), `GET /api/alerts`,
+  `GET /api/telemetry/summary`, `POST /api/telemetry/canary` in
+  `backend/src/main/java/dev/sovra/ops/`; contract 0.3.0; see
+  [semantic-health.md](semantic-health.md).
+- 33 committed tests in `backend/src/test/java/dev/sovra/ops/` (positive,
+  negative, authz, sanitization); `./mvnw verify` green.
+- Independent security review of the ops surfaces remains open.
+
 ### SOV-030
 
 **Approve and enforce service, resource and recovery budgets**
@@ -972,6 +982,18 @@ Required closure evidence:
 - Reviewed design or implemented artifact for the assigned scope.
 - Reproducible positive and negative validation, actual configuration/version references and sanitized results.
 - Independent review of security-critical behavior and retest of findings where applicable.
+
+Implementation evidence (G1 synthetic, partial):
+
+- Clean-checkout vertical-slice proof: clone, backend `./mvnw verify`,
+  frontend build, and `scripts/e2e-issuance.py` reproduced without private
+  files; see [first-vertical-slice.md](first-vertical-slice.md#clean-checkout-reproduction-sov-035).
+- Public-demo frontend flows run over synthetic fixtures only (Demo view);
+  no real-ID upload path exists in the app and no production issuer
+  connectivity is configured.
+- Still open: SOV-036 profile qualification, SOV-041 packaged
+  consent-to-verification suite, live-model acceptance (OD-02), and
+  independent review. This gate grants no real-data authorization.
 
 ### SOV-036
 

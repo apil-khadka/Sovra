@@ -12,8 +12,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Deny-by-default HTTP security. Public: the liveness probe, the current
- * trust snapshot, and issuer verification keys (federation metadata).
+ * Deny-by-default HTTP security. Public: the liveness and semantic
+ * readiness probes, the current trust snapshot, and issuer verification
+ * keys (federation metadata).
  * Everything else needs a verified
  * Bearer service credential; service methods additionally enforce
  * tenant/action/object authority explicitly.
@@ -35,6 +36,8 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(HttpMethod.GET, "/api/health")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/health/ready")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/trust/snapshots/current")
                     .permitAll()

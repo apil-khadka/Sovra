@@ -15,6 +15,8 @@ Architecture documents describe intended behavior rather than implemented guaran
 - [First vertical slice](docs/engineering/first-vertical-slice.md): the initial implementation target.
 - [Business implementation plan](docs/engineering/implementation-plan.md) and [task backlog](docs/engineering/implementation-backlog.md): delivery gates, dependencies, acceptance criteria and GitHub tasks.
 - [API draft](docs/engineering/api-contract.openapi.yaml): proposed orchestration endpoints.
+- [Implemented API](docs/engineering/implemented-api.openapi.yaml): exact backend contract with per-operation scopes.
+- [Semantic health](docs/engineering/semantic-health.md): readiness probes, alerts, sanitized telemetry, and canaries.
 - [Acceptance criteria](docs/demo/evaluation-and-acceptance.md): evidence required for the demo.
 - [Security validation plan](docs/engineering/security-validation-plan.md): proposed adversarial tests and production evidence gates.
 - [Identity/key-provider architecture](docs/architecture/identity-key-provider-architecture.md): provider recommendation, current architecture findings and development/live-data gates.

@@ -18,6 +18,7 @@ import dev.sovra.guard.SelectedPolicy;
 import dev.sovra.issuance.LocalDevSigner;
 import dev.sovra.issuance.TrustSnapshotProvider;
 import dev.sovra.issuance.TrustUnavailableException;
+import dev.sovra.ops.TelemetryService;
 import dev.sovra.trust.AlreadyDecidedException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -29,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -75,6 +77,7 @@ public class ConsentService {
   private final JdbcTemplate tenant;
   private final Clock clock;
   private final ObjectMapper mapper;
+  private final TelemetryService telemetry;
 
   public ConsentService(
       AuthorizationService authz,
@@ -83,7 +86,8 @@ public class ConsentService {
       GuardService guard,
       JdbcTemplate tenantJdbcTemplate,
       Clock clock,
-      ObjectMapper mapper) {
+      ObjectMapper mapper,
+      TelemetryService telemetry) {
     this.authz = authz;
     this.audit = audit;
     this.snapshots = snapshots;
@@ -91,6 +95,7 @@ public class ConsentService {
     this.tenant = tenantJdbcTemplate;
     this.clock = clock;
     this.mapper = mapper;
+    this.telemetry = telemetry;
   }
 
   public record CreateRequest(
@@ -137,6 +142,15 @@ public class ConsentService {
   /** Opens a proof request against a currently usable credential. */
   @Transactional
   public RequestView create(ServiceAccountPrincipal caller, CreateRequest request) {
+    return telemetry.time(
+        caller.tenantId(),
+        TelemetryService.Stage.CONSENT_CREATE,
+        Set.of(InvalidConsentException.class, TrustUnavailableException.class,
+            GuardRejectedException.class),
+        () -> createInner(caller, request));
+  }
+
+  private RequestView createInner(ServiceAccountPrincipal caller, CreateRequest request) {
     ResourceRef resource =
         ResourceRef.tenantScoped("proof-request", "requests", caller.tenantId());
     Decision decision = authz.authorize(Optional.of(caller), Action.REQUEST_PROOF, resource);
@@ -188,6 +202,17 @@ public class ConsentService {
    */
   @Transactional
   public RequestView decide(ServiceAccountPrincipal caller, UUID requestId, DecisionRequest input) {
+    return telemetry.time(
+        caller.tenantId(),
+        TelemetryService.Stage.CONSENT_DECIDE,
+        Set.of(InvalidConsentException.class, ConsentNotFoundException.class,
+            AlreadyDecidedException.class, TrustUnavailableException.class,
+            GuardRejectedException.class),
+        () -> decideInner(caller, requestId, input));
+  }
+
+  private RequestView decideInner(
+      ServiceAccountPrincipal caller, UUID requestId, DecisionRequest input) {
     ResourceRef resource =
         ResourceRef.tenantScoped("proof-request", requestId.toString(), caller.tenantId());
     Decision decision = authz.authorize(Optional.of(caller), Action.DECIDE_CONSENT, resource);

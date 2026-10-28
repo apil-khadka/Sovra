@@ -39,6 +39,39 @@ No source database is globally reachable and no model tool can sign, approve con
 A completed synthetic slice supports Java migration review; the [production validation gates](security-validation-plan.md) remain separate.
 Use the [dated hackathon schedule](hackathon-milestone-plan.md) only for the synthetic milestone.
 
+## Clean-checkout reproduction (SOV-035)
+
+Clone the local repository to a fresh directory and reproduce the
+synthetic slice without private files or production secrets (`.intel/`
+is git-ignored, so the clone also proves its exclusion breaks nothing):
+
+```sh
+git clone /path/to/Sovra /tmp/sovra-clean-<rand>
+cd /tmp/sovra-clean-<rand>
+export JAVA_HOME=$HOME/.jdk/temurin-25/Contents/Home
+cd backend && ./mvnw verify
+pnpm --dir frontend install && pnpm --dir frontend run build
+python3 scripts/e2e-issuance.py
+```
+
+Requires Docker (Testcontainers plus Compose), JDK 25, Node.js 22 with
+pnpm, and the Python `cryptography` package. The e2e script boots and
+tears down its own Compose stack.
+
+Observed result (2026-10-28, synthetic profile only):
+
+- Backend `./mvnw verify`: 261 tests, 0 failures, 0 errors, BUILD SUCCESS.
+- Frontend `pnpm run build`: clean; `pnpm run lint`: 0 warnings, 0 errors.
+- `scripts/e2e-issuance.py`: PASS (issue 201, byte-identical replay,
+  JWKS-verified artifact, terminal REVOKED).
+- `scripts/smoke-two-instance.sh`: two instances UP plus READY with live
+  authority on both (run in the source checkout).
+
+This proof covers clean-checkout reproducibility only. Live-model
+acceptance (OD-02), SOV-036 profile qualification, the SOV-041 packaged
+consent-to-verification suite, and independent review remain open, and
+this gate grants no real-data or production authorization.
+
 ## Architecture review follow-up
 
 Use [SOV-004 v0.2](../architecture/decisions/SOV-004-provider-key-cache-contracts.md) for the identity/key reference and synthetic-development permission.

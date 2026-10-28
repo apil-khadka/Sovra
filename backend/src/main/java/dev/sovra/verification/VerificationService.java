@@ -12,6 +12,7 @@ import dev.sovra.crypto.HolderProofs;
 import dev.sovra.issuance.LocalDevSigner;
 import dev.sovra.issuance.StatusEvidenceFetcher;
 import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.ops.TelemetryService;
 import dev.sovra.trust.TrustService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -23,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -79,6 +81,7 @@ public class VerificationService {
   private final JdbcTemplate tenant;
   private final Clock clock;
   private final ObjectMapper mapper;
+  private final TelemetryService telemetry;
 
   public VerificationService(
       AuthorizationService authz,
@@ -87,7 +90,8 @@ public class VerificationService {
       StatusEvidenceFetcher status,
       JdbcTemplate tenantJdbcTemplate,
       Clock clock,
-      ObjectMapper mapper) {
+      ObjectMapper mapper,
+      TelemetryService telemetry) {
     this.authz = authz;
     this.audit = audit;
     this.snapshots = snapshots;
@@ -95,6 +99,7 @@ public class VerificationService {
     this.tenant = tenantJdbcTemplate;
     this.clock = clock;
     this.mapper = mapper;
+    this.telemetry = telemetry;
   }
 
   public record VerifyRequest(
@@ -118,6 +123,15 @@ public class VerificationService {
    */
   @Transactional
   public String verify(ServiceAccountPrincipal caller, VerifyRequest request) {
+    return telemetry.time(
+        caller.tenantId(),
+        TelemetryService.Stage.VERIFICATION_VERIFY,
+        Set.of(InvalidVerificationException.class, VerificationNotFoundException.class,
+            VerificationConflictException.class, HolderProofException.class),
+        () -> verifyInner(caller, request));
+  }
+
+  private String verifyInner(ServiceAccountPrincipal caller, VerifyRequest request) {
     ResourceRef resource =
         ResourceRef.tenantScoped("verification", "presentations", caller.tenantId());
     Decision decision = authz.authorize(Optional.of(caller), Action.VERIFY_PRESENTATION, resource);

@@ -9,6 +9,7 @@ import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.ops.TelemetryService;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -26,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -59,6 +61,7 @@ public class IssuanceService {
   private final JdbcTemplate tenant;
   private final Clock clock;
   private final ObjectMapper mapper;
+  private final TelemetryService telemetry;
 
   public IssuanceService(
       AuthorizationService authz,
@@ -68,7 +71,8 @@ public class IssuanceService {
       CredentialEncoder encoder,
       JdbcTemplate tenantJdbcTemplate,
       Clock clock,
-      ObjectMapper mapper) {
+      ObjectMapper mapper,
+      TelemetryService telemetry) {
     this.authz = authz;
     this.audit = audit;
     this.snapshots = snapshots;
@@ -77,6 +81,7 @@ public class IssuanceService {
     this.tenant = tenantJdbcTemplate;
     this.clock = clock;
     this.mapper = mapper;
+    this.telemetry = telemetry;
   }
 
   public record IssueRequest(
@@ -105,6 +110,18 @@ public class IssuanceService {
    */
   @Transactional
   public String issue(ServiceAccountPrincipal caller, IssueRequest request, String idempotencyKey) {
+    // One sanitized timing sample per call; the transaction boundary stays
+    // on this public method so proxy semantics are unchanged.
+    return telemetry.time(
+        caller.tenantId(),
+        TelemetryService.Stage.ISSUANCE_ISSUE,
+        Set.of(InvalidIssuanceException.class, TrustUnavailableException.class,
+            IdempotencyConflictException.class, SigningRefusedException.class),
+        () -> issueInner(caller, request, idempotencyKey));
+  }
+
+  private String issueInner(
+      ServiceAccountPrincipal caller, IssueRequest request, String idempotencyKey) {
     ResourceRef resource =
         ResourceRef.tenantScoped("credential", "issuance", caller.tenantId());
     Decision decision = authz.authorize(Optional.of(caller), Action.ISSUE_CREDENTIAL, resource);

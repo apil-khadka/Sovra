@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.2.0
+  version: 0.3.0
   description: >-
-    Exact contract of the implemented backend (SOV-005 through SOV-015).
+    Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
     pagination, ETags, RFC 9457 negotiation, idempotency) are specified
     in docs/engineering/api-compatibility.md. Each operation lists its
@@ -31,6 +31,75 @@ paths:
       responses:
         '200':
           description: UP with service name and version
+  /api/health/ready:
+    get:
+      operationId: readiness
+      x-sovra-scopes: []
+      summary: >-
+        Public semantic flow readiness (SOV-029). Liveness says the
+        process answers; readiness says the flow can proceed. 200 READY
+        only when every dependency probe is UP, otherwise 503 with the
+        sanitized per-check report. Details carry fixed codes and
+        numbers only, never exception text or identity data.
+      security: []
+      responses:
+        '200':
+          description: >-
+            {status READY, checks[{name, status UP, code, detail,
+            durationMs}]}
+        '503':
+          description: >-
+            {status NOT_READY, checks[...]} with at least one
+            DEGRADED/DOWN check
+  /api/alerts:
+    get:
+      operationId: listAlerts
+      x-sovra-scopes: [AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Active security alerts derived from semantic readiness
+        (SOV-029). Global derived state with fixed names, severities,
+        and codes; no tenant data.
+      responses:
+        '200':
+          description: >-
+            [{alert, severity critical|high|medium, status, code, check,
+            firstObservedAt, observedAt}]
+        '401': { description: Anonymous }
+        '403': { description: Lacks AUDIT_READER/TRUST_ADMIN }
+  /api/telemetry/summary:
+    get:
+      operationId: telemetrySummary
+      x-sovra-scopes: [TENANT_MEMBER, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Sanitized stage timings and reason metrics for the caller's
+        own tenant (SOV-029). Fixed stage/outcome names with durations
+        and counts only; no request content or error text.
+      responses:
+        '200':
+          description: >-
+            {stages: {ISSUANCE_ISSUE|CONSENT_CREATE|CONSENT_DECIDE|
+            VERIFICATION_VERIFY: {count, p50Ms, p95Ms, maxMs,
+            outcomes}}, reasons: [{action, decision, reasonCode,
+            count}]}
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/AUDIT_READER/TRUST_ADMIN }
+  /api/telemetry/canary:
+    post:
+      operationId: runCanary
+      x-sovra-scopes: [TENANT_MEMBER, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Success/failure canary over the log, error, metric, and
+        fixture-model containment paths (SOV-029). Takes no input;
+        the server-side sentinel is never echoed. The model probe is
+        deterministic and labeled FIXTURE (no model call).
+      responses:
+        '200':
+          description: >-
+            {synthetic true, mode FIXTURE, channels {logs, errors,
+            metrics, modelFixture {label, caseId, contained, noPath}},
+            contained}
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/AUDIT_READER/TRUST_ADMIN }
   /api/whoami:
     get:
       operationId: whoami
