@@ -1,7 +1,7 @@
 # SOV-001: proof profile decision record
 
-**Version:** 0.2 (proposed G0 decision, pending independent review).
-**Date:** 2026-10-28 (v0.1); revision note 2026-10-28 (v0.2, section 9).
+**Version:** 0.3 (selected development profile; qualification and independent review pending).
+**Date:** 2026-10-28 (v0.1 through v0.3; sections 9 and 10 record sequencing revisions).
 **Task:** [SOV-001](https://github.com/apil-khadka/Sovra/issues/5)
 (freeze proof profile, issuer assurance, freshness and session semantics).
 **Owner decision:** full interoperable profile now; the narrow-attestation
@@ -138,7 +138,7 @@ constitutes an interoperability certification.
 
 ## 8. Approval
 
-- [ ] Independent security review of this record (required before SOV-005/SOV-008 start).
+- [ ] Independent review under SOV-037 before real-data provisioning/processing; synthetic work may proceed against the selected contracts without claiming interoperability qualification.
 - [ ] Library conditions 1-4 evidenced in SOV-004/SOV-036.
 - [ ] Record revision on any profile, algorithm, library, or value change.
 
@@ -170,3 +170,12 @@ deliberately not an SD-JWT VC:
 
 Nothing in this note weakens the frozen profile above: it sequences the
 build, and the synthetic artifact satisfies no interop claim.
+
+## 10. Profile qualification sequencing (v0.3 revision)
+
+SOV-036 is mandatory G1 library/profile qualification, not optional expanded product scope.
+It qualifies the selected issuer/verifier/format adapters using independent fixtures before SOV-010/011 integration is accepted.
+It does not depend on the final whole-product SEC suite or holder-custody release, which would create a circular implementation gate.
+SOV-041 subsequently exercises the actual packaged consent-to-verification path, and SOV-032/034 retain full integrated/independent release assessment.
+Library coordinates and protocol versions remain candidates until their source, support, dependency/provenance, Java 25 and exact-profile tests pass.
+An available `.sha1` file is not a substitute for an independently trusted artifact origin and strong digest/provenance policy.

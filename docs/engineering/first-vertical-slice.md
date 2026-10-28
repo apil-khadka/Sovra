@@ -16,7 +16,8 @@ The TypeScript prototype was removed by explicit decision; its preserved JSON fi
 
 ## Implementation sequence
 
-1. Implement a synthetic issuer and approved narrow claim such as `adultOver18`, constrained signing and idempotent issuance with explicit key/profile/version bindings.
+1. Qualify the selected SD-JWT VC/OpenID adapters under SOV-036, then implement the synthetic issuer and permitted `adultOver18` claim with constrained signing and idempotency.
+   The existing labelled synthetic JWS may scaffold controls but does not satisfy selected-profile acceptance.
 2. Implement an RP proof request and holder page showing the exact RP, purpose, claims and expiry before explicit approval.
 3. Validate proof/profile, holder, audience, consent, policy, trust/status and freshness, then atomically commit one-time challenge consumption and the immutable decision/audit relation.
 4. Connect the actual Meta endpoint through bounded Spring AI tools using only approved schemas, policy excerpts and minimized synthetic context.
@@ -37,3 +38,10 @@ The TypeScript prototype was removed by explicit decision; its preserved JSON fi
 No source database is globally reachable and no model tool can sign, approve consent, modify trust/policy or accept a proof.
 A completed synthetic slice supports Java migration review; the [production validation gates](security-validation-plan.md) remain separate.
 Use the [dated hackathon schedule](hackathon-milestone-plan.md) only for the synthetic milestone.
+
+## Architecture review follow-up
+
+Use [SOV-004 v0.2](../architecture/decisions/SOV-004-provider-key-cache-contracts.md) for the identity/key reference and synthetic-development permission.
+SOV-041 must run the actual packaged consent-to-verification HTTP/browser flow across two backend instances, not just validate a credential signature.
+SOV-036 qualification precedes integration acceptance without depending on SOV-032 final whole-product assessment.
+Independent SOV-037 review and SOV-039 location approval remain gates before real-data provisioning/processing.

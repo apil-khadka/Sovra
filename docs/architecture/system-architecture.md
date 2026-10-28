@@ -51,6 +51,12 @@ Its [issuer-node API draft](../engineering/issuer-node-api.openapi.yaml) is a de
 
 ## Required production control boundaries
 
+The [provider architecture assessment](identity-key-provider-architecture.md) recommends issuer-local Keycloak and a Google Cloud Single-tenant HSM/Confidential Space reference subject to approved issuer/location capability.
+Human OIDC/BFF sessions, machine credentials and cloud key-use identity are distinct boundaries.
+The attested signing/vault gateways authorize typed current operations and protected input channels; ordinary hosts, decoder workers and shared federation services cannot inherit direct issuer-key authority.
+Sensitive input TLS and plaintext processing must remain inside the approved confidentiality boundary, while issuer signing keys remain non-exportable in the HSM.
+Synthetic development may proceed; independent design review, actual location approval and deployed attested denial tests remain unsatisfied live-data gates.
+
 The deployment separates signing, decryption, hostile-file workers, review, deployment/migration and audit identities even where application modules share a repository.
 Privileged access uses phishing-resistant enrollment/recovery and bounded elevation; ultimate host/root powers remain an explicit deployment decision.
 Recovery fences old writers and preserves or invalidates replay/revocation/trust/approval state before traffic resumes.

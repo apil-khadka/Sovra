@@ -1,39 +1,52 @@
 # Implementation backlog
 
-**Baseline:** business SRS v0.5, 2026-10-27.
-**State:** planned work awaiting maintainer triage; no application/security gate is complete.
+**Baseline:** business SRS v0.6, 2026-10-28.
+**State:** partial synthetic implementations exist; acceptance and release evidence require maintainer triage.
 
-This backlog covers the Java/Spring business application, issuer-local images and extraction, identity lifecycle, integrations, SDKs, dashboards and required security evidence.
-The [implementation plan](implementation-plan.md) defines release gates; the [SRS](../requirements/software-requirements-specification.md) remains the requirement authority.
-The [task registry](implementation-tasks.json) contains the same stable IDs, dependencies, requirement/test references and tracker URLs in machine-readable form.
+This backlog contains 41 tasks for the Java/Spring business application, issuer-local identity/documents, protocol qualification, SDKs, dashboards, deployed security and independent release evidence.
+The [SRS](../requirements/software-requirements-specification.md) defines requirements and the [implementation plan](implementation-plan.md) defines delivery gates.
+The [task registry](implementation-tasks.json) contains the same task IDs, dependencies, acceptance criteria and tracker URLs for tooling.
+The [provider architecture assessment](../architecture/identity-key-provider-architecture.md) records the selected reference and ARCH-01 through ARCH-08.
 
-## How to use the tasks
+## Development and release boundaries
 
-Each task is initially `needs-triage` with a proposed priority and an accountable owner role, not an assigned person.
-A maintainer confirms scope, names an owner and applies the repository's priority/status workflow.
-Dependencies must meet their acceptance criteria before dependent integration is accepted; isolated design and synthetic scaffolding may proceed without asserting those dependencies are complete.
-Component security tests ship with each implementation task; SOV-032 consolidates coverage and independent assertions rather than delaying testing until the end.
-SOV-036 is conditional scope and is excluded from the initial narrow-attestation release unless its profile is selected.
-If selected, it must pass before the SOV-034 release decision.
+Confirmed initial launch: public demo with synthetic identities/documents only and no new paid services, subscriptions or hardware.
+Use self-hosted Keycloak and existing or verified no-charge resources; paid HSM/TEE qualification is deferred and real-ID ingestion remains disabled.
+Before publication, verify external capacity and charge prevention, restricted demo actions, rotated secrets, private administration and bounded resource use.
+Actual visitor/authentication metadata still requires minimization/protection, and fixtures never count as a live model call.
 
-Task numbering is stable and is not execution order.
-The graph includes forward references; follow dependencies and gates rather than ascending ID order.
-No dates or effort estimates override security gates.
-Do not attach secrets, identity data, raw credentials or private research to issues or evidence.
+The selected reference is issuer-local Keycloak plus Google Cloud KMS Single-tenant HSM/Confidential Space where the complete issuer-approved location/capability intersection exists.
+Synthetic SOV-006 and G1 development can proceed under SOV-001/002/004 contracts without a production account or completed external assessment.
+SOV-037 independent assessment and SOV-039 actual issuer/location approval remain gates before real-data provisioning/processing.
+SOV-027/028/038 provide isolated deployment, artifact admission and deployed attested key/input-path evidence; SOV-032/033/034 retain complete release assessment.
+No architecture recommendation, source observation or historical test report closes a live-data/security gate.
+
+SOV-036 is mandatory G1 qualification for the already selected full interoperable profile.
+It no longer depends on final whole-product SEC coverage or holder-custody release, avoiding a circular prerequisite.
+SOV-010/011 integrate the qualified profile and SOV-041 proves the packaged consent-to-verification flow across two instances.
+An independent credential-signature probe is issuance evidence, not complete verification E2E evidence.
+
+## Triage and closure
+
+Stable numbering is not execution order; follow dependencies, including forward references.
+An owner role is a responsibility, not an assigned person or an appointed external assessor.
+Existing task status is retained for maintainer triage; source observations do not assert full acceptance.
+Dependencies must meet the relevant criteria before dependent integration is accepted, while isolated synthetic design/scaffolding may proceed without claiming those dependencies passed.
+Security tests ship with each component; SOV-032 consolidates and assesses evidence rather than deferring testing to the end.
+Record exact commits/artifacts, effective configuration, reproducible commands, independently asserted positive/negative results and retested findings.
+Do not attach identity data, credentials, secrets or private research to public issues/evidence.
 
 ## Gate map
 
-| Gate | Result | Principal task groups |
-| --- | --- | --- |
-| G0 | Approved proof, locality/root, identity/key and cache contracts | SOV-001, SOV-002, SOV-004 |
-| G1 | Reproducible Java synthetic issuance/consent/verification with live bounded planning | SOV-003, SOV-005, SOV-007 through SOV-015, SOV-029, SOV-035 |
-| G2 | Approved and tested sensitive-document, custody, deployment and recovery boundaries using synthetic data | SOV-006, SOV-016 through SOV-020, SOV-027, SOV-028, SOV-030, SOV-031 |
-| G3 | Customer integration and dashboards plus complete SEC/MC/ASVS and independent release evidence | SOV-021 through SOV-026, SOV-032 through SOV-034 |
-| Conditional | Tested expanded interoperable/selective-disclosure profile | SOV-036 |
+| Gate | Principal scope |
+| --- | --- |
+| G0 | SOV-001/002/004 contracts; SOV-039 deployment/location qualification and SOV-037 independent design assessment remain unsatisfied live-data gates |
+| G1 | Java authority/audit/trust/issuance, mandatory SOV-036 profile qualification, consent/verification/status, bounded AI/guard, SOV-040 authority hardening and SOV-041 packaged E2E |
+| G2 | Privileged lifecycle, document/custody features, isolated deployment, budgets/recovery and SOV-038 attested HSM/input gateways, tested with synthetic data |
+| G3 | SDK/portal/dashboards and applicable SEC/MC/ASVS evidence, independent assessment, finding retest and accountable production release |
 
-G2 completion prepares the sensitive-data boundary but does not authorize real-data processing.
-Real data and customer operation require the applicable G3 security/review evidence and named release approval under the SRS.
-The synthetic milestone can pass G1 without shipping document custody or all business screens.
+G2 completion alone does not authorize real-data collection, signing, decryption or customer operation.
+All selected-profile, authority, locality, consent and replay requirements remain applicable across rollback and recovery.
 
 ## Task index
 
@@ -48,8 +61,8 @@ The synthetic milestone can pass G1 without shipping document custody or all bus
 | [SOV-007](#sov-007) | Implement durable privacy-minimized audit and decision evidence | G1 | p0 | SOV-002, SOV-003, SOV-004, SOV-005 | [Issue](https://github.com/apil-khadka/Sovra/issues/11) |
 | [SOV-008](#sov-008) | Implement versioned trust registry and approved RP policies | G1 | p0 | SOV-001, SOV-003, SOV-005, SOV-007 | [Issue](https://github.com/apil-khadka/Sovra/issues/12) |
 | [SOV-009](#sov-009) | Implement issuer-scoped issuance and constrained signing | G1 | p0 | SOV-001, SOV-003, SOV-004, SOV-005, SOV-007, SOV-008 | [Issue](https://github.com/apil-khadka/Sovra/issues/13) |
-| [SOV-010](#sov-010) | Implement consent-bound proof requests and minimal holder flow | G1 | p0 | SOV-001, SOV-003, SOV-005, SOV-007, SOV-008 | [Issue](https://github.com/apil-khadka/Sovra/issues/14) |
-| [SOV-011](#sov-011) | Implement durable multi-instance verification and replay-safe acceptance | G1 | p0 | SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-009, SOV-010 | [Issue](https://github.com/apil-khadka/Sovra/issues/15) |
+| [SOV-010](#sov-010) | Implement consent-bound proof requests and minimal holder flow | G1 | p0 | SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/14) |
+| [SOV-011](#sov-011) | Implement durable multi-instance verification and replay-safe acceptance | G1 | p0 | SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-009, SOV-010, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/15) |
 | [SOV-012](#sov-012) | Implement freshness, revocation and key-compromise lifecycle | G1 | p0 | SOV-001, SOV-004, SOV-007, SOV-008, SOV-009, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/16) |
 | [SOV-013](#sov-013) | Integrate live Meta planning through bounded Spring AI tools | G1 | p1 | SOV-003, SOV-005, SOV-008, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/18) |
 | [SOV-014](#sov-014) | Port deterministic plan guard and citation validation | G1 | p0 | SOV-001, SOV-003, SOV-008 | [Issue](https://github.com/apil-khadka/Sovra/issues/19) |
@@ -65,22 +78,23 @@ The synthetic milestone can pass G1 without shipping document custody or all bus
 | [SOV-024](#sov-024) | Build holder enrollment, consent and credential dashboard | G3 | p1 | SOV-005, SOV-010, SOV-015, SOV-019, SOV-020 | [Issue](https://github.com/apil-khadka/Sovra/issues/29) |
 | [SOV-025](#sov-025) | Build RP and organization integration dashboard | G3 | p1 | SOV-005, SOV-006, SOV-015, SOV-021, SOV-022 | [Issue](https://github.com/apil-khadka/Sovra/issues/30) |
 | [SOV-026](#sov-026) | Build governed federation and security operations dashboard | G3 | p1 | SOV-005, SOV-006, SOV-007, SOV-008, SOV-015, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/32) |
-| [SOV-027](#sov-027) | Implement approved issuer-local deployment and isolation | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/21) |
+| [SOV-027](#sov-027) | Implement approved issuer-local deployment and isolation | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-037, SOV-039 | [Issue](https://github.com/apil-khadka/Sovra/issues/21) |
 | [SOV-028](#sov-028) | Implement supply-chain provenance and artifact admission | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-027 | [Issue](https://github.com/apil-khadka/Sovra/issues/33) |
 | [SOV-029](#sov-029) | Implement semantic health, safe telemetry and security alerts | G1 | p0 | SOV-003, SOV-005, SOV-007, SOV-008, SOV-011, SOV-012 | [Issue](https://github.com/apil-khadka/Sovra/issues/31) |
 | [SOV-030](#sov-030) | Approve and enforce service, resource and recovery budgets | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-015, SOV-027, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/34) |
 | [SOV-031](#sov-031) | Implement replay-safe recovery, key-copy containment and rollback | G2 | p0 | SOV-007, SOV-008, SOV-009, SOV-011, SOV-012, SOV-016, SOV-020, SOV-027, SOV-029, SOV-030 | [Issue](https://github.com/apil-khadka/Sovra/issues/35) |
-| [SOV-032](#sov-032) | Complete SEC suite and ASVS applicability evidence | G3 | p0 | SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031 | [Issue](https://github.com/apil-khadka/Sovra/issues/36) |
+| [SOV-032](#sov-032) | Complete SEC suite and ASVS applicability evidence | G3 | p0 | SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-036, SOV-038, SOV-040, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/36) |
 | [SOV-033](#sov-033) | Execute mission-critical attack, load, failover and rollback exercises | G3 | p0 | SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-032 | [Issue](https://github.com/apil-khadka/Sovra/issues/37) |
-| [SOV-034](#sov-034) | Obtain independent review and production release decision | G3 | p0 | SOV-032, SOV-033, SOV-035 | [Issue](https://github.com/apil-khadka/Sovra/issues/39) |
-| [SOV-035](#sov-035) | Prove clean-checkout Java synthetic cross-issuer vertical slice | G1 | p0 | SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/38) |
-| [SOV-036](#sov-036) | Add interoperable selective disclosure under an approved profile | Conditional | p2 | SOV-001, SOV-009, SOV-012, SOV-020, SOV-032 | [Issue](https://github.com/apil-khadka/Sovra/issues/40) |
+| [SOV-034](#sov-034) | Obtain independent review and production release decision | G3 | p0 | SOV-032, SOV-033, SOV-035, SOV-036, SOV-037, SOV-038, SOV-039, SOV-040, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/39) |
+| [SOV-035](#sov-035) | Prove clean-checkout Java synthetic cross-issuer vertical slice | G1 | p0 | SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029, SOV-036, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/38) |
+| [SOV-036](#sov-036) | Qualify selected SD-JWT VC and OpenID libraries and profile adapters | G1 | p0 | SOV-001, SOV-003, SOV-004, SOV-009, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/40) |
+| [SOV-037](#sov-037) | Obtain independent G0 architecture, privacy and custody assessment | G0 | p0 | SOV-001, SOV-002, SOV-004, SOV-039 | [Issue](https://github.com/apil-khadka/Sovra/issues/42) |
+| [SOV-038](#sov-038) | Implement attested HSM authorization and confidential input gateways | G2 | p0 | SOV-004, SOV-006, SOV-016, SOV-027, SOV-028, SOV-040 | [Issue](https://github.com/apil-khadka/Sovra/issues/44) |
+| [SOV-039](#sov-039) | Approve the first issuer jurisdiction and complete provider capability matrix | G0 | p0 | SOV-002, SOV-004 | [Issue](https://github.com/apil-khadka/Sovra/issues/41) |
+| [SOV-040](#sov-040) | Harden issuer bindings, immutable approval identity and sealed trust snapshots | G1 | p0 | SOV-004, SOV-005, SOV-008, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/43) |
+| [SOV-041](#sov-041) | Add packaged two-instance consent-to-verification end-to-end suite | G1 | p0 | SOV-010, SOV-011, SOV-012, SOV-015, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/45) |
 
 ## Acceptance and evidence
-
-Every implementation task requires tests of its public/user-facing paths, negative authorization and safe failure where relevant.
-A design-only task closes a decision and does not establish implemented security.
-Closure records the implementing commit/artifact, exact environment/configuration, reproducible commands and sanitized results; independent assessment remains separate from the author's own assertions.
 
 ### SOV-001
 
@@ -122,7 +136,7 @@ Acceptance criteria:
 
 - Approve a data-flow inventory covering originals, derivatives, keys, TLS termination, OCR, telemetry, support, backups and failover.
 - Record retention/deletion obligations, permitted disclosures and provider/operator/root visibility for each location.
-- Decide whether attested confidential processing is required; document remaining administrative override powers and issuer approval.
+- Apply the mandatory attested sensitive-processing boundary and SOV-002 v0.2 non-exportable-key recovery clarification; document remaining root powers and obtain issuer/privacy approval before real-data use.
 
 Required closure evidence:
 
@@ -140,6 +154,7 @@ Dependencies: None.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/7).
 Requirements: NFR-06, NFR-07, NFR-08, SR-14.
 Validation: SEC-29.
+Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
@@ -170,6 +185,9 @@ Acceptance criteria:
 - Approve provider, region/operator, key algorithms, envelope/AAD/nonce format and signing/unwrap interfaces.
 - Specify MFA enrollment/recovery, JIT elevation, independent approvals and separate workload/deploy/migration/key/audit identities.
 - Define measurable token, grant, DEK and positive-permission cache bounds, restored-key inventories and control/data-plane outage rules.
+- Use SOV-004 v0.2: issuer-local Keycloak and the Google Cloud Single-tenant HSM/Confidential Space reference; actual issuer regions remain subject to SOV-039 and independent assessment to SOV-037.
+- Disable cross-request plaintext-DEK caching, distinguish local five-second stop freshness from cloud IAM/token propagation, and qualify attested key-use/input channels under SOV-038.
+- Initial delivery is a public synthetic-data demo with no new paid services or hardware; the cloud HSM/TEE reference is deferred qualification and is not a demo provisioning dependency.
 
 Required closure evidence:
 
@@ -185,14 +203,17 @@ Owner role: Backend security.
 Gate: G1; proposed priority: p0; state: needs-triage.
 Dependencies: SOV-002, SOV-003, SOV-004.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/9).
-Requirements: FR-01, FR-16, FR-24, DR-06, IF-02, IF-06, SR-01, SR-15, SR-27.
+Requirements: FR-01, FR-16, FR-24, DR-06, IF-02, IF-06, SR-01, SR-15, SR-27, SR-34, SR-35.
 Validation: SEC-01, SEC-02, SEC-03, SEC-25, SEC-26, SEC-31, MC-01, MC-06.
+Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
 - Enforce authenticated principal, tenant, issuer/RP, action and object authority at HTTP and service entry points.
 - Run database access under non-owner, non-superuser roles without BYPASSRLS; separate migrations and test pooled tenant context.
 - Deny cross-boundary reads, existence leaks, alternate-controller bypass and caller-supplied identity/proxy overrides in packaged tests.
+- Revalidate current roles and entitlement/elevation epochs after authentication and before privileged operations; exercise removal during warm caches and queued work rather than checking credential liveness alone.
+- Bind tenant and legal issuer separately; a session GUC is request isolation rather than a defense against a database role able to issue arbitrary SQL.
 
 Required closure evidence:
 
@@ -208,7 +229,7 @@ Owner role: Identity and security.
 Gate: G2; proposed priority: p0; state: needs-triage.
 Dependencies: SOV-004, SOV-005.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/10).
-Requirements: FR-26, FR-28, FR-47, SR-02, SR-26, SR-27, SR-29.
+Requirements: FR-26, FR-28, FR-47, SR-02, SR-26, SR-27, SR-29, SR-34, SR-35.
 Validation: SEC-01, SEC-26, SEC-32, SEC-43, MC-01, MC-09.
 SRS acceptance: AC-16.
 Open decisions to resolve or implement: OD-10, OD-18.
@@ -218,6 +239,11 @@ Acceptance criteria:
 - Implement phishing-resistant privileged enrollment, authentication, recovery and bounded elevation with independent high-impact approvals.
 - Separate sandbox/production applications, approved scopes/origins/audiences, secret rotation and revocation.
 - Exercise stolen sessions, removed roles, weak recovery and warm authorization caches within approved containment bounds.
+- Implement issuer-local Keycloak OIDC authorization code with S256 PKCE through a Spring BFF, server-held tokens, protected cookies/CSRF and an allowlisted issuer/audience/redirect registry; keep machine authentication separate.
+- Enforce verified hardware-bound privileged authentication context, controlled enrollment/recovery without weak-factor fallback, stable (iss, sub) membership and independently approved action-bound elevation.
+- Local synthetic Keycloak development may proceed under SOV-004 v0.2; production identity tenant, cloud credentials and independent release approvals are not prerequisites for writing that synthetic implementation and are not claimed completed.
+- Pin a maintained Keycloak server/container and its supported runtime; enforce reviewed attestation trust/AAGUID and user-verification policy at privileged enrollment, reject weaker legacy credentials/fallback, and test configuration drift and recovery.
+- For the public synthetic demo, use self-hosted Keycloak on existing or verified no-charge resources with restricted demo accounts; do not require paid hosted identity, SMS, email or new security-key purchases, and do not claim unavailable hardware assurance passed.
 
 Required closure evidence:
 
@@ -236,6 +262,7 @@ Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/11).
 Requirements: FR-27, DR-08, SR-12, SR-16, INV-02.
 Validation: SEC-20, SEC-28, MC-06, MC-08.
 Open decisions to resolve or implement: OD-07, OD-11.
+Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
@@ -257,14 +284,16 @@ Owner role: Trust and policy backend.
 Gate: G1; proposed priority: p0; state: needs-triage.
 Dependencies: SOV-001, SOV-003, SOV-005, SOV-007.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/12).
-Requirements: FR-03, FR-13, FR-17, FR-18, FR-25, FR-32, DR-05, SR-05, SR-06, INV-03, INV-05, INV-06.
+Requirements: FR-03, FR-13, FR-17, FR-18, FR-25, FR-32, DR-05, SR-05, SR-06, INV-03, INV-05, INV-06, SR-35.
 Validation: SEC-11, SEC-12, SEC-13.
+Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
 - Implement scoped issuer/type/claim/purpose approval, immutable policy/trust revisions and effective epochs.
 - Validate approved metadata endpoints, signed key bindings, freshness and separately authorized changes.
 - Prove AI, ordinary admins and unapproved schemas cannot create policy authority or broaden trust.
+- SOV-040 must seal activated snapshot membership and bind independently authenticated immutable approvers; inequality of supplied names is not independent approval against a compromised runtime/database writer.
 
 Required closure evidence:
 
@@ -280,14 +309,16 @@ Owner role: Credential backend and key operations.
 Gate: G1; proposed priority: p0; state: needs-triage.
 Dependencies: SOV-001, SOV-003, SOV-004, SOV-005, SOV-007, SOV-008.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/13).
-Requirements: FR-02, FR-23, DR-05, DR-09, IF-05, SR-03, SR-13, SR-27, INV-03, INV-08.
+Requirements: FR-02, FR-23, DR-05, DR-09, IF-05, SR-03, SR-13, SR-27, INV-03, INV-08, SR-35.
 Validation: SEC-04, SEC-05, SEC-06, SEC-14, SEC-26, MC-06.
+Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
 - Issue only permitted profile claims from authorized synthetic issuer inputs and current trust/type scope.
 - Bind credential ID, holder, key version, validity and status; make authorized duplicate retries recover the same result.
 - Constrain the signing boundary to approved issuance evidence; reject arbitrary payload, wrong-issuer signing, key export and self-granted key permissions.
+- Keep synthetic issuance explicitly labelled; the production boundary validates typed issuer/source/approval authority before invoking the byte-signing adapter and rejects synthetic genesis/key/configuration on every production path.
 
 Required closure evidence:
 
@@ -301,7 +332,7 @@ Required closure evidence:
 
 Owner role: Verifier backend and holder frontend.
 Gate: G1; proposed priority: p0; state: needs-triage.
-Dependencies: SOV-001, SOV-003, SOV-005, SOV-007, SOV-008.
+Dependencies: SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/14).
 Requirements: FR-07, FR-20, FR-21, DR-02, SR-05, UX-01, UX-02, UX-03, UX-04, INV-05.
 Validation: SEC-13, SEC-23, SEC-24, SEC-32.
@@ -324,7 +355,7 @@ Required closure evidence:
 
 Owner role: Verifier backend.
 Gate: G1; proposed priority: p0; state: needs-triage.
-Dependencies: SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-009, SOV-010.
+Dependencies: SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-009, SOV-010, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/15).
 Requirements: FR-08, FR-19, FR-21, FR-22, FR-31, SR-04, SR-05, SR-06, INV-01, INV-02, INV-05, INV-07, INV-08.
 Validation: SEC-04, SEC-07, SEC-08, SEC-09, SEC-10, SEC-11, SEC-12, SEC-13.
@@ -336,6 +367,7 @@ Acceptance criteria:
 - Validate signature/profile, holder, audience, consent, policy, trust scope/status/freshness and session bindings before acceptance.
 - Commit nonce consumption, immutable decision and required audit relation atomically across two instances.
 - Exercise concurrency, process kill, commit ambiguity and response loss; only authorized retrieval may return an existing result and manual follow-up cannot rewrite invalid evidence.
+- Accept the selected SD-JWT VC/OpenID4VP profile only after SOV-036 qualification; a custom synthetic JWS or independent issuer-signature check does not satisfy the interoperable verification gate.
 
 Required closure evidence:
 
@@ -457,6 +489,7 @@ Acceptance criteria:
 - Use reviewed per-object-version envelope AEAD, fresh DEKs, protected context and approved local wrapping keys.
 - Authorize current principal, issuer, object/version, purpose and workload before unwrap; release no plaintext before full authentication.
 - Test ciphertext/tag/context/key substitution, nonce concurrency/retry safety, expired/revoked grants and KMS/cache outages with no plaintext fallback.
+- Use zero cross-request plaintext-DEK cache entries, current purpose/object/version grants and the attested vault gateway; require SOV-038 deployed input/key-use denial evidence before real-data release.
 
 Required closure evidence:
 
@@ -558,6 +591,7 @@ Acceptance criteria:
 - Implement approved client/server key custody, presentation binding, loss/theft/recovery and administrator limitations.
 - Ensure recovery invalidates affected authority under declared bounds without bypassing proof/consent or resurrecting revoked credentials.
 - Assess supported browsers, keyboard/focus/labels and assistive technology against an approved accessibility target with actual recovery/consent flows.
+- Keep non-exportable device keys out of server backups; recover permitted encrypted credential state through re-proof, new keys and profile-compliant reissuance/rebinding with old authority revoked, subject to the SOV-002 v0.2 custody approval.
 
 Required closure evidence:
 
@@ -718,7 +752,7 @@ Required closure evidence:
 
 Owner role: Platform security and operations.
 Gate: G2; proposed priority: p0; state: needs-triage.
-Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-015.
+Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-037, SOV-039.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/21).
 Requirements: DR-01, DR-04, DR-11, IF-08, SR-09, SR-11, SR-15, SR-25, SR-27, SR-30, SR-33, INV-11, INV-13, NFR-14.
 Validation: SEC-17, SEC-23, SEC-25, SEC-26, SEC-31, SEC-40, SEC-41, MC-02, MC-05, MC-06.
@@ -730,6 +764,8 @@ Acceptance criteria:
 - Implement approved ingress/TLS termination, private data/key paths, issuer-local OCR/storage/backups and management-plane separation.
 - Apply distinct workload/runtime/deployment/migration/audit identities, database privilege controls and explicit egress restrictions.
 - Test alternate ingress, direct DB/key access, DNS/redirect SSRF, support paths and outage routing against the approved locality/root threat model.
+- Serving containers receive no migration-owner credentials or schema-administration capability; a separately approved migration job owns schema changes.
+- Keep issuer identity metadata, TLS/input processing, confidential runtime, storage, HSM, backup and support paths within the approved capability matrix; expose no ordinary-host plaintext ingress bypass.
 
 Required closure evidence:
 
@@ -840,7 +876,7 @@ Required closure evidence:
 
 Owner role: Security validation.
 Gate: G3; proposed priority: p0; state: needs-triage.
-Dependencies: SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031.
+Dependencies: SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-036, SOV-038, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/36).
 Requirements: SR-10, SR-17, SR-18, NFR-01, NFR-06, NFR-15, NFR-17.
 Validation: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, SEC-10, SEC-11, SEC-12, SEC-13, SEC-14, SEC-15, SEC-16, SEC-17, SEC-18, SEC-19, SEC-20, SEC-21, SEC-22, SEC-23, SEC-24, SEC-25, SEC-26, SEC-27, SEC-28, SEC-29, SEC-30, SEC-31, SEC-32, SEC-33, SEC-34, SEC-35, SEC-36, SEC-37, SEC-38, SEC-39, SEC-40, SEC-41, SEC-42, SEC-43, SEC-44.
@@ -889,7 +925,7 @@ Required closure evidence:
 
 Owner role: Independent security reviewer and release authority.
 Gate: G3; proposed priority: p0; state: needs-triage.
-Dependencies: SOV-032, SOV-033, SOV-035.
+Dependencies: SOV-032, SOV-033, SOV-035, SOV-036, SOV-037, SOV-038, SOV-039, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/39).
 Requirements: SR-18, SR-33, NFR-04, NFR-12, NFR-17.
 Validation: SEC-30, MC-01, MC-02, MC-03, MC-04, MC-05, MC-06, MC-07, MC-08, MC-09, MC-10.
@@ -901,7 +937,7 @@ Acceptance criteria:
 - Obtain independent proof/profile, application, infrastructure, privacy/residency and privileged/root boundary review for the exact deployment/customer scope.
 - Retest findings, close every applicable open decision and require complete SEC/MC/ASVS evidence with no unresolved high/critical finding.
 - Have named accountable release/issuer authorities approve the real-data and production gates; publish only evidence-supported claims and limitations.
-- If the expanded interoperable/selective-disclosure profile is selected, require SOV-036 to pass before approving that release.
+- Require mandatory SOV-036 profile qualification, SOV-037 independent design assessment, SOV-039 jurisdiction approval and SOV-038/040/041 implementation evidence before approving real-data release.
 
 Required closure evidence:
 
@@ -915,7 +951,7 @@ Required closure evidence:
 
 Owner role: Backend integration and E2E.
 Gate: G1; proposed priority: p0; state: needs-triage.
-Dependencies: SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029.
+Dependencies: SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029, SOV-036, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/38).
 Requirements: FR-04, FR-09, FR-10, FR-11, FR-12, FR-19, FR-20, FR-21, FR-22, NFR-01, NFR-07, NFR-10.
 Validation: SEC-04, SEC-08, SEC-09, SEC-11, SEC-12, SEC-13, SEC-15, SEC-16, SEC-18, SEC-19, SEC-20.
@@ -927,6 +963,9 @@ Acceptance criteria:
 - Reproduce the Java issuer-to-holder-to-verifier flow from a clean checkout using synthetic jurisdictions, scoped keys/data and a real Meta call.
 - Prove SRS AC-01 through AC-08, including refusal, tampering, replay, stale/unknown authority, incompatible plans and no source-record/model PII exchange.
 - Retain commands, immutable versions, complete positive/negative outcomes and sanitized evidence; this gate grants no real-data or production authorization.
+- Publish only bundled or pre-approved synthetic identity/document fixtures; reject real-ID uploads and disable production issuer connectivity and credential authority while minimizing actual visitor/authentication metadata.
+- Before public exposure, verify zero-new-payment hosting/external-service capacity and charge prevention, rotate deployment secrets, keep administration private and prove bounded demo actions/resource use; local Compose defaults are not publication approval.
+- Use a live model only within verified no-charge capacity; label unavailable or fixture-driven planning truthfully and do not count fixture mode as completed live-Meta acceptance.
 
 Required closure evidence:
 
@@ -936,25 +975,154 @@ Required closure evidence:
 
 ### SOV-036
 
-**Add interoperable selective disclosure under an approved profile**
+**Qualify selected SD-JWT VC and OpenID libraries and profile adapters**
 
 Owner role: Credential interoperability.
-Gate: Conditional; proposed priority: p2; state: needs-triage.
-Dependencies: SOV-001, SOV-009, SOV-012, SOV-020, SOV-032.
+Gate: G1; proposed priority: p0; state: needs-triage.
+Dependencies: SOV-001, SOV-003, SOV-004, SOV-009, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/40).
 Requirements: FR-14, FR-15, DR-02, DR-16, SR-03, NFR-12.
 Validation: SEC-04, SEC-05, SEC-06, SEC-30.
 Open decisions to resolve or implement: OD-01.
-Condition: Requires separate approval of expanded proof-profile scope; excluded from initial narrow-attestation gate.
 
 Acceptance criteria:
 
-- Proceed only when a separately approved interoperable/selective-disclosure profile is selected beyond the initial narrow-attestation scope.
-- Use independent wallet/issuer/verifier implementations and positive/negative protocol corpus for the exact profile versions.
-- Prove undisclosed fields are cryptographically absent and holder/replay/status semantics remain valid before making conformance or unlinkability claims.
+- Qualify the mandatory full profile selected in SOV-001: pin exact supported issuer/verifier/format modules, trusted artifact origin and strong provenance/digests, license/support/dependency review and Java 25 packaged compatibility.
+- Use independent wallet/issuer/verifier fixtures and applicable conformance/adversarial harnesses for exact SD-JWT VC/OpenID4VCI/OpenID4VP versions, disclosure integrity, holder binding, audience/nonce, encryption and malformed cases.
+- Implement profile adapters behind the existing seams without claiming synthetic JWT interoperability; fixtures may use labelled synthetic state services, while full Sovra consent/replay/status integration is accepted under SOV-010/011/012 and SOV-041.
+- Run before profile-dependent integration acceptance; do not depend on the final whole-product SEC suite or holder-custody release, which would make the gate circular.
 
 Required closure evidence:
 
 - Reviewed design or implemented artifact for the assigned scope.
 - Reproducible positive and negative validation, actual configuration/version references and sanitized results.
 - Independent review of security-critical behavior and retest of findings where applicable.
+
+### SOV-037
+
+**Obtain independent G0 architecture, privacy and custody assessment**
+
+Owner role: Independent security/privacy assessor and issuer authority.
+Gate: G0; proposed priority: p0; state: needs-triage.
+Dependencies: SOV-001, SOV-002, SOV-004, SOV-039.
+Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/42).
+Requirements: SR-18, SR-26, SR-27, SR-33, SR-34, SR-35, DR-10, NFR-12.
+Validation: SEC-26, SEC-30, SEC-32, MC-01, MC-05, MC-06.
+Open decisions to resolve or implement: OD-07, OD-08, OD-09, OD-10, OD-13, OD-17, OD-18.
+
+Acceptance criteria:
+
+- Have a named qualified independent assessor review the exact G0 revisions, current code findings ARCH-01 through ARCH-08, operator/root powers, actual jurisdiction matrix and proposed custody changes.
+- Record issuer/privacy decisions, findings, remediation owners and retest conditions without treating this engineering research or an implementation author review as independent approval.
+- Block real-data provisioning/processing until the applicable design review passes; synthetic contract-driven development may continue and final deployed/release assessment remains SOV-034.
+
+Required closure evidence:
+
+- Versioned reviewed decision or implementing commit/artifact for the exact scope.
+- Reproducible positive/negative evidence, effective configuration and sanitized results.
+- Independent assessment and retested findings where required; no fabricated approval.
+
+### SOV-038
+
+**Implement attested HSM authorization and confidential input gateways**
+
+Owner role: Confidential platform, key and security engineering.
+Gate: G2; proposed priority: p0; state: needs-triage.
+Dependencies: SOV-004, SOV-006, SOV-016, SOV-027, SOV-028, SOV-040.
+Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/44).
+Requirements: IF-05, SR-13, SR-19, SR-21, SR-25, SR-27, SR-29, SR-33, SR-35, INV-11, INV-13.
+Validation: SEC-14, SEC-26, SEC-33, SEC-35, SEC-40, MC-02, MC-04, MC-05, MC-06, MC-07, MC-10.
+SRS acceptance: AC-09, AC-12, AC-16, AC-17.
+Open decisions to resolve or implement: OD-08, OD-13, OD-17, OD-18.
+
+Acceptance criteria:
+
+- Implement the reviewed reference or an explicitly qualified regional profile with per-issuer non-exportable P-256 HSM signing keys, distinct wrapping keys, immutable key versions and verified provider response/protection/integrity/JOSE encoding.
+- Bind key-use credentials to exact approved production attestation/image/workload/location claims; deny wrong/debug/revoked image, host metadata credentials, impersonation, deployment identity and direct generic signing/unwrap bypasses.
+- Validate typed current issuance/source/approval authority in the attested signing gateway; scope vault grants and OCR inputs per object/version/purpose/job with no arbitrary KEK use or raw-digest signing oracle.
+- Prove supported attestation-bound encrypted input/TLS and protected derived-data storage so plaintext cannot first traverse an ordinary host proxy; retain hardware/software/isolation assumptions and independent denial evidence.
+- Measure local stop, provider propagation, active jobs and key-copy containment separately; never promise cached plaintext recall or deterministic Java heap zeroization.
+- Prove IAM-policy and service-account impersonation administration cannot silently bypass attested key-use governance; HSM-instance quorum is not assumed to govern IAM edits or business approval.
+- Distinguish attestation-derived credential issuance from per-key-call hardware attestation; test image withdrawal with already issued federated tokens and measure the actual residual containment window instead of promising immediate recall.
+
+Required closure evidence:
+
+- Versioned reviewed decision or implementing commit/artifact for the exact scope.
+- Reproducible positive/negative evidence, effective configuration and sanitized results.
+- Independent assessment and retested findings where required; no fabricated approval.
+
+### SOV-039
+
+**Approve the first issuer jurisdiction and complete provider capability matrix**
+
+Owner role: Issuer authority, privacy and platform architecture.
+Gate: G0; proposed priority: p0; state: needs-triage.
+Dependencies: SOV-002, SOV-004.
+Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/41).
+Requirements: DR-01, DR-04, DR-11, SR-25, SR-33, INV-11, NFR-12, NFR-14.
+Validation: SEC-40, SEC-41, SEC-44, MC-05, MC-06.
+Open decisions to resolve or implement: OD-07, OD-08, OD-10, OD-13, OD-17.
+
+Acceptance criteria:
+
+- Obtain explicit issuer-approved jurisdictions/operators and verify the supported intersection for identity metadata, ingress, compute/TEE, HSM protection/algorithms, database, storage, backups, telemetry, support and control-plane processing.
+- Recheck current service availability, attestation claims, quotas, recovery/copy rules, contractual processing boundaries and administrative/support access using provider evidence.
+- Do not substitute foreign regions or multi-tenant protection for a dedicated local HSM requirement; if no valid intersection exists, keep the node synthetic or qualify a separate sovereign/provider profile before real-data provisioning.
+
+Required closure evidence:
+
+- Versioned reviewed decision or implementing commit/artifact for the exact scope.
+- Reproducible positive/negative evidence, effective configuration and sanitized results.
+- Independent assessment and retested findings where required; no fabricated approval.
+
+### SOV-040
+
+**Harden issuer bindings, immutable approval identity and sealed trust snapshots**
+
+Owner role: Authority backend and database security.
+Gate: G1; proposed priority: p0; state: needs-triage.
+Dependencies: SOV-004, SOV-005, SOV-008, SOV-009.
+Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/43).
+Requirements: FR-23, FR-25, DR-05, DR-06, SR-01, SR-27, SR-34, SR-35, INV-03, INV-05, INV-06.
+Validation: SEC-01, SEC-02, SEC-03, SEC-26, SEC-31, MC-01, MC-06, MC-09.
+SRS acceptance: AC-02, AC-11, AC-14, AC-16.
+Open decisions to resolve or implement: OD-10, OD-11, OD-14, OD-17.
+
+Acceptance criteria:
+
+- Bind verified immutable principal identities and tenant-to-legal-issuer authority, current entitlement epochs and independently authenticated maker/checker evidence; two accounts controlled by one person do not satisfy independence.
+- Seal published snapshot contents and restrict proposal, approval and activation writers so runtime INSERT rights or supplied actor names cannot fabricate approval or append issuer/policy rows to an active version.
+- Require protected approved source/claim provenance at the signing authorization boundary and deny cross-issuer, stale-approval and arbitrary payload/digest requests.
+- Add adversarial HTTP/service/direct-role tests and production startup/activation/restore tests rejecting synthetic keys, issuers, profiles and seed configuration on every path; document remaining database/root powers.
+
+Required closure evidence:
+
+- Versioned reviewed decision or implementing commit/artifact for the exact scope.
+- Reproducible positive/negative evidence, effective configuration and sanitized results.
+- Independent assessment and retested findings where required; no fabricated approval.
+
+### SOV-041
+
+**Add packaged two-instance consent-to-verification end-to-end suite**
+
+Owner role: Integration and security E2E engineering.
+Gate: G1; proposed priority: p0; state: needs-triage.
+Dependencies: SOV-010, SOV-011, SOV-012, SOV-015, SOV-036.
+Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/45).
+Requirements: FR-08, FR-19, FR-20, FR-21, FR-22, SR-03, SR-04, SR-05, SR-06, INV-01, INV-02, INV-07, INV-08, NFR-01, NFR-07.
+Validation: SEC-04, SEC-05, SEC-07, SEC-08, SEC-09, SEC-10, SEC-11, SEC-12, SEC-13, SEC-20, SEC-30.
+SRS acceptance: AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08.
+Open decisions to resolve or implement: OD-01, OD-03, OD-06.
+
+Acceptance criteria:
+
+- Run the packaged selected-profile issuer, actual holder consent/browser path and verifier over HTTP with real PostgreSQL and two backend instances; a Python signature check alone is not this verification test.
+- Assert exactly one fresh accepted decision for healthy concurrent replay and none for tampered disclosures, wrong issuer/type/holder/audience/nonce, refusal or changed consent, expiry, stale/unknown authority and revoked keys/credentials.
+- Kill/restart instances, lose responses and interrupt persistence to prove durable consumption, audit/decision consistency and authorized original-result retrieval without a second acceptance.
+- Keep synthetic-harness and full-profile evidence distinct, assert persisted state and prohibited side effects independently, and retain clean-checkout commands, versioned fixtures and sanitized browser/API evidence.
+
+Required closure evidence:
+
+- Versioned reviewed decision or implementing commit/artifact for the exact scope.
+- Reproducible positive/negative evidence, effective configuration and sanitized results.
+- Independent assessment and retested findings where required; no fabricated approval.

@@ -140,6 +140,17 @@ A stale restore must not reopen verification until consumed-session and revoked/
 Warm caches and independently restored keys must follow the approved current-authority/known-deny policy; disabling one original key is not evidence that every copy or previously unwrapped DEK stopped working.
 An externally isolated image/OCR process must be tested without relying on the unavailable Java Security Manager.
 
+## Provider and authority architecture follow-up
+
+The [architecture assessment](../architecture/identity-key-provider-architecture.md) records ARCH-01 through ARCH-08 and SRS v0.6 provider/authority requirements.
+These are static observations, not executed exploit or penetration tests.
+SOV-006 and SOV-040 extend SEC-01/02/03/26/31/32/43 and MC-01/06/09 with actual OIDC/BFF/CSRF, hardware-authenticator enrollment/recovery, current entitlements, immutable actor identity, sealed snapshot and issuer-binding cases.
+SOV-027 removes schema-owner credentials from serving processes and tests the actual runtime/migration privilege boundary.
+SOV-038 extends SEC-14/33/35/40 and MC-02/04/05/06/07/10 with wrong/debug/revoked attestation, host/metadata/impersonation direct-key bypass, protected input channels and separate local/provider containment measurements.
+Plaintext DEKs have no cross-request cache in the selected initial profile; best-effort buffer clearing must not be reported as deterministic JVM memory erasure.
+SOV-036 qualifies the mandatory protocol/library profile and SOV-041 supplies packaged two-instance consent-to-verification evidence, including persisted state and absence of prohibited side effects.
+SOV-037 and SOV-039 retain independent design and issuer/location approval before real-data provisioning/processing; synthetic development does not mark either complete.
+
 ## Release gates
 
 | Stage | Required evidence |

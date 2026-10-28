@@ -1,16 +1,37 @@
 # SOV-004: identity/key providers, revocation and cache contracts
 
-**Version:** 0.1 (proposed G0 decision, pending independent review).
+**Version:** 0.2 (recommended implementation reference; independent/deployment review pending).
 **Date:** 2026-10-28.
 **Task:** [SOV-004](https://github.com/apil-khadka/Sovra/issues/8)
 (select identity and key providers with revocation and cache contracts).
 **Depends on:** [SOV-001](SOV-001-proof-profile.md),
 [SOV-002](SOV-002-locality-custody-boundaries.md).
 
-This record freezes OD-10 (authentication/governance), OD-13 (document
-cryptography and processing locations) and OD-18 (revocation/cache/copy
-authority). It resolves SOV-001 library condition 1 (artifact registry)
-and sets the contracts SOV-005, SOV-009 and SOV-012 implement.
+This record selects the implementation reference for OD-10, OD-13 and OD-18.
+It does not close deployment-specific location, provider entitlement, retention or independent-review decisions.
+Version 0.2 supersedes the deferred provider pick, broad cache allowances and pre-G1 external-review sequencing in version 0.1.
+Read the [architecture assessment](../identity-key-provider-architecture.md) for evidence, alternatives, code findings and remaining gates.
+
+## 0. Selected reference and development gate
+
+Human SSO: issuer-local Keycloak, OIDC authorization code plus PKCE through a Spring backend-for-frontend.
+Privileged users require hardware-bound phishing-resistant factors with reviewed enrollment/recovery; Sovra independently owns current entitlements, elevation and approval records.
+Cloud key/processing reference: Google Cloud KMS with `HSM_SINGLE_TENANT` and Confidential Space attestation-derived workload federation in a mutually supported issuer-approved region.
+Issuer signing keys remain non-exportable P-256 HSM keys; signing authorization and claim construction execute in the attested workload, while ECDSA executes in the HSM.
+The signing and wrapping roles/keys are separate.
+This is a reference profile, not an approved universal cloud location or a working production adapter.
+SOV-039 qualifies each issuer's actual location/capability matrix; unsupported locations require a separately reviewed provider profile and never automatic foreign-region fallback.
+
+Synthetic implementation of SOV-006 and G1 work may proceed against these contracts without a production account or completed independent assessment.
+SOV-037 records the independent design/privacy assessment before real-data provisioning or processing, and SOV-034 remains the final release gate.
+This architecture review does not tick those approval boxes.
+
+Initial-phase budget: no new paid services, subscriptions or hardware purchases.
+The cloud HSM/TEE reference is deferred qualification, not an initial provisioning instruction.
+Self-hosted identity and existing resources support synthetic development without a paid provider account; actual hosting capacity and any free quota must still be verified.
+Confirmed initial launch: a public demo with synthetic identities/documents only, self-hosted Keycloak and no new paid service or hardware purchase.
+Real-ID ingestion, production issuers and production credential authority remain disabled.
+See the [budget clarification](../identity-key-provider-architecture.md#initial-phase-budget-constraint); real-data gates remain separate and unsatisfied.
 
 ## 1. Protocol provider coordinates (OD-10)
 
@@ -42,7 +63,7 @@ packaged verification.
 - Vault envelope (G2 real data): AES-256-GCM, per-object-version DEKs,
   96-bit random nonce per encryption, never reused.
 - AAD (authenticated, all fields required): tenant ID, issuer ID,
-  object ID, purpose, schema version, DEK version. Decryption verifies
+  object ID/version, purpose, schema version, DEK version. Decryption verifies
   AAD before use; no plaintext is processed before verification.
 - KEKs live in KMS/HSM with per-issuer permissions; DEKs are wrapped
   (envelope) and cached only under section 5 bounds.
@@ -71,12 +92,10 @@ binding; packaging follows the backend module map):
 
 ## 4. Authentication, MFA, elevation, approvals, identities (OD-10)
 
-- Human authentication: SSO-backed identity provider (concrete IdP
-  selected at G2 with the provider pick); TOTP minimum for operators,
-  phishing-resistant MFA (WebAuthn/passkeys) for all privileged roles.
-- Privileged enrollment/recovery: in-person or video-verified ceremony
-  plus hardware-key binding; recovery needs quorum approval (2-of-n
-  security role) and revokes the old factors first.
+- Human authentication: issuer-local Keycloak OIDC with exact issuer/audience/redirect validation and local `(iss, sub)` entitlement mapping.
+- Browser sessions: server-held tokens, Secure/HttpOnly cookies, CSRF, fixation protection and explicit reauthentication context checks.
+- Privileged enrollment/recovery: reviewed identity evidence plus hardware-bound phishing-resistant authenticators, independently controlled recovery and removal of superseded authority.
+- TOTP, email and SMS are not privileged-elevation fallback; general passkey support alone does not prove hardware binding.
 - JIT elevation: ticket-bound, maximum 4 hours, least-privilege scope,
   fully logged, auto-revoked; no standing privileged access.
 - Independent approvals (2-person rule) for: trust-registry changes,
@@ -99,30 +118,31 @@ service implementing the same shapes.
 | --- | --- | --- | --- |
 | Trust snapshot | 60 min (background refresh at 45 min + jitter) | 4 snapshots | Version bump; emergency flag |
 | Status evidence | 15 min | 10,000 | Issuer-indicated refresh; emergency flag |
-| DEK plaintext | 10 min | 1,000, zeroized on evict | Key rotation/compromise; emergency flag |
-| Positive permission grant | 60 s | 50,000 | Policy-version bump; deny wins on conflict |
+| DEK plaintext | One authorized operation only | 0 cross-request entries | Release references after work; no persisted cache; best-effort buffer clearing without Java-heap zeroization promises |
+| Positive permission grant | 60 s for approved non-privileged decisions only | 50,000 | Entitlement/policy epoch plus current deny; privileged operations reauthorize current local state |
 | Deny decision | 60 s | 50,000 | Policy-version bump; explicit re-grant |
-| Own service tokens | 5 min or token expiry, sooner | 5,000 | Revocation signal; emergency flag |
+| Sovra-issued machine tokens | 5 min or token expiry, sooner | 5,000 | Current local grant/epoch checks and emergency stop; external/federated token lifetimes are separately qualified |
 
-Rules: every cached entry carries its policy/snapshot version; a
-version bump invalidates the whole class. A live emergency flag
-(5-second TTL, checked on the authorization path) bypasses all caches.
-Deny always wins over a conflicting cached grant. Cache sizes are
-enforced with bounded eviction; unbounded growth is a bug.
+Every cached entry carries its policy/snapshot and relevant entitlement version.
+A version bump invalidates affected authority, and current deny wins over a cached grant.
+The local emergency flag has a maximum five-second freshness bound; stale/unavailable authoritative state fails closed.
+Privileged signing, unwrap, approval and elevation reauthorize current local state rather than using a positive decision cache.
+Provider IAM propagation, federated-token validity and active-job containment are separately measured and must not be advertised as a five-second cloud revocation guarantee.
+Cache sizes are enforced; disabling a key does not recall already released plaintext.
 
 Restored-key inventory: every disaster-recovery restore produces a
 signed inventory (key ID, version, location, hash) reconciled against
 KMS/HSM before serving resumes; unknown key copies block serving until
 explained and approved.
 
-Control/data-plane outage rules: control-plane outage (trust admin,
-approvals) freezes new approvals while steady state serves from the
-bounded caches above; data-plane (database) outage fails closed with
-`UNKNOWN`, never with cached success beyond the stated TTLs. Read
-replicas may serve reads only under a recorded replica-lag bound at G2.
+Control-plane failure freezes new approvals and permits only operations whose current local authority/freshness checks still succeed within their declared bounds.
+Loss of local authorization/emergency state or database durability fails closed, never through cached permission or a new accepted result.
+The five-second local stop target and the provider's separate IAM/key containment delays must be tested independently.
+Read replicas require an approved lag bound and cannot supply ambiguous acceptance/replay authority.
 
 ## 6. Approval
 
-- [ ] Independent security review of this record (required before SOV-005/SOV-009 start).
+- [ ] Independent security/privacy review under SOV-037 before real-data provisioning or processing; synthetic contract-driven development may proceed.
+- [ ] SOV-039 issuer/location/capability approval and SOV-038 deployed attested key-use/input-path evidence.
 - [ ] SOV-001 library conditions 2-4 evidenced in SOV-036.
 - [ ] Record revision on any coordinate, algorithm, bound, or identity change.

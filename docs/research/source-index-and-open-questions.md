@@ -10,6 +10,9 @@
 
 ## Promoted implementation baseline
 
+The [SRS v0.6 provider/authority baseline](../requirements/software-requirements-specification.md) and [identity/key-provider assessment](../architecture/identity-key-provider-architecture.md) now select an implementation reference and record current static source findings.
+Issuer-local Keycloak and Google Cloud Single-tenant HSM/Confidential Space are reference choices subject to actual location, configuration and independent review; no provider deployment or test completion is inferred.
+
 The [SRS v0.5](../requirements/software-requirements-specification.md) and [ADRs 028 through 032](../architecture/architecture-decision-records.md) promote the selected research controls into explicit production requirements.
 The [implementation backlog](../engineering/implementation-backlog.md) assigns dependency-ordered work and acceptance evidence.
 Required SEC/MC scenarios remain unexecuted; researched provider behavior is not evidence that Sovra implements or satisfies those controls.

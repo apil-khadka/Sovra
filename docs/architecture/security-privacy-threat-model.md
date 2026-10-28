@@ -50,7 +50,9 @@ Key disablement alone does not recall plaintext or already cached keys.
 Production artifact admission must bind approved source, builder/provenance, digest, configuration and runtime identity.
 Readiness must reflect actual authority freshness, replay persistence, authorization/key availability and required durable audit, including when superficial HTTP health remains green.
 The required [SEC and MC scenarios](../engineering/security-validation-plan.md) cover these threats under synthetic load, restore, rollback, alternate ingress and provider control/data-plane failures.
-The [backlog](../engineering/implementation-backlog.md) records implementation ownership roles and dependencies; all controls remain unimplemented until evidence exists.
+The [backlog](../engineering/implementation-backlog.md) records implementation ownership roles and dependencies; existing synthetic implementations do not establish production acceptance without the required evidence.
+The [provider architecture assessment](identity-key-provider-architecture.md) records current source findings, issuer-local Keycloak and the attested HSM reference, with explicit independent/location/live-data gates.
+SRS SR-34/SR-35 require verified human/machine identity, current privileged entitlements, immutable independent approvals and sealed issuer authority.
 
 ## Compliance truthfulness
 

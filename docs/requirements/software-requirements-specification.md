@@ -1,15 +1,17 @@
 # Sovra Software Requirements Specification
 
-**Version:** 0.5 - security implementation baseline draft.
-**Date:** 2026-10-27.
+**Version:** 0.6 - provider and authority architecture baseline draft.
+**Date:** 2026-10-28.
 **Status:** draft for product, engineering, security, and operations review.
 **Scope:** federated identity-evidence interoperability platform, including a synthetic demonstration and production release requirements.
 
 This specification expands the hackathon-only scope of version 0.2 and the business baseline of version 0.3.
 Version 0.4 adds issuer-local encrypted documents, extraction/enrollment lifecycle, developer APIs/SDKs, and role-specific dashboards.
 Version 0.5 makes the mission-critical research controls explicit requirements and links them to an implementation backlog and required security/recovery scenarios.
+Version 0.6 selects an issuer-local identity and attested key-provider reference, makes human/machine and governance boundaries explicit, and separates synthetic development from independent real-data release approval.
 It describes required behavior, not implemented features or completed security assurance.
-The repository contains a Java backend bootstrap and a React frontend bootstrap; the earlier TypeScript prototype was removed and only its JSON fixtures are preserved as migration evidence. The G1 vertical slice and security validation remain pending.
+The repository contains a Java/Spring backend, a React bootstrap and synthetic control-plane implementations; the earlier TypeScript backend was removed.
+Human SSO, real KMS integration, the full consent/presentation-verification flow and production assurance remain pending.
 
 ## Contents
 
@@ -84,6 +86,11 @@ FR-01 through FR-15 retain their subject areas, with clarified scope and accepta
 ## 2. Product scope and release boundaries
 
 ### 2.1 Objective and included capabilities
+
+The confirmed initial delivery is a public demo with synthetic identity/document fixtures and no new paid services, subscriptions or hardware purchases.
+Real identity-document ingestion and production issuer/credential authority shall remain disabled in that deployment.
+Self-hosted identity and existing/verified no-charge resources are the initial profile; paid cloud HSM/TEE qualification remains later work.
+Actual visitor/authentication metadata still requires protection, and public deployment, external-service capacity and charge prevention require verification before publication.
 
 Identity systems differ in formats, schemas, trust anchors, assurance, and policy requirements.
 Sovra shall help an RP discover a supported evidence path without requiring unnecessary source identity documents or a central citizen database.
@@ -364,7 +371,9 @@ This draft does not assert certification, completed ASVS mapping, or absence of 
 | SR-30 | Production | Hostile file processing shall use reviewed process/OS/runtime isolation and resource/egress limits outside any presumed Java Security Manager sandbox | Controlled worker compromise cannot access the signer, unrelated documents/keys, unrestricted network, or privileged host capabilities |
 | SR-31 | Production | Production admission shall verify approved source, builder/provenance, artifact digest, configuration, and runtime identity rather than signature presence alone | Substituted artifact or provenance from an unapproved builder/source/configuration is rejected and audited |
 | SR-32 | Production | Flow health/readiness and alerts shall reflect freshness, replay persistence, authorization/key availability, durable audit, and deny behavior rather than HTTP success alone | Stale authority or failed critical persistence closes affected readiness and alerts even while superficial probes remain green |
-| SR-33 | Production | Administrative/root/host visibility and override powers shall have an explicit threat assessment and deployment-specific mitigations, including attested confidential processing when needed to meet the approved boundary | Independent review identifies remaining roots and exercises selected isolation/attestation/key-release controls without unsupported provider-confidentiality claims |
+| SR-33 | Production | Administrative/root/host visibility shall have an approved threat model; sensitive key-use authorization, matching and plaintext-processing/input paths shall use the selected attested boundary before real data, with issuer signing keys non-exportable in the HSM | Wrong/debug image, ordinary host credentials, direct key calls and input-channel bypass fail; independent review identifies remaining roots without claiming remote HSM computation occurs in the application TEE |
+| SR-34 | Production | Human browser sessions and machine credentials shall use separately validated authentication paths, with issuer-scoped `(iss, sub)` identity, protected server-held tokens, CSRF, verified privileged authentication context and current local entitlement/elevation checks | Wrong issuer/audience, login CSRF, cookie/session theft, weak factor recovery, stale role/grant and cloud-token substitution cases fail through actual browser/API paths |
+| SR-35 | Production | Issuer/type/purpose signing and trust changes shall bind stable authorized identities, independently controlled approvals, current source/trust/key versions and sealed published snapshots | Caller-supplied actor names, late snapshot inserts, cross-issuer signing, generic digest signing and same-person/multiple-account quorum bypass cannot establish authority |
 
 ## 10. States and consistency invariants
 
@@ -469,7 +478,7 @@ Development/test environments shall use documented finite conservative settings.
 | Freshness | Per-assurance trust/status age, permitted clock skew, unknown/error handling | Open - OD-03 | Security/policy approver |
 | Sessions/retries | Consent/session lifetime, nonce entropy, attempt limits, idempotency lifetime, retry classes | Open - OD-06 | Security/engineering |
 | Data lifecycle | Per-class retention/deletion, backup expiry, audit exceptions, approved locations | Open - OD-07/OD-08 | Product/security/privacy reviewer |
-| Privileged/key caches | Positive authorization age, token/grant/DEK lifetimes, known-deny propagation, active-job containment, and independent key-copy handling | Open - OD-18 | Security/identity/key owners |
+| Privileged/key caches | No cross-request plaintext-DEK cache; privileged actions check current local authority; local stop max age 5 s; external credential/IAM propagation and active-job/copy containment measured separately | Reference selected in SOV-004 v0.2; deployment qualification remains OD-18 | Security/identity/key owners |
 
 ## 13. Verification and traceability
 
@@ -518,6 +527,7 @@ The coverage map links groups to planned scenarios; it does not claim passing Ja
 | SR-30, SR-33 | MC-02, MC-05, MC-06 | OS/runtime isolation and approved root/host/attestation boundary |
 | SR-31 | MC-07 | Verified source/builder/artifact/configuration admission |
 | SR-32, NFR-15, NFR-17 | MC-01, MC-02, MC-03, MC-04, MC-05, MC-06, MC-07, MC-08, MC-09, MC-10 | Representative synthetic-load testing, semantic readiness, alerts and independent recovery evidence |
+| SR-34, SR-35 | SEC-01, SEC-02, SEC-03, SEC-26, SEC-31, SEC-32, SEC-43; MC-01, MC-06, MC-09 | Verified human/machine identity, current elevation/entitlements, sealed trust and independently controlled issuer authority |
 
 The production assessment shall extend this map to individual applicable ASVS requirements.
 Scanners and line coverage shall support rather than replace business-invariant tests and independent review.
@@ -566,8 +576,13 @@ Security-critical failures and unresolved high/critical findings shall block rel
 Independent assessment shall be separate from the implementation author's own generated tests.
 MC-01 through MC-10, workload/root privilege assessment, replay-safe restoration, copy/cache revocation behavior, and artifact admission are explicit required release evidence.
 The [implementation plan](../engineering/implementation-plan.md) and [task backlog](../engineering/implementation-backlog.md) order this work; closing a documentation or decision task does not close the corresponding implementation/security gate.
+The [provider architecture assessment](../architecture/identity-key-provider-architecture.md) selects the implementation reference while SOV-037 and SOV-039 retain independent assessment and actual issuer/location approval before real-data provisioning/processing.
+Synthetic contract-driven development may proceed without those approvals; it shall not be described as production-ready or fully interoperable before the qualification evidence exists.
 
 ## 15. Open decisions and dependencies
+
+SOV-001/002/004 and the provider architecture assessment now specify development choices, including the full proof profile, issuer-local Keycloak and the attested HSM reference.
+The entries below retain exact deployment values, qualification and accountable/independent approval gates; they do not imply that the reference provider or synthetic implementation must be chosen again before development can proceed.
 
 Resolve these in public architecture/contracts or access-controlled deployment records as appropriate.
 No private planning file is required to interpret requirements.
@@ -613,6 +628,7 @@ Roles identify responsibility, not named approvals or completed work.
 | [MVP specification](../engineering/mvp-specification.md), [demo scorecard](../demo/evaluation-and-acceptance.md) | Synthetic milestone and demonstration evidence |
 | [Claims/limitations](../compliance/claims-and-limitations.md) | Supported assertions and deployment boundaries |
 | [Mission-critical security research](../research/security-and-mission-critical-review.md) | Primary-source reasoning for the promoted security/recovery controls |
+| [Identity/key-provider architecture](../architecture/identity-key-provider-architecture.md) | Reference provider choice, current source findings, attested key/input paths and explicit development/live-data gates |
 | [Implementation plan](../engineering/implementation-plan.md), [task backlog](../engineering/implementation-backlog.md) | Sequenced engineering tasks, dependencies, evidence and issue tracking |
 
 ### 16.2 Governance
@@ -628,3 +644,4 @@ Changes to scope, claims, consent, proof profiles, data destinations, or securit
 | 0.3 | Business draft covering Java/Spring, production boundaries, functional/data/interface/security requirements, state invariants, acceptance evidence, and open-decision gates |
 | 0.4 | Adds federated local image custody/crypto/extraction, enrollment and source revision rules, API/SDK integration, dashboards, and expanded security/acceptance coverage |
 | 0.5 | Promotes research into privileged/workload isolation, recovery, cache/key-copy, artifact-admission and semantic-health requirements, required MC evidence, root/cache decisions, and dependency-ordered implementation tasks |
+| 0.6 | Selects issuer-local identity and attested HSM reference, human/machine and sealed-authority requirements, revised cache/custody contracts, mandatory profile qualification and explicit design/location/E2E follow-up tasks |

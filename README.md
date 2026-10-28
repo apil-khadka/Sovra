@@ -17,6 +17,7 @@ Architecture documents describe intended behavior rather than implemented guaran
 - [API draft](docs/engineering/api-contract.openapi.yaml): proposed orchestration endpoints.
 - [Acceptance criteria](docs/demo/evaluation-and-acceptance.md): evidence required for the demo.
 - [Security validation plan](docs/engineering/security-validation-plan.md): proposed adversarial tests and production evidence gates.
+- [Identity/key-provider architecture](docs/architecture/identity-key-provider-architecture.md): provider recommendation, current architecture findings and development/live-data gates.
 - [Claims and limitations](docs/compliance/claims-and-limitations.md): prototype and standards boundaries.
 
 The demo is designed for synthetic data and simulated jurisdictions.
@@ -29,7 +30,7 @@ prerequisites besides Docker for integration tests; the frontend needs
 Node.js 22 with pnpm; repository validation needs Python 3.11 or newer.
 
 ```sh
-cd backend && ./mvnw verify
+(cd backend && ./mvnw verify)
 ./scripts/smoke-two-instance.sh
 pnpm --dir frontend install
 pnpm --dir frontend run build

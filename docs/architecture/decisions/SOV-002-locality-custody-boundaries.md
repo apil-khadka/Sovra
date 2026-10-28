@@ -1,6 +1,6 @@
 # SOV-002: locality, lifecycle, custody and root trust boundaries
 
-**Version:** 0.1 (proposed G0 decision, pending independent review).
+**Version:** 0.2 (recommended custody/provider clarification; independent/issuer approval pending).
 **Date:** 2026-10-28.
 **Task:** [SOV-002](https://github.com/apil-khadka/Sovra/issues/6)
 (approve issuer locality, lifecycle, custody and root trust boundaries).
@@ -26,6 +26,7 @@ work and sets the rules real-data work must satisfy.
 | Telemetry, metrics, traces | Sanitized (counts, reason codes, correlation IDs); no PII, key material, or complete proofs | Any store with weaker access control than the source system |
 | Support and admin views | Metadata + redacted excerpts only; every access logged and justified | Standing access to originals or keys |
 | Backups and failover copies | Same boundary, encryption, and access rules as the primary; same-region first | Cross-boundary replicas without a recorded approval |
+| Identity/account and authentication metadata | Approved issuer-local IdP boundary, including subject mappings, factors, sign-in/device events, sessions, recovery, support and backups | Unapproved upstream IdP, factor-delivery, telemetry or administrative processing locations |
 
 G1 synthetic data follows the same flow shapes with fixture values so the
 boundary is tested before real data exists. No G1 evidence uses real
@@ -49,18 +50,14 @@ are frozen here.
 
 ## 3. Holder custody and recovery (OD-09)
 
-Hybrid model: device-held keys are primary; an opt-in encrypted server
-backup exists for recovery.
+Hybrid model: non-exportable device keys are primary; opt-in encrypted server backup may preserve permitted credential/application state for recovery.
 
-- Holder private keys live in device secure hardware where available and
-  never leave the device except inside the opt-in backup blob.
+- Non-exportable holder keys remain in device secure hardware and never enter a backup blob.
 - Backup blobs are encrypted with a key derived from a holder secret the
   server never sees (envelope: holder-secret KEK wraps the backup DEK).
   The server stores opaque bytes it cannot decrypt.
-- Recovery ceremony: fresh identity re-proof at the original assurance
-  level, a 72-hour delay with out-of-band notification to all holder
-  contact points, then backup release to the new device. The old device
-  keys are revoked at release.
+- Recovery ceremony: fresh identity re-proof at the original assurance level, the approved delay/notifications, new device keys and profile-compliant reissuance or rebinding.
+  Old device authority is revoked; the earlier 72-hour delay remains a proposed policy value pending issuer review.
 - Loss/theft without backup: the holder re-enrolls; old credentials are
   revoked, never restored.
 - Administrators, support staff, and operators have no technical path to
@@ -72,8 +69,9 @@ Issuer signing keys live in KMS/HSM with per-issuer key permissions, tested
 rotation, and compromise procedures. Production keys are never in source,
 prompts, browser storage, config files, or images.
 
-The cloud provider pick is deferred to G2. The provider must satisfy all
-selection criteria before hosting real data:
+The [provider reference](SOV-004-provider-key-cache-contracts.md) now selects Google Cloud KMS Single-tenant Cloud HSM and Confidential Space for qualification.
+SOV-039 must verify the actual issuer-approved location/capability intersection; this is not an approved cloud deployment or a fallback outside the issuer boundary.
+The provider must satisfy all selection criteria before hosting real data:
 
 1. In-region KMS plus dedicated HSM (CloudHSM or equivalent) with
    customer-controlled key material and export of audit logs.
@@ -90,8 +88,9 @@ provider account, until a recorded governance agreement changes that.
 
 ## 5. Digest and matching profile (OD-15)
 
-- Canonicalization: JSON Canonicalization Scheme (RFC 8785) over the exact
-  disclosed bytes; no re-serialization before hashing.
+- Original-document integrity hashes cover exact accepted bytes; image re-encoding creates a different artifact/version.
+- Structured extraction digests use versioned business normalization followed by a reviewed RFC 8785 canonicalization profile over supported JSON types.
+- Credential signatures, SD-JWT disclosure hashes and holder proofs use the selected protocol's exact byte rules, not a substituted extraction canonicalization rule.
 - Field normalization: per-schema version, recorded alongside the schema;
   normalization rules are versioned and immutable once approved.
 - Provenance: every digest references its source revision, schema version,
@@ -101,14 +100,16 @@ provider account, until a recorded governance agreement changes that.
   overlap verification; rotation never silently re-links identities.
 - Correlation: pairwise, purpose-scoped subject identifiers only. No global
   subject key, no cross-purpose joins, no cross-RP correlation by Sovra.
+  This application policy is not proof of cryptographic unlinkability; repeated credentials, holder keys and status references require explicit correlation analysis under the selected profile.
 
 ## 6. Root, workload, and data-in-use boundary (OD-17)
 
 Attested confidential processing is **required** before real data is
-handled: key use and identity matching run inside attested TEEs (AWS Nitro
+handled: sensitive key-use authorization and identity matching run inside attested TEEs (AWS Nitro
 Enclaves, AMD SEV-SNP, Intel TDX, or provider equivalent selected under
 section 4), with launch measurement verified against pinned values and
 attestation evidence retained per operation batch.
+Non-exportable issuer signing keys remain in the HSM; its ECDSA computation is outside the application TEE as clarified in section 8.
 
 Remaining administrative overrides, explicitly inventoried:
 
@@ -133,7 +134,21 @@ codebase never implies one runtime identity.
 
 ## 7. Approval
 
-- [ ] Independent security and privacy review of this record (required before SOV-004/SOV-005 start).
+- [ ] SOV-037 independent security/privacy assessment before real-data provisioning or processing; synthetic implementation may proceed without asserting this approval.
 - [ ] Legal review of section 2 retention values in each operating jurisdiction.
 - [ ] Issuer-authority sign-off on sections 1, 3, and 6.
 - [ ] Record revision on any boundary, custody, provider, or retention change.
+
+## 8. Custody and confidential-boundary clarification (v0.2 revision)
+
+This section supersedes the incompatible key-backup wording in section 3 and requires issuer/privacy approval before real custody use.
+Non-exportable device hardware keys never enter a server backup and are never restored to a replacement device.
+Opt-in backup may preserve permitted encrypted credential/application state; recovery re-proofs the holder, generates new device keys and reissues or rebinds credentials under the selected profile with old authority revoked.
+Loss of the independent backup secret is not bypassed through an administrator decrypt path.
+If a future profile permits exportable software holder keys, it requires a separate lower-assurance custody decision and is not described as non-exportable hardware custody.
+
+Signing authorization and sensitive claim construction occur in the attested workload; the non-exportable issuer key's ECDSA computation remains in the HSM.
+The reference does not assert that a remote HSM operation executes inside the application TEE.
+Uploads, OCR/matching, decryption and sensitive derived values must remain inside the approved confidentiality boundary while in use, including input-channel/TLS termination and storage outside the TEE.
+SOV-038 validates attestation-bound input/key-use paths and denial of host/ordinary-workload bypasses.
+No public cloud location or corporate security report by itself establishes permission to process an issuer's data there.
