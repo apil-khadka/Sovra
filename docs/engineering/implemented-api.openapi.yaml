@@ -1,9 +1,18 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.1.0
+  version: 0.2.0
   description: >-
-    Exact contract of the implemented backend (SOV-005 through SOV-012 plus SOV-014).
+    Exact contract of the implemented backend (SOV-005 through SOV-015).
+    Compatibility rules (versioning, origins, audiences, scopes,
+    pagination, ETags, RFC 9457 negotiation, idempotency) are specified
+    in docs/engineering/api-compatibility.md. Each operation lists its
+    authorizing roles in x-sovra-scopes. Clients that send
+    Accept: application/problem+json receive RFC 9457 problem details
+    (type/title/status plus Sovra code/correlationId/retryable) instead
+    of the legacy bodies; 404s stay empty in both variants. Mutation
+    preconditions beyond single-shot 409s, async jobs, and cursor
+    pagination beyond audit events are reserved, not implemented.
     Authentication is a Bearer service-account token except for the three
     public federation-metadata reads. Error bodies are minimal by design:
     404s carry empty bodies (never confirm or deny another tenant's
@@ -16,6 +25,7 @@ paths:
   /api/health:
     get:
       operationId: health
+      x-sovra-scopes: []
       summary: Public liveness probe with build identity
       security: []
       responses:
@@ -24,6 +34,7 @@ paths:
   /api/whoami:
     get:
       operationId: whoami
+      x-sovra-scopes: [authenticated]
       summary: Caller identity without secrets
       responses:
         '200': { description: accountId, tenantId, name, roles }
@@ -31,18 +42,27 @@ paths:
   /api/audit/events:
     get:
       operationId: listAuditEvents
+      x-sovra-scopes: [AUDIT_READER, TRUST_ADMIN]
       summary: Tenant-scoped decision evidence, newest first
       parameters:
         - name: limit
           in: query
-          schema: { type: integer, default: 50 }
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: >-
+            Opaque keyset position from the previous page's last row
+            (occurred_at/id); malformed cursors are a 400
       responses:
         '200': { description: Audit rows for the caller's tenant }
+        '400': { description: Malformed cursor }
         '401': { description: Anonymous }
         '403': { description: Lacks AUDIT_READER/TRUST_ADMIN }
   /api/trust/snapshots/current:
     get:
       operationId: currentSnapshot
+      x-sovra-scopes: []
       summary: Public active trust snapshot (issuers, keys, epochs, RP policies)
       security: []
       responses:
@@ -51,6 +71,7 @@ paths:
   /api/trust/proposals:
     post:
       operationId: proposeTrustChange
+      x-sovra-scopes: [TRUST_ADMIN]
       summary: Maker step of the two-person trust change
       requestBody:
         required: true
@@ -77,6 +98,7 @@ paths:
   /api/trust/proposals/{id}/approve:
     post:
       operationId: approveTrustChange
+      x-sovra-scopes: [TRUST_ADMIN]
       summary: Checker step; the checker cannot be the maker
       parameters:
         - name: id
@@ -93,6 +115,7 @@ paths:
   /api/trust/snapshots/{version}/activate:
     post:
       operationId: activateSnapshot
+      x-sovra-scopes: [TRUST_ADMIN]
       summary: Move the active snapshot forward to an approved version
       parameters:
         - name: version
@@ -107,6 +130,7 @@ paths:
   /api/trust/keys:
     post:
       operationId: registerIssuerKey
+      x-sovra-scopes: [TRUST_ADMIN]
       summary: >-
         Publish an issuer key version. Registration alone never widens
         trust: only a later two-person snapshot activation authorizes
@@ -134,6 +158,7 @@ paths:
   /api/trust/keys/revoke:
     post:
       operationId: revokeIssuerKey
+      x-sovra-scopes: [TRUST_ADMIN]
       summary: >-
         Terminally revoke an issuer key version. The revocation row is
         append-only, so concurrent revokes converge on one instant;
@@ -161,6 +186,7 @@ paths:
   /api/issuance/credentials:
     post:
       operationId: issueCredential
+      x-sovra-scopes: [ISSUER_OPS]
       summary: >-
         Issue a synthetic credential. Retries with the same idempotency
         key and request replay the original response byte-for-byte.
@@ -205,6 +231,7 @@ paths:
   /api/issuance/credentials/{id}:
     get:
       operationId: getCredential
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS]
       summary: Credential metadata and status (no artifact, no holder binding)
       parameters:
         - name: id
@@ -220,6 +247,7 @@ paths:
   /api/issuance/credentials/{id}/status:
     get:
       operationId: credentialStatus
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS]
       summary: Status evidence with version, fetch time, and max age
       parameters:
         - name: id
@@ -234,6 +262,7 @@ paths:
   /api/issuance/credentials/{id}/revoke:
     post:
       operationId: revokeCredential
+      x-sovra-scopes: [ISSUER_OPS]
       summary: Terminal revocation (VALID becomes REVOKED, never the reverse)
       parameters:
         - name: id
@@ -249,6 +278,7 @@ paths:
   /api/issuance/jwks.json:
     get:
       operationId: issuerKeys
+      x-sovra-scopes: []
       summary: Public verification keys of authorized issuers
       security: []
       responses:
@@ -256,6 +286,7 @@ paths:
   /api/consent/requests:
     post:
       operationId: createProofRequest
+      x-sovra-scopes: [RP_CLIENT]
       summary: >-
         Open a consent-bound proof request against a usable credential.
         The deterministic plan guard must accept the candidate plan
@@ -305,6 +336,7 @@ paths:
   /api/consent/requests/{id}:
     get:
       operationId: reviewProofRequest
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
       summary: >-
         Holder review: the exact bound values plus the derived consent
         state (PENDING, DENIED, UNAVAILABLE, or VERIFIED with a reason)
@@ -313,15 +345,26 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: If-None-Match
+          in: header
+          schema: { type: string }
+          description: Exact ETag from a previous review; matches return 304
       responses:
-        '200': { description: Bound request with derived state }
+        '200':
+          description: Bound request with derived state
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Strong tag over the review including derived state
+        '304': { description: Caller already holds the current review }
         '400': { description: Malformed id }
         '401': { description: Anonymous }
         '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
-        '404': { description: Unknown or other-tenant request (empty body) }
+        '404': { description: Unknown or other-tenant request (empty body, no ETag) }
   /api/consent/requests/{id}/decision:
     post:
       operationId: decideProofRequest
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
       summary: >-
         Record the holder's explicit signed approve/deny decision. The
         consent proof must cover the stored request bytes exactly.
@@ -361,6 +404,7 @@ paths:
   /api/consent/requests/{id}/presentation:
     get:
       operationId: getConsentPresentation
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
       summary: >-
         Authorized presentation (holder-signed consent JWS, labelled
         synthetic), delivered only while consent is verified
@@ -378,6 +422,7 @@ paths:
   /api/verification/presentations:
     post:
       operationId: verifyPresentation
+      x-sovra-scopes: [RP_CLIENT]
       summary: >-
         Evaluate one presentation against an approved proof request and
         commit an immutable ACCEPTED, REJECTED, or UNKNOWN decision with
@@ -426,6 +471,7 @@ paths:
   /api/verification/decisions/{id}:
     get:
       operationId: getVerificationDecision
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
       summary: >-
         Authorized retrieval of an already committed verification
         decision; retrieval never creates or rewrites a decision
@@ -434,15 +480,85 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: If-None-Match
+          in: header
+          schema: { type: string }
+          description: Exact ETag from a previous read; matches return 304
       responses:
-        '200': { description: Stored decision with outcome, reason, keyRef, and statusVersion }
+        '200':
+          description: Stored decision with outcome, reason, keyRef, and statusVersion
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Strong tag; decisions are immutable so the tag is stable
+        '304': { description: Caller already holds the current decision }
         '400': { description: Malformed id }
         '401': { description: Anonymous }
         '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
-        '404': { description: Unknown or other-tenant decision (empty body) }
+        '404': { description: Unknown or other-tenant decision (empty body, no ETag) }
+  /api/plans/propose:
+    post:
+      operationId: proposePlan
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
+      summary: >-
+        Propose an untrusted candidate plan with bounded read-only
+        discovery tools. The intent (RP, audience, purpose, outcome,
+        policy binding, requested claims) is validated before any model
+        contact. Default boot serves explicitly-labeled fixture
+        candidates (mode FIXTURE, liveAcceptance false); live model
+        calls happen only when the operator armed them, and provider
+        faults fail as 503 without fixture fallback. The candidate
+        authorizes nothing: only the guard may accept it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rpId, audience, purpose, outcome, policyId, policyVersion, requestedClaims]
+              properties:
+                rpId: { type: string }
+                audience: { type: string }
+                purpose: { type: string }
+                outcome:
+                  type: string
+                  description: 'Exactly age_over_18 at G1'
+                policyId: { type: string }
+                policyVersion: { type: string }
+                requestedClaims:
+                  type: array
+                  items: { type: string }
+                  description: 'Exactly [adultOver18] at G1'
+      responses:
+        '200':
+          description: >-
+            {mode LIVE|FIXTURE, liveAcceptance, synthetic, profile, plan
+            (CandidatePlanWire or null), recommendation, reason, model,
+            promptVersion, toolContractVersion, toolSchemaHash, toolCalls,
+            latencyMs, usageTokens, cost, snapshotVersion}
+        '400': { description: Invalid intent, before any model contact }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '503': { description: Live planning unavailable (planning_unavailable; retryable) }
+  /api/plans/status:
+    get:
+      operationId: planStatus
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
+      summary: >-
+        Planner mode and frozen versions. Reports booleans only for
+        live readiness (never endpoint, model, or credential values).
+      responses:
+        '200':
+          description: >-
+            {mode LIVE|FIXTURE, liveEnabled, modelConfigured,
+            promptVersion, toolContractVersion, toolSchemaHash,
+            baselineVersion, tools}
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
   /api/guard/validate:
     post:
       operationId: validatePlan
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
       summary: >-
         Adjudicate one untrusted candidate plan against live trust
         state and the RP-selected policy binding, before any holder
@@ -474,3 +590,49 @@ components:
       type: http
       scheme: bearer
       description: Service-account token; tenant and roles come from the token, never from headers
+  schemas:
+    Problem:
+      type: object
+      description: >-
+        RFC 9457 problem detail returned when the client sends
+        Accept: application/problem+json. The legacy bodies stay the
+        default; see api-compatibility.md for the migration rule.
+      required: [type, title, status, code, correlationId, retryable]
+      properties:
+        type: { type: string, example: 'about:blank' }
+        title: { type: string, description: Sovra error code, same as code }
+        status: { type: integer }
+        code:
+          type: string
+          description: >-
+            Machine-readable Sovra code (invalid_request, forbidden:<REASON>,
+            trust_unavailable, planning_unavailable,
+            dependency_unavailable, already_decided,
+            issuer_key_conflict, idempotency_conflict,
+            verification_conflict, internal)
+        correlationId: { type: string, description: Per-response id for support }
+        retryable: { type: boolean, description: Whether retrying later can succeed }
+    CandidatePlanWire:
+      type: object
+      description: >-
+        Snake-case candidate plan wire form shared by planning and guard
+        validation; see POST /api/guard/validate for the adjudication rule.
+      required: [plan_id, requested_outcome, candidate_issuer_id, credential_type,
+        claim_paths, evidence, policy_id, policy_version, recommendation]
+      properties:
+        plan_id: { type: string }
+        requested_outcome: { type: string }
+        candidate_issuer_id: { type: string }
+        credential_type: { type: string }
+        claim_paths: { type: array, items: { type: string } }
+        evidence:
+          type: array
+          items:
+            type: object
+            required: [document_id, section_id]
+            properties:
+              document_id: { type: string }
+              section_id: { type: string }
+        policy_id: { type: string }
+        policy_version: { type: string }
+        recommendation: { type: string, enum: [CANDIDATE_ONLY, NO_PATH, MANUAL_REVIEW] }

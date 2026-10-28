@@ -3,6 +3,7 @@ package dev.sovra.consent;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ReasonCode;
 import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.web.Etags;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
@@ -51,10 +53,19 @@ public class ConsentController {
   }
 
   @GetMapping("/requests/{id}")
-  public ResponseEntity<ConsentService.RequestView> get(@PathVariable("id") UUID requestId) {
+  public ResponseEntity<ConsentService.RequestView> get(
+      @PathVariable("id") UUID requestId,
+      @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
     var caller =
         CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
-    return ResponseEntity.ok(consent.get(caller, requestId));
+    ConsentService.RequestView view = consent.get(caller, requestId);
+    // The tag covers the derived state too, so a state change (expiry,
+    // decision) invalidates a cached review. 404s stay tagless.
+    String etag = Etags.strong(view.toString());
+    if (Etags.matches(etag, ifNoneMatch)) {
+      return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+    }
+    return ResponseEntity.ok().eTag(etag).body(view);
   }
 
   @PostMapping("/requests/{id}/decision")

@@ -1,0 +1,11 @@
+{
+  "caseId": "U4",
+  "note": "Policy asks for evidence the fixed mapping cannot attest; no path.",
+  "outcome": "age_over_18",
+  "issuerId": "https://sovra.example/issuers/synth-1",
+  "credentialType": "https://sovra.example/vct/adult-status/1",
+  "requestedClaims": ["dateOfBirth"],
+  "policyId": "sovra-synthetic-policy/age-check",
+  "policyVersion": "1",
+  "expectBaseline": "NO_PATH"
+}

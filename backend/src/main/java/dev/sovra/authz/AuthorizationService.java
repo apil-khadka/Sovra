@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 5;
+  static final long RULES_VERSION = 6;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
       Map.ofEntries(
@@ -47,7 +47,11 @@ public class AuthorizationService {
           Map.entry(Action.REVOKE_ISSUER_KEY, Set.of("TRUST_ADMIN")),
           // Either tenant agent may validate a candidate plan; the
           // verdict authorizes nothing by itself (INV-05).
-          Map.entry(Action.VALIDATE_PLAN, Set.of("TENANT_MEMBER", "RP_CLIENT")));
+          Map.entry(Action.VALIDATE_PLAN, Set.of("TENANT_MEMBER", "RP_CLIENT")),
+          // Either tenant agent may request planning; the candidate is
+          // untrusted until the guard accepts it, and planning tools are
+          // read-only (SOV-013).
+          Map.entry(Action.PROPOSE_PLAN, Set.of("TENANT_MEMBER", "RP_CLIENT")));
 
   private final ServiceAccountRepository accounts;
   private final EmergencyFlagService emergency;

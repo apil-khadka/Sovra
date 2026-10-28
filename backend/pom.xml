@@ -83,6 +83,14 @@
       <artifactId>nimbus-jose-jwt</artifactId>
       <version>10.3</version>
     </dependency>
+    <!-- OpenAI-compatible chat adapter for live planning (SOV-013). The
+         Meta Llama API endpoint, model, and key arrive from environment
+         only; the OpenAI autoconfigurations stay excluded in
+         SovraApplication so default boot is keyless. -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-model-openai</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>

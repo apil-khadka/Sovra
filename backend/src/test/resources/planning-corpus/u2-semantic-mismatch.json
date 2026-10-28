@@ -1,0 +1,11 @@
+{
+  "caseId": "U2",
+  "note": "yearsInEmployment>=18 is not adulthood; the fixed mapping refuses it for manual review.",
+  "outcome": "age_over_18",
+  "issuerId": "https://sovra.example/issuers/synth-1",
+  "credentialType": "https://sovra.example/vct/employment-tenure/1",
+  "requestedClaims": ["yearsInEmployment"],
+  "policyId": "sovra-synthetic-policy/age-check",
+  "policyVersion": "1",
+  "expectBaseline": "MANUAL_REVIEW"
+}

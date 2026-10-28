@@ -55,11 +55,37 @@ public class AuditEventRepository {
   }
 
   public List<Map<String, Object>> listRecent(UUID tenantId, int limit) {
+    return listRecent(tenantId, limit, null);
+  }
+
+  /**
+   * Keyset page over the stable {@code (occurred_at, id)} ordering (SOV-015,
+   * IF-11). The cursor is opaque; callers treat it as an untrusted string.
+   * Tenant filtering applies before the cursor, so a foreign cursor can
+   * only narrow the caller's own page, never widen it.
+   */
+  public List<Map<String, Object>> listRecent(UUID tenantId, int limit, AuditCursor cursor) {
     // Typed mapping: raw PG types (jsonb, arrays) must never reach Jackson.
-    return tenant.query(
+    String sql =
         "SELECT id, occurred_at, actor_type, actor_id, action, resource_type,"
             + " resource_id, decision, reason_code, policy_version, correlation_id, detail"
-            + " FROM audit_event WHERE tenant_id = ? ORDER BY occurred_at DESC LIMIT ?",
+            + " FROM audit_event WHERE tenant_id = ?";
+    Object[] args;
+    if (cursor == null) {
+      args = new Object[] {tenantId, bounded(limit)};
+    } else {
+      sql += " AND (occurred_at, id) < (?, ?)";
+      args =
+          new Object[] {
+            tenantId,
+            java.sql.Timestamp.from(cursor.occurredAt()),
+            cursor.id(),
+            bounded(limit)
+          };
+    }
+    sql += " ORDER BY occurred_at DESC, id DESC LIMIT ?";
+    return tenant.query(
+        sql,
         (rs, row) -> {
           Map<String, Object> event = new LinkedHashMap<>();
           event.put("id", rs.getString("id"));
@@ -76,8 +102,11 @@ public class AuditEventRepository {
           event.put("detail", readTree(rs.getString("detail")));
           return event;
         },
-        tenantId,
-        Math.min(Math.max(limit, 1), 100));
+        args);
+  }
+
+  private static int bounded(int limit) {
+    return Math.min(Math.max(limit, 1), 100);
   }
 
   private JsonNode readTree(String json) {

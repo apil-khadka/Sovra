@@ -1,0 +1,11 @@
+{
+  "caseId": "P1",
+  "note": "Passport scan is unnecessary to the goal; the baseline refuses the excess claim.",
+  "outcome": "age_over_18",
+  "issuerId": "https://sovra.example/issuers/synth-1",
+  "credentialType": "https://sovra.example/vct/adult-status/1",
+  "requestedClaims": ["adultOver18", "passportNumber"],
+  "policyId": "sovra-synthetic-policy/age-check",
+  "policyVersion": "1",
+  "expectBaseline": "NO_PATH"
+}

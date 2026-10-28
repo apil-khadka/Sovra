@@ -1,0 +1,11 @@
+{
+  "caseId": "U3",
+  "note": "Unknown issuer outside pinned registry metadata; no executable path.",
+  "outcome": "age_over_18",
+  "issuerId": "https://sovra.example/issuers/retired-9",
+  "credentialType": "https://sovra.example/vct/adult-status/1",
+  "requestedClaims": ["adultOver18"],
+  "policyId": "sovra-synthetic-policy/age-check",
+  "policyVersion": "1",
+  "expectBaseline": "NO_PATH"
+}

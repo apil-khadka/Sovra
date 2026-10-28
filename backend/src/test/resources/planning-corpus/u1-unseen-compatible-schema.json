@@ -1,0 +1,11 @@
+{
+  "caseId": "U1",
+  "note": "Unseen fictional isAdult schema with adequate assurance; the exact-match baseline cannot adapt and reports no path.",
+  "outcome": "age_over_18",
+  "issuerId": "https://sovra.example/issuers/unseen-fjord-1",
+  "credentialType": "https://sovra.example/vct/fjord-adult/1",
+  "requestedClaims": ["isAdult"],
+  "policyId": "sovra-synthetic-policy/age-check",
+  "policyVersion": "1",
+  "expectBaseline": "NO_PATH"
+}

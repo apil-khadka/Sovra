@@ -1,0 +1,11 @@
+{
+  "caseId": "X1",
+  "note": "Unapproved policy binding resolves to manual review, never acceptance.",
+  "outcome": "age_over_18",
+  "issuerId": "https://sovra.example/issuers/synth-1",
+  "credentialType": "https://sovra.example/vct/adult-status/1",
+  "requestedClaims": ["adultOver18"],
+  "policyId": "rp-custom-policy/unreviewed",
+  "policyVersion": "9",
+  "expectBaseline": "MANUAL_REVIEW"
+}
