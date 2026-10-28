@@ -3,6 +3,9 @@
 // approve/deny decision with the credential's P-256 holder key. The
 // canonical message mirrors ConsentService.consentMessage line for line.
 
+import { sessionPath, xsrfToken } from './auth'
+import type { Caller } from './auth'
+
 export interface ConsentReview {
   requestId: string
   rpId: string
@@ -139,36 +142,42 @@ export function randomNonce(): string {
   return base64Url(crypto.getRandomValues(new Uint8Array(24)))
 }
 
-async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+async function request<T>(path: string, caller: Caller, init?: RequestInit): Promise<T> {
+  const session = caller.kind === 'session'
+  const xsrf = session && init?.method !== undefined ? xsrfToken() : null
+  const res = await fetch(session ? sessionPath(path) : path, {
     ...init,
+    credentials: session ? 'include' : undefined,
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(session ? {} : { Authorization: `Bearer ${caller.token}` }),
       'Content-Type': 'application/json',
+      ...(xsrf === null ? {} : { 'X-XSRF-TOKEN': xsrf }),
       ...(init?.headers ?? {}),
     },
   })
   if (res.status === 404) throw new ConsentApiError(404, 'unknown, refused, or expired request')
-  if (res.status === 401) throw new ConsentApiError(401, 'invalid or missing token')
-  if (res.status === 403) throw new ConsentApiError(403, 'token lacks the required role')
+  if (res.status === 401)
+    throw new ConsentApiError(401, session ? 'session expired: log in again' : 'invalid or missing token')
+  if (res.status === 403)
+    throw new ConsentApiError(403, session ? 'session lacks the required role' : 'token lacks the required role')
   if (res.status === 409) throw new ConsentApiError(409, 'this request was already decided')
   if (!res.ok) throw new ConsentApiError(res.status, `backend responded ${res.status}`)
   return (await res.json()) as T
 }
 
-export function fetchReview(base: string, token: string, requestId: string): Promise<ConsentReview> {
-  return request<ConsentReview>(`${base}/api/consent/requests/${requestId}`, token)
+export function fetchReview(base: string, caller: Caller, requestId: string): Promise<ConsentReview> {
+  return request<ConsentReview>(`${base}/api/consent/requests/${requestId}`, caller)
 }
 
 export function postDecision(
   base: string,
-  token: string,
+  caller: Caller,
   holder: HolderKey,
   review: ConsentReview,
   decision: 'approve' | 'deny',
 ): Promise<ConsentReview> {
   return signConsent(holder, review, decision).then((consentProof) =>
-    request<ConsentReview>(`${base}/api/consent/requests/${review.requestId}/decision`, token, {
+    request<ConsentReview>(`${base}/api/consent/requests/${review.requestId}/decision`, caller, {
       method: 'POST',
       body: JSON.stringify({ decision, holderJwk: holder.jwk, consentProof }),
     }),
@@ -177,11 +186,11 @@ export function postDecision(
 
 export function fetchPresentation(
   base: string,
-  token: string,
+  caller: Caller,
   requestId: string,
 ): Promise<ConsentPresentation> {
   return request<ConsentPresentation>(
     `${base}/api/consent/requests/${requestId}/presentation`,
-    token,
+    caller,
   )
 }

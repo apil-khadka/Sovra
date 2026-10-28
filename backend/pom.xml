@@ -72,6 +72,13 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
+    <!-- SOV-006: Spring BFF login (auth code + forced S256 PKCE) against
+         issuer-local Keycloak. Machine Bearer [REDACTED] stays a separate
+         stateless chain; sessions never authenticate it. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-oauth2-client</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jdbc</artifactId>

@@ -1,5 +1,14 @@
 server:
   port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        # Localhost counts as trustworthy for Secure cookies, so these
+        # hold for local Keycloak development and production alike.
+        secure: true
+        http-only: true
+        same-site: lax
 
 spring:
   application:
@@ -27,6 +36,24 @@ spring:
   threads:
     virtual:
       enabled: true
+  # SOV-006 BFF login against issuer-local Keycloak. Disabled unless
+  # sovra.bff.enabled is true; values must match the sovra.bff trust
+  # registry exactly or startup fails (see BffConfigValidator).
+  security:
+    oauth2:
+      client:
+        registration:
+          sovra:
+            provider: sovra
+            client-id: ${SOVRA_BFF_CLIENT_ID:sovra-bff}
+            client-secret: ${SOVRA_BFF_CLIENT_SECRET:changeme-dev-only}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+            redirect-uri: ${SOVRA_BFF_REDIRECT_URI:http://localhost:8080/login/oauth2/code/sovra}
+            scope: openid, profile, groups, tenant
+        provider:
+          sovra:
+            issuer-uri: ${SOVRA_BFF_ISSUER_URI:http://localhost:18080/realms/sovra}
 
 management:
   endpoints:
@@ -52,3 +79,24 @@ sovra:
   synthetic-issuers:
     enabled: ${SOVRA_SYNTHETIC_ISSUERS_ENABLED:false}
     acknowledge-non-production: ${SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION:false}
+  # SOV-006 BFF trust registry: exact allowlist entries, validated at
+  # startup. Demo defaults point at local Keycloak over loopback; any
+  # other issuer must be https (see BffProperties).
+  bff:
+    enabled: ${SOVRA_BFF_ENABLED:false}
+    issuer: ${SOVRA_BFF_ISSUER:http://localhost:18080/realms/sovra}
+    client-id: ${SOVRA_BFF_CLIENT_ID:sovra-bff}
+    redirect-uri: ${SOVRA_BFF_REDIRECT_URI:http://localhost:8080/login/oauth2/code/sovra}
+    post-logout-redirect-uri: ${SOVRA_BFF_POST_LOGOUT_URI:http://localhost:8080/}
+    end-session-endpoint: ${SOVRA_BFF_END_SESSION:http://localhost:18080/realms/sovra/protocol/openid-connect/logout}
+    require-https-issuer: ${SOVRA_BFF_REQUIRE_HTTPS_ISSUER:true}
+    tenant-claim: tenant_slug
+    groups-claim: groups
+    allowed-tenant-slugs: ${SOVRA_BFF_TENANT_SLUGS:sovra-demo}
+    group-role-map:
+      sovra-members: TENANT_MEMBER
+      sovra-rp: RP_CLIENT
+      sovra-ops: ISSUER_OPS
+      sovra-trust-admins: TRUST_ADMIN
+    privileged-roles: TRUST_ADMIN
+    hardware-amr: webauthn

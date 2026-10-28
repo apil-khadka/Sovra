@@ -3,6 +3,13 @@
 # plus test-only values. If the main file gains a key, mirror it here.
 server:
   port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        secure: true
+        http-only: true
+        same-site: lax
 
 spring:
   application:
@@ -49,6 +56,29 @@ sovra:
   # Signing backend: local-dev (G1 synthetic double, needs both arming
   # flags below) or kms (production; arrives with the G2 provider pick).
   signer: local-dev
+  profile: synthetic
   synthetic-issuers:
     enabled: true
     acknowledge-non-production: true
+  # SOV-006 BFF trust registry mirror (main defaults). Disabled here;
+  # BFF tests enable it per-class with stub-OP endpoints. No
+  # spring.security.oauth2 client section: registering a provider
+  # would fetch OIDC discovery at startup in every test context.
+  bff:
+    enabled: false
+    issuer: http://localhost:18080/realms/sovra
+    client-id: sovra-bff
+    redirect-uri: http://localhost:8080/login/oauth2/code/sovra
+    post-logout-redirect-uri: http://localhost:8080/
+    end-session-endpoint: http://localhost:18080/realms/sovra/protocol/openid-connect/logout
+    require-https-issuer: true
+    tenant-claim: tenant_slug
+    groups-claim: groups
+    allowed-tenant-slugs: sovra-demo
+    group-role-map:
+      sovra-members: TENANT_MEMBER
+      sovra-rp: RP_CLIENT
+      sovra-ops: ISSUER_OPS
+      sovra-trust-admins: TRUST_ADMIN
+    privileged-roles: TRUST_ADMIN
+    hardware-amr: webauthn

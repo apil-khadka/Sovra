@@ -1,6 +1,7 @@
 package dev.sovra.authz;
 
 import dev.sovra.auth.ServiceAccountPrincipal;
+import dev.sovra.auth.HumanMembershipRepository;
 import dev.sovra.auth.ServiceAccountRepository;
 import java.time.Clock;
 import java.util.Map;
@@ -21,7 +22,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 7;
+  static final long RULES_VERSION = 8;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
       Map.ofEntries(
@@ -59,9 +60,14 @@ public class AuthorizationService {
           // may review their own flow timings and reason counts.
           Map.entry(
               Action.READ_TELEMETRY, Set.of("TENANT_MEMBER", "AUDIT_READER", "TRUST_ADMIN")),
-          Map.entry(Action.RUN_CANARY, Set.of("TENANT_MEMBER", "AUDIT_READER", "TRUST_ADMIN")));
+          Map.entry(Action.RUN_CANARY, Set.of("TENANT_MEMBER", "AUDIT_READER", "TRUST_ADMIN")),
+          Map.entry(Action.CREATE_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")),
+          Map.entry(Action.READ_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")),
+          Map.entry(Action.ROTATE_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")),
+          Map.entry(Action.REVOKE_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")));
 
   private final ServiceAccountRepository accounts;
+  private final HumanMembershipRepository humans;
   private final EmergencyFlagService emergency;
   private final PermissionCache cache;
   private final JdbcTemplate global;
@@ -69,11 +75,13 @@ public class AuthorizationService {
 
   public AuthorizationService(
       ServiceAccountRepository accounts,
+      HumanMembershipRepository humans,
       EmergencyFlagService emergency,
       PermissionCache cache,
       DataSource globalDataSource,
       Clock clock) {
     this.accounts = accounts;
+    this.humans = humans;
     this.emergency = emergency;
     this.cache = cache;
     this.global = new JdbcTemplate(globalDataSource);
@@ -94,11 +102,15 @@ public class AuthorizationService {
       return Decision.deny(ReasonCode.ANONYMOUS, policyVersion);
     }
     ServiceAccountPrincipal principal = caller.get();
+    // Either credential store vouches: machine accounts and
+    // provisioned human memberships share this liveness gate, so
+    // revocation in either store denies on the next call.
     boolean live =
         accounts
             .findLive(principal.id())
             .map(row -> row.live(clock.instant()))
-            .orElse(false);
+            .orElseGet(
+                () -> humans.findLive(principal.id()).map(row -> row.live()).orElse(false));
     if (!live) {
       cache.invalidatePrincipal(principal.id());
       return Decision.deny(ReasonCode.CREDENTIAL_REVOKED, policyVersion);
@@ -142,7 +154,8 @@ public class AuthorizationService {
     return Decision.deny(ReasonCode.MISSING_ROLE, policyVersion);
   }
 
-  private long policyVersion() {
+  /** Epoch stamped on every decision and audit row. */
+  public long policyVersion() {
     Long active =
         global.queryForObject(
             "SELECT COALESCE(MAX(snapshot_version), 0) FROM trust_snapshot_activation",

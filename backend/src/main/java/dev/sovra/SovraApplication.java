@@ -1,5 +1,6 @@
 package dev.sovra;
 
+import dev.sovra.bff.BffProperties;
 import dev.sovra.planning.PlanningProperties;
 import org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration;
 import org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration;
@@ -26,7 +27,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
       OpenAiAudioTranscriptionAutoConfiguration.class,
       OpenAiModerationAutoConfiguration.class
     })
-@EnableConfigurationProperties(PlanningProperties.class)
+@EnableConfigurationProperties({BffProperties.class, PlanningProperties.class})
 public class SovraApplication {
 
   public static void main(String[] args) {

@@ -7,6 +7,7 @@ import {
 import type { HolderKey } from './consent'
 import { VerifyApiError, fetchDecision, submitVerification } from './verification'
 import type { VerificationDecision } from './verification'
+import type { Caller, SessionInfo } from './auth'
 
 // Minimal verifier flow (SOV-011). Three visibly distinct outcomes:
 // accepted, rejected, unknown. Every server value renders as plain
@@ -18,9 +19,10 @@ type Stage =
   | { kind: 'decided'; decision: VerificationDecision; replayed: boolean }
   | { kind: 'error'; message: string }
 
-export default function VerifyView() {
+export default function VerifyView({ session }: { session: SessionInfo | null }) {
   const [base, setBase] = useState('')
   const [token, setToken] = useState('')
+  const [useSession, setUseSession] = useState(true)
   const [requestId, setRequestId] = useState('')
   const [nonce, setNonce] = useState('')
   const [audience, setAudience] = useState('')
@@ -51,13 +53,17 @@ export default function VerifyView() {
     }
   }
 
+  function caller(): Caller {
+    return session !== null && useSession ? { kind: 'session' } : { kind: 'token', token: token.trim() }
+  }
+
   async function onSubmit() {
     if (holder === null) return
     setStage({ kind: 'submitting' })
     try {
       const first = await submitVerification(
         base.trim(),
-        token.trim(),
+        caller(),
         holder,
         requestId.trim(),
         nonce.trim(),
@@ -65,7 +71,7 @@ export default function VerifyView() {
       )
       // Response-loss shape: re-read the stored decision and confirm
       // the server returns the identical committed outcome.
-      const reread = await fetchDecision(base.trim(), token.trim(), first.decisionId)
+      const reread = await fetchDecision(base.trim(), caller(), first.decisionId)
       setStage({
         kind: 'decided',
         decision: first,
@@ -109,6 +115,16 @@ export default function VerifyView() {
               autoComplete="off"
             />
           </label>
+          {session !== null && (
+            <label className="consent-session">
+              <input
+                type="checkbox"
+                checked={useSession}
+                onChange={(event) => setUseSession(event.target.checked)}
+              />
+              Act as {session.displayName} (browser session)
+            </label>
+          )}
           <label>
             RP bearer [REDACTED]
             <input
@@ -116,6 +132,7 @@ export default function VerifyView() {
               value={token}
               onChange={(event) => setToken(event.target.value)}
               autoComplete="off"
+              disabled={session !== null && useSession}
             />
           </label>
           <label>

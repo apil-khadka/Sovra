@@ -21,6 +21,60 @@ services:
     networks:
       - sovra-net
 
+  # SOV-006 issuer-local Keycloak (synthetic demo only: start-dev with
+  # a file store, http frontend, and literal demo secrets — never a
+  # production shape). Browsers AND backend containers must resolve the
+  # same issuer string, so add one hosts line on the demo machine:
+  #   127.0.0.1 sovra-keycloak
+  # and the app services map it to the host gateway below. Pinned by
+  # tag plus digest; image provenance is re-checked per release.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.0@sha256:5f3fb534cde6bf006d79f5912473e5d2c828c707cdfc52e16972803aca9d43dd
+    command:
+      - start-dev
+      - --import-realm
+      - --hostname=http://sovra-keycloak:18080
+      - --http-port=8080
+      - --health-enabled=true
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${SOVRA_KC_BOOTSTRAP_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${SOVRA_KC_BOOTSTRAP_PASSWORD:-sovra-dev-only}
+    ports:
+      - "18080:8080"
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+    healthcheck:
+      # No curl in this image: raw HTTP over bash /dev/tcp against the
+      # management interface. TCP-alone is not enough — Quarkus
+      # accepts connections before serving, and apps fetch OIDC
+      # discovery at boot, so readiness must mean serving.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\r\n\r\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - sovra-net
+
+  # One-shot demo fixture (compose/dev only): seeds the sovra-demo
+  # tenant once migrations have created the table. Deliberately NOT
+  # gating app boot (that would deadlock with Flyway, which runs
+  # inside app boot); logins in the first seconds fail closed with
+  # WRONG_TENANT until the seed lands.
+  db-seed:
+    image: postgres:17.7
+    command: ["sh", "/seed/seed-demo-tenant.sh"]
+    environment:
+      SOVRA_DB_URL: jdbc:postgresql://db:5432/sovra
+      SOVRA_DB_ADMIN_USER: sovra
+      SOVRA_DB_ADMIN_PASSWORD: ${SOVRA_DB_ADMIN_PASSWORD:-sovra-dev-only}
+    volumes:
+      - ./db/seed:/seed:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sovra-net
+
   app-a:
     build: ./backend
     ports:
@@ -39,8 +93,24 @@ services:
       SOVRA_PROFILE: ${SOVRA_PROFILE:-synthetic}
       SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
       SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+      # SOV-006 BFF login against issuer-local Keycloak (synthetic
+      # demo only). Redirects are per-instance and exact; the issuer
+      # string must resolve identically in browsers and in these
+      # containers (see the keycloak service note about sovra-keycloak).
+      SOVRA_BFF_ENABLED: 'true'
+      SOVRA_BFF_ISSUER: http://sovra-keycloak:18080/realms/sovra
+      SOVRA_BFF_ISSUER_URI: http://sovra-keycloak:18080/realms/sovra
+      SOVRA_BFF_CLIENT_SECRET: ${SOVRA_BFF_CLIENT_SECRET:-sovra-bff-dev-only}
+      SOVRA_BFF_END_SESSION: http://sovra-keycloak:18080/realms/sovra/protocol/openid-connect/logout
+      SOVRA_BFF_REQUIRE_HTTPS_ISSUER: 'false'
+      SOVRA_BFF_REDIRECT_URI: http://localhost:8080/login/oauth2/code/sovra
+      SOVRA_BFF_POST_LOGOUT_URI: http://localhost:8080/
+    extra_hosts:
+      - "sovra-keycloak:host-gateway"
     depends_on:
       db:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     networks:
       - sovra-net
@@ -63,8 +133,24 @@ services:
       SOVRA_PROFILE: ${SOVRA_PROFILE:-synthetic}
       SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
       SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+      # SOV-006 BFF login against issuer-local Keycloak (synthetic
+      # demo only). Redirects are per-instance and exact; the issuer
+      # string must resolve identically in browsers and in these
+      # containers (see the keycloak service note about sovra-keycloak).
+      SOVRA_BFF_ENABLED: 'true'
+      SOVRA_BFF_ISSUER: http://sovra-keycloak:18080/realms/sovra
+      SOVRA_BFF_ISSUER_URI: http://sovra-keycloak:18080/realms/sovra
+      SOVRA_BFF_CLIENT_SECRET: ${SOVRA_BFF_CLIENT_SECRET:-sovra-bff-dev-only}
+      SOVRA_BFF_END_SESSION: http://sovra-keycloak:18080/realms/sovra/protocol/openid-connect/logout
+      SOVRA_BFF_REQUIRE_HTTPS_ISSUER: 'false'
+      SOVRA_BFF_REDIRECT_URI: http://localhost:8081/login/oauth2/code/sovra
+      SOVRA_BFF_POST_LOGOUT_URI: http://localhost:8081/
+    extra_hosts:
+      - "sovra-keycloak:host-gateway"
     depends_on:
       db:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     networks:
       - sovra-net

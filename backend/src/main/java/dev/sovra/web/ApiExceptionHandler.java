@@ -82,7 +82,8 @@ public class ApiExceptionHandler {
     CredentialNotFoundException.class,
     ConsentNotFoundException.class,
     VerificationNotFoundException.class,
-    IssuerKeyNotFoundException.class
+    IssuerKeyNotFoundException.class,
+    dev.sovra.auth.ServiceAccountService.ServiceAccountNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -103,6 +104,7 @@ public class ApiExceptionHandler {
     InvalidConsentException.class,
     InvalidVerificationException.class,
     InvalidPlanningException.class,
+    dev.sovra.auth.ServiceAccountService.InvalidServiceAccountException.class,
     AuditCursorException.class,
     GuardRejectedException.class,
     MalformedPlanException.class,
@@ -125,6 +127,16 @@ public class ApiExceptionHandler {
     }
     return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
         .body(Map.of("error", "idempotency_conflict"));
+  }
+
+  @ExceptionHandler(
+      dev.sovra.auth.ServiceAccountService.ServiceAccountConflictException.class)
+  public ResponseEntity<Object> serviceAccountConflict(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.UNPROCESSABLE_ENTITY, "service_account_conflict", false);
+    }
+    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+        .body(Map.of("error", "service_account_conflict"));
   }
 
   @ExceptionHandler(VerificationConflictException.class)

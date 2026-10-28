@@ -2,7 +2,7 @@
 
 G1 operations surfaces for the synthetic flow. Everything here is sanitized:
 fixed codes, fixed names, durations, and counts only — never exception text,
-SQL, secrets, or identity data. Contract version 0.3.0 in
+SQL, secrets, or identity data. Contract version 0.4.0 in
 [implemented-api.openapi.yaml](implemented-api.openapi.yaml).
 
 ## Liveness vs readiness

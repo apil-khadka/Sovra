@@ -1,0 +1,207 @@
+{
+  "realm": "sovra",
+  "displayName": "Sovra (synthetic demo)",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "minimumQuickLoginWaitSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "maxDeltaTimeSeconds": 43200,
+  "quickLoginCheckMilliSeconds": 1000,
+  "passwordPolicy": "length(12)",
+  "webAuthnPolicyRpEntityName": "sovra",
+  "webAuthnPolicySignatureAlgorithms": ["ES256"],
+  "webAuthnPolicyRpId": "",
+  "webAuthnPolicyAttestationConveyancePreference": "not specified",
+  "webAuthnPolicyAuthenticatorAttachment": "not specified",
+  "webAuthnPolicyRequireResidentKey": "not specified",
+  "webAuthnPolicyUserVerificationRequirement": "preferred",
+  "webAuthnPolicyCreateTimeout": 0,
+  "webAuthnPolicyAvoidSameAuthenticatorRegister": false,
+  "webAuthnPolicyAcceptableAaguids": [],
+  "webAuthnPolicyPasswordlessRpEntityName": "sovra",
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256"],
+  "webAuthnPolicyPasswordlessRpId": "",
+  "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
+  "webAuthnPolicyPasswordlessAuthenticatorAttachment": "not specified",
+  "webAuthnPolicyPasswordlessRequireResidentKey": "not specified",
+  "webAuthnPolicyPasswordlessUserVerificationRequirement": "preferred",
+  "webAuthnPolicyPasswordlessCreateTimeout": 0,
+  "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister": false,
+  "webAuthnPolicyPasswordlessAcceptableAaguids": [],
+  "groups": [
+    {"name": "sovra-members", "path": "/sovra-members"},
+    {"name": "sovra-rp", "path": "/sovra-rp"},
+    {"name": "sovra-ops", "path": "/sovra-ops"},
+    {"name": "sovra-trust-admins", "path": "/sovra-trust-admins"}
+  ],
+  "users": [
+    {
+      "username": "demo-member",
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "Member",
+      "email": "demo-member@example.invalid",
+      "emailVerified": true,
+      "groups": ["/sovra-members", "/sovra-rp"],
+      "attributes": {"tenant_slug": ["sovra-demo"]},
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sovra-demo-member-01",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "demo-priv",
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "Privileged",
+      "email": "demo-priv@example.invalid",
+      "emailVerified": true,
+      "groups": ["/sovra-members", "/sovra-trust-admins"],
+      "attributes": {"tenant_slug": ["sovra-demo"]},
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sovra-demo-priv-02",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "sovra-bff",
+      "name": "Sovra Spring BFF (synthetic demo)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "sovra-bff-dev-only",
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [
+        "http://localhost:8080/login/oauth2/code/sovra",
+        "http://localhost:8081/login/oauth2/code/sovra"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "id.token.signed.response.alg": "ES256",
+        "post.logout.redirect.uris": "http://localhost:8080/##http://localhost:8081/"
+      },
+      "defaultClientScopes": ["profile", "groups", "tenant", "amr"],
+      "optionalClientScopes": []
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "amr",
+      "description": "Authentication method references. Password-only sessions emit an empty list (fail closed for privileged roles); executions declare reference values when WebAuthn joins the flow.",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "protocolMappers": [
+        {
+          "name": "amr",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-amr-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "amr",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "description": "Minimal demo profile: username only. The built-in defaults are not created when an import defines clientScopes, so this realm ships exactly what the BFF reads.",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "protocolMappers": [
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "preferred_username",
+            "user.attribute": "username",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "name": "groups",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tenant",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "protocolMappers": [
+        {
+          "name": "tenant_slug",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "tenant_slug",
+            "user.attribute": "tenant_slug",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "components": {
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "name": "ecdsa-generated",
+        "providerId": "ecdsa-generated",
+        "subComponents": {},
+        "config": {
+          "priority": ["200"],
+          "algorithm": ["ES256"]
+        }
+      }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.3.0
+  version: 0.4.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -108,6 +108,115 @@ paths:
       responses:
         '200': { description: accountId, tenantId, name, roles }
         '401': { description: Missing, unknown, revoked, or expired token }
+  /api/auth/service-accounts:
+    post:
+      operationId: createServiceAccount
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Create a machine-chain credential (SOV-006). The token is
+        returned once in the 201 body and never readable afterwards;
+        only its hash is stored. Roles must be a non-empty subset of
+        the known roles; expiry, when given, must be in the future.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, roles]
+              properties:
+                name: { type: string, description: 1 to 128 chars }
+                roles:
+                  type: array
+                  items: { type: string }
+                  description: >-
+                    Non-empty subset of TENANT_MEMBER, ISSUER_OPS,
+                    RP_CLIENT, TRUST_ADMIN, AUDIT_READER
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: Optional; must be in the future
+      responses:
+        '201': { description: '{id, name, roles, revoked false, expiresAt, createdAt, token one-time}' }
+        '400': { description: Invalid name, roles, or expiry }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+    get:
+      operationId: listServiceAccounts
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        List the caller's tenant service accounts, oldest first.
+        Views never include token material.
+      responses:
+        '200': { description: '[{id, name, roles, revoked, expiresAt, createdAt}]' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+  /api/auth/service-accounts/{id}:
+    get:
+      operationId: getServiceAccount
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Inspect one service account; the view never includes token material
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{id, name, roles, revoked, expiresAt, createdAt}' }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown or other-tenant account (empty body) }
+  /api/auth/service-accounts/{id}/rotate:
+    post:
+      operationId: rotateServiceAccount
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Replace the credential with a fresh one-time token. The old
+        token stops working immediately. Revoked accounts stay
+        revoked: rotation refuses and the operator creates a new
+        account instead.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: Optional new expiry; must be in the future; absent clears it
+      responses:
+        '200': { description: '{id, name, roles, revoked false, expiresAt, createdAt, token one-time}' }
+        '400': { description: Malformed id or non-future expiry }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown or other-tenant account (empty body) }
+        '422': { description: Account is revoked (service_account_conflict) }
+  /api/auth/service-accounts/{id}/revoke:
+    post:
+      operationId: revokeServiceAccount
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Terminally revoke the credential. Revocation is idempotent:
+        re-revoking returns the revoked view.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{id, name, roles, revoked true, expiresAt, createdAt}' }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown or other-tenant account (empty body) }
   /api/audit/events:
     get:
       operationId: listAuditEvents

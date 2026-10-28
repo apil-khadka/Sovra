@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import ConsentView from './ConsentView'
 import DemoView, { ReadinessPanel } from './DemoView'
 import VerifyView from './VerifyView'
+import { fetchSession, login, logout } from './auth'
+import type { SessionInfo } from './auth'
 import { fetchReadiness } from './ops'
 import type { ReadinessReport } from './ops'
 
@@ -20,6 +22,17 @@ export default function App() {
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [readiness, setReadiness] = useState<ReadinessReport | null>(null)
   const [view, setView] = useState<'status' | 'demo' | 'consent' | 'verify'>('status')
+  const [session, setSession] = useState<SessionInfo | null>(null)
+  const [authError] = useState<string | null>(() => {
+    const denied = new URLSearchParams(window.location.search).get('auth_error')
+    if (denied === null) return null
+    const params = new URLSearchParams(window.location.search)
+    params.delete('auth_error')
+    const rest = params.toString()
+    window.history.replaceState(null, '', window.location.pathname + (rest === '' ? '' : `?${rest}`))
+    return denied
+  })
+  const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -44,12 +57,47 @@ export default function App() {
       .catch(() => {
         if (!controller.signal.aborted) setReadiness(null)
       })
+    fetchSession()
+      .then((info) => {
+        if (!controller.signal.aborted) setSession(info)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSession(null)
+      })
     return () => controller.abort()
   }, [])
+
+  async function onLogout() {
+    setLoggingOut(true)
+    try {
+      await logout()
+    } catch {
+      setLoggingOut(false)
+    }
+  }
 
   return (
     <main>
       <h1>Sovra</h1>
+      <div className="auth-bar">
+        {session === null ? (
+          <button type="button" onClick={login}>
+            Log in with Keycloak
+          </button>
+        ) : (
+          <>
+            <span>
+              {session.displayName} · {session.roles.join(', ')}
+            </span>
+            <button type="button" onClick={() => void onLogout()} disabled={loggingOut}>
+              {loggingOut ? 'Logging out…' : 'Log out'}
+            </button>
+          </>
+        )}
+      </div>
+      {authError !== null && (
+        <p role="alert">Login denied: {authError}. No session was created.</p>
+      )}
       <nav className="app-nav" aria-label="Views">
         <button type="button" onClick={() => setView('status')} aria-pressed={view === 'status'}>
           Status
@@ -86,8 +134,8 @@ export default function App() {
         </>
       )}
       {view === 'demo' && <DemoView />}
-      {view === 'consent' && <ConsentView />}
-      {view === 'verify' && <VerifyView />}
+      {view === 'consent' && <ConsentView session={session} />}
+      {view === 'verify' && <VerifyView session={session} />}
     </main>
   )
 }

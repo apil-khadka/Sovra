@@ -72,12 +72,18 @@ class VerificationNegativeTests extends SovraAppRoleBase {
         "SELECT artifact FROM credential_artifact WHERE id = ?", String.class,
         UUID.fromString(stage.credentialId()));
     assertThat(artifact).isNotNull();
-    // Flip the final signature character inside the base64url alphabet:
-    // the container still parses, but the signature no longer verifies.
-    char last = artifact.charAt(artifact.length() - 1);
-    char flipped = last == 'A' ? 'B' : 'A';
+    // Flip the first signature character inside the base64url
+    // alphabet: the container still parses, but the decoded signature
+    // bytes always change, so verification must fail. (The final
+    // character is unusable for this: a 64-byte ECDSA signature ends
+    // in pad-constrained bits, and flipping only those decodes to
+    // identical bytes that still verify.)
+    String[] parts = artifact.split("\\.", -1);
+    assertThat(parts.length).isEqualTo(3);
+    char first = parts[2].charAt(0);
+    char flipped = first == 'A' ? 'B' : 'A';
     owner.update("UPDATE credential_artifact SET artifact = ? WHERE id = ?",
-        artifact.substring(0, artifact.length() - 1) + flipped,
+        parts[0] + "." + parts[1] + "." + flipped + parts[2].substring(1),
         UUID.fromString(stage.credentialId()));
 
     assertThat(submitForReason(stage, freshBody(stage)))

@@ -8,6 +8,7 @@ import {
   postDecision,
 } from './consent'
 import type { ConsentPresentation, ConsentReview, HolderKey } from './consent'
+import type { Caller, SessionInfo } from './auth'
 
 // Minimal holder consent flow (SOV-010). Five visibly distinct states:
 // pending, review, denied, unavailable, verified. Every server value
@@ -34,9 +35,10 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   )
 }
 
-export default function ConsentView() {
+export default function ConsentView({ session }: { session: SessionInfo | null }) {
   const [base, setBase] = useState('')
   const [token, setToken] = useState('')
+  const [useSession, setUseSession] = useState(true)
   const [requestId, setRequestId] = useState('')
   const [holder, setHolder] = useState<HolderKey | null>(null)
   const [keyStatus, setKeyStatus] = useState('')
@@ -52,15 +54,19 @@ export default function ConsentView() {
     }
   }
 
+  function caller(): Caller {
+    return session !== null && useSession ? { kind: 'session' } : { kind: 'token', token: token.trim() }
+  }
+
   async function onLoad() {
     setStage({ kind: 'loading' })
     try {
-      const review = await fetchReview(base.trim(), token.trim(), requestId.trim())
+      const review = await fetchReview(base.trim(), caller(), requestId.trim())
       if (review.state === 'PENDING') setStage({ kind: 'pending', review })
       else if (review.state === 'DENIED') setStage({ kind: 'denied', review })
       else if (review.state === 'UNAVAILABLE') setStage({ kind: 'unavailable', review })
       else {
-        const presentation = await fetchPresentation(base.trim(), token.trim(), review.requestId)
+        const presentation = await fetchPresentation(base.trim(), caller(), review.requestId)
         setStage({ kind: 'verified', review, presentation })
       }
     } catch (err: unknown) {
@@ -76,9 +82,9 @@ export default function ConsentView() {
     if (holder.thumbprint !== stage.review.holderThumbprint) return
     setStage({ kind: 'deciding', review: stage.review })
     try {
-      const review = await postDecision(base.trim(), token.trim(), holder, stage.review, decision)
+      const review = await postDecision(base.trim(), caller(), holder, stage.review, decision)
       if (review.state === 'VERIFIED') {
-        const presentation = await fetchPresentation(base.trim(), token.trim(), review.requestId)
+        const presentation = await fetchPresentation(base.trim(), caller(), review.requestId)
         setStage({ kind: 'verified', review, presentation })
       } else if (review.state === 'DENIED') {
         setStage({ kind: 'denied', review })
@@ -133,6 +139,16 @@ export default function ConsentView() {
               autoComplete="off"
             />
           </label>
+          {session !== null && (
+            <label className="consent-session">
+              <input
+                type="checkbox"
+                checked={useSession}
+                onChange={(event) => setUseSession(event.target.checked)}
+              />
+              Act as {session.displayName} (browser session)
+            </label>
+          )}
           <label>
             Bearer [REDACTED]
             <input
@@ -140,6 +156,7 @@ export default function ConsentView() {
               value={token}
               onChange={(event) => setToken(event.target.value)}
               autoComplete="off"
+              disabled={session !== null && useSession}
             />
           </label>
           <label>

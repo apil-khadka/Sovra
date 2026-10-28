@@ -104,4 +104,34 @@ public class AuditService {
         "",
         Map.of());
   }
+
+  /**
+   * External-identity audit (BFF login/logout): the actor is an OIDC
+   * subject, not a provisioned row yet. The caller sets the tenant
+   * context first; RLS rejects anything unattributed, so failures
+   * before tenant resolution stay log-only by schema design.
+   */
+  public void recordExternal(
+      String actorType,
+      java.util.UUID tenantId,
+      String actorId,
+      Action action,
+      ResourceRef resource,
+      Decision decision,
+      String correlationId,
+      Map<String, String> detail) {
+    String decisionText = decision.permitted() ? "PERMIT" : "DENY";
+    events.insert(
+        tenantId,
+        actorType,
+        actorId,
+        action.name(),
+        resource.type(),
+        resource.id(),
+        decisionText,
+        decision.reasonCode(),
+        decision.policyVersion(),
+        correlationId == null ? "" : correlationId,
+        toJson(sanitize(detail)));
+  }
 }
