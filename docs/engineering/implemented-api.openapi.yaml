@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.4.0
+  version: 0.5.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -217,6 +217,203 @@ paths:
         '401': { description: Anonymous }
         '403': { description: Lacks TRUST_ADMIN }
         '404': { description: Unknown or other-tenant account (empty body) }
+  /api/vault/objects:
+    post:
+      operationId: storeVaultObject
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Seal source bytes as vault object version 1 (SOV-016).
+        Content is base64; the optional digest pin must match.
+        Returns identity only, never ciphertext or key material.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuerId, purposes, contentBase64]
+              properties:
+                issuerId: { type: string }
+                displayName: { type: string }
+                purposes:
+                  type: array
+                  items: { type: string }
+                  description: 1 to 16 names matching [a-z0-9-]{1,64}
+                contentBase64: { type: string, description: 1 to 16777200 bytes decoded }
+                contentSha256Hex: { type: string, description: Optional pinned digest }
+      responses:
+        '201': { description: '{objectId, version 1}' }
+        '400': { description: Malformed shape, bounds, or digest mismatch }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '503': { description: Wrapping backend unavailable (kms_unavailable) }
+  /api/vault/objects/{id}/versions:
+    post:
+      operationId: storeVaultVersion
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Seal a new version of an object under a fresh DEK.
+        Re-encryption always mints a version; versions are immutable.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purposes, contentBase64]
+              properties:
+                purposes:
+                  type: array
+                  items: { type: string }
+                contentBase64: { type: string }
+                contentSha256Hex: { type: string }
+      responses:
+        '201': { description: '{objectId, version}' }
+        '400': { description: Malformed shape, bounds, or digest mismatch }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown or other-tenant object (empty body) }
+        '503': { description: Wrapping backend unavailable (kms_unavailable) }
+  /api/vault/objects/{id}:
+    get:
+      operationId: readVaultMetadata
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Read object metadata: versions, purposes, KEK versions,
+        statuses, digests. Never content or key material.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{objectId, issuerId, displayName, versions[]}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a metadata role }
+        '404': { description: Unknown or other-tenant object (empty body) }
+  /api/vault/objects/{id}/versions/{version}/read:
+    post:
+      operationId: readVaultVersion
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS]
+      summary: >-
+        Release one version's plaintext to a live, exactly-matching
+        grant: same principal, object, version, purpose, workload,
+        unrevoked, unexpired. Tampered rows fail closed with
+        vault_integrity_failure and no plaintext.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: version
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantId, purpose, workload]
+              properties:
+                grantId: { type: string, format: uuid }
+                purpose: { type: string }
+                workload: { type: string }
+      responses:
+        '200': { description: '{objectId, version, contentSha256Hex, contentBase64}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a read role, or grant invalid/expired/revoked (reason codes GRANT_INVALID, GRANT_EXPIRED, GRANT_REVOKED) }
+        '404': { description: Unknown object, version, or grant (empty body) }
+        '500': { description: Ciphertext/context/key mismatch (vault_integrity_failure, never plaintext) }
+        '503': { description: Wrapping backend unavailable (kms_unavailable) }
+  /api/vault/objects/{id}/versions/{version}/delete:
+    post:
+      operationId: deleteVaultVersion
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Terminally mark one version DELETED; reads refuse
+        afterwards. Idempotent. Purging bytes stays a reviewed
+        owner operation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: version
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: '{objectId, version, status DELETED}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown or other-tenant object/version (empty body) }
+  /api/vault/grants:
+    post:
+      operationId: grantVaultAccess
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Issue a short-lived purpose- and workload-bound grant for
+        one object version. The purpose must belong to the
+        version's authorized set; TTL 60 to 86400 seconds.
+        Defaults to a self grant for service callers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectId, objectVersion, purpose, workload, ttlSeconds]
+              properties:
+                objectId: { type: string, format: uuid }
+                objectVersion: { type: integer }
+                principalType:
+                  type: string
+                  description: service_account (default) or human_membership
+                principalId: { type: string, format: uuid, description: Defaults to the caller }
+                purpose: { type: string }
+                workload: { type: string }
+                ttlSeconds: { type: integer }
+      responses:
+        '201': { description: '{grantId, objectId, objectVersion, principalType, principalId, purpose, workload, revoked false, expiresAt, createdAt}' }
+        '400': { description: Malformed shape, TTL, unknown purpose, or widened purpose }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown object/version or principal (empty body) }
+  /api/vault/grants/{id}/revoke:
+    post:
+      operationId: revokeVaultGrant
+      x-sovra-scopes: [ISSUER_OPS, TRUST_ADMIN]
+      summary: >-
+        Terminally revoke a grant; reads under it refuse
+        immediately. Idempotent.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Grant view with revoked true }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a revocation role }
+        '404': { description: Unknown or other-tenant grant (empty body) }
+  /api/vault/keys/rotate:
+    post:
+      operationId: rotateVaultKek
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Mint the next tenant wrapping-key version; new seals use
+        it while older versions keep unwrapping their data.
+      responses:
+        '200': { description: '{kekVersion}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
   /api/audit/events:
     get:
       operationId: listAuditEvents
@@ -786,9 +983,9 @@ components:
           type: string
           description: >-
             Machine-readable Sovra code (invalid_request, forbidden:<REASON>,
-            trust_unavailable, planning_unavailable,
-            dependency_unavailable, already_decided,
-            issuer_key_conflict, idempotency_conflict,
+            trust_unavailable, planning_unavailable, kms_unavailable,
+            vault_integrity_failure, dependency_unavailable,
+            already_decided, issuer_key_conflict, idempotency_conflict,
             verification_conflict, internal)
         correlationId: { type: string, description: Per-response id for support }
         retryable: { type: boolean, description: Whether retrying later can succeed }

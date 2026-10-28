@@ -61,6 +61,11 @@ sovra:
   synthetic-issuers:
     enabled: true
     acknowledge-non-production: true
+  vault:
+    kek: software
+    # Non-secret test credential, never production.
+    seed: c292cmEtdGVzdC12YXVsdC1zZWVkLU5PTi1QUk9EVUNUSU9OLTEyMw==
+    acknowledge-non-production: true
   # SOV-006 BFF trust registry mirror (main defaults). Disabled here;
   # BFF tests enable it per-class with stub-OP endpoints. No
   # spring.security.oauth2 client section: registering a provider

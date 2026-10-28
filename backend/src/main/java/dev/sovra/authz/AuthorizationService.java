@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 8;
+  static final long RULES_VERSION = 9;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
       Map.ofEntries(
@@ -64,7 +64,20 @@ public class AuthorizationService {
           Map.entry(Action.CREATE_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")),
           Map.entry(Action.READ_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")),
           Map.entry(Action.ROTATE_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")),
-          Map.entry(Action.REVOKE_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")));
+          Map.entry(Action.REVOKE_SERVICE_ACCOUNT, Set.of("TRUST_ADMIN")),
+          // Vault (SOV-016): issuer workers ingest and grant; members
+          // read only through a live grant; relying parties never see
+          // source (INV-11); auditors see metadata, never content; key
+          // lifecycle and deletion are trust administration.
+          Map.entry(Action.VAULT_STORE_OBJECT, Set.of("ISSUER_OPS")),
+          Map.entry(Action.VAULT_READ_OBJECT, Set.of("TENANT_MEMBER", "ISSUER_OPS")),
+          Map.entry(
+              Action.VAULT_READ_METADATA,
+              Set.of("TENANT_MEMBER", "ISSUER_OPS", "AUDIT_READER", "TRUST_ADMIN")),
+          Map.entry(Action.VAULT_GRANT_ACCESS, Set.of("ISSUER_OPS")),
+          Map.entry(Action.VAULT_REVOKE_GRANT, Set.of("ISSUER_OPS", "TRUST_ADMIN")),
+          Map.entry(Action.VAULT_ROTATE_KEK, Set.of("TRUST_ADMIN")),
+          Map.entry(Action.VAULT_DELETE_VERSION, Set.of("TRUST_ADMIN")));
 
   private final ServiceAccountRepository accounts;
   private final HumanMembershipRepository humans;

@@ -83,7 +83,8 @@ public class ApiExceptionHandler {
     ConsentNotFoundException.class,
     VerificationNotFoundException.class,
     IssuerKeyNotFoundException.class,
-    dev.sovra.auth.ServiceAccountService.ServiceAccountNotFoundException.class
+    dev.sovra.auth.ServiceAccountService.ServiceAccountNotFoundException.class,
+    dev.sovra.vault.VaultNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -210,5 +211,23 @@ public class ApiExceptionHandler {
     }
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(Map.of("error", "internal"));
+  }
+
+  @ExceptionHandler(dev.sovra.vault.VaultInvalidException.class)
+  public ResponseEntity<Object> vaultInvalid(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.BAD_REQUEST, "invalid_request", false);
+    }
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid_request"));
+  }
+
+  @ExceptionHandler(dev.sovra.vault.VaultAuthenticationException.class)
+  public ResponseEntity<Object> vaultIntegrityFailure(HttpServletRequest request) {
+    log.error("vault integrity failure: ciphertext, context, or key mismatch");
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.INTERNAL_SERVER_ERROR, "vault_integrity_failure", false);
+    }
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(Map.of("error", "vault_integrity_failure"));
   }
 }

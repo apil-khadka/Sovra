@@ -168,6 +168,38 @@ class LeastPrivilegeTests extends SovraPostgresBase {
   }
 
   @Test
+  void appRoleCannotRewriteVault() throws Exception {
+    TestAccount account = TestAccounts.create(owner, "vault-frozen", Set.of("TENANT_MEMBER"));
+    setTenant(account.tenantId());
+    // Sealed columns only: ciphertext, wrapped keys, and grant scope
+    // are immutable to the runtime role; status/revoke columns stay
+    // writable through the service paths.
+    String[] denied = {
+      "UPDATE vault_object_version SET ciphertext = '\\x00'",
+      "UPDATE vault_object_version SET wrapped_dek = '\\x00'",
+      "UPDATE vault_object_version SET authorized_purposes = '{}'",
+      "UPDATE vault_grant SET purpose = 'x'",
+      "UPDATE vault_grant SET expires_at = now() + INTERVAL '1 year'",
+      "UPDATE vault_kek SET version = 99",
+      "DELETE FROM vault_object_version",
+      "DELETE FROM vault_grant",
+      "DELETE FROM vault_kek",
+      "TRUNCATE vault_object"
+    };
+    for (String sql : denied) {
+      assertThatThrownBy(
+              () -> {
+                try (Statement stmt = app.createStatement()) {
+                  stmt.executeUpdate(sql);
+                }
+              })
+          .as("runtime write must fail: " + sql)
+          .isInstanceOf(PSQLException.class)
+          .hasMessageContaining("permission denied");
+    }
+  }
+
+  @Test
   void appRoleCannotTouchMigrations() {
     assertThatThrownBy(
             () -> {

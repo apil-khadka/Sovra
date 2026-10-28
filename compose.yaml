@@ -93,6 +93,12 @@ services:
       SOVRA_PROFILE: ${SOVRA_PROFILE:-synthetic}
       SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
       SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+      # Smoke/dev only: synthetic vault KEK seed (base64, non-secret
+      # demo literal). Production sets SOVRA_VAULT_KEK=kms, leaves the
+      # seed empty, and refuses to boot otherwise.
+      SOVRA_VAULT_KEK: software
+      SOVRA_VAULT_SEED: c292cmEtZGVtby12YXVsdC1zZWVkLTAxLU5PTi1QUk9EVUNUSU9OIQ==
+      SOVRA_VAULT_ACKNOWLEDGE_NON_PRODUCTION: 'true'
       # SOV-006 BFF login against issuer-local Keycloak (synthetic
       # demo only). Redirects are per-instance and exact; the issuer
       # string must resolve identically in browsers and in these
@@ -133,6 +139,12 @@ services:
       SOVRA_PROFILE: ${SOVRA_PROFILE:-synthetic}
       SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
       SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+      # Smoke/dev only: synthetic vault KEK seed (base64, non-secret
+      # demo literal). Production sets SOVRA_VAULT_KEK=kms, leaves the
+      # seed empty, and refuses to boot otherwise.
+      SOVRA_VAULT_KEK: software
+      SOVRA_VAULT_SEED: c292cmEtZGVtby12YXVsdC1zZWVkLTAxLU5PTi1QUk9EVUNUSU9OIQ==
+      SOVRA_VAULT_ACKNOWLEDGE_NON_PRODUCTION: 'true'
       # SOV-006 BFF login against issuer-local Keycloak (synthetic
       # demo only). Redirects are per-instance and exact; the issuer
       # string must resolve identically in browsers and in these

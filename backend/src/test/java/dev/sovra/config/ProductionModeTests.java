@@ -6,6 +6,8 @@ import static org.mockito.Mockito.mock;
 
 import dev.sovra.issuance.IssuerSigner;
 import dev.sovra.issuance.KmsSigner;
+import dev.sovra.vault.KmsVaultKekProvider;
+import dev.sovra.vault.VaultKekProvider;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +33,8 @@ class ProductionModeTests {
   void demoSkipsTheEntryScan() {
     IssuerSigner devDouble = (ref, payload, aad) -> new byte[64];
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("demo"), devDouble, mock(DataSource.class), "synthetic");
+        new SovraMode("demo"), devDouble, mock(VaultKekProvider.class),
+        mock(DataSource.class), "synthetic", "seed");
     validator.run(null);
   }
 
@@ -39,16 +42,38 @@ class ProductionModeTests {
   void productionRefusesTheDevSigner() {
     IssuerSigner devDouble = (ref, payload, aad) -> new byte[64];
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("production"), devDouble, mock(DataSource.class), "sdjwt-vc");
+        new SovraMode("production"), devDouble, new KmsVaultKekProvider(),
+        mock(DataSource.class), "sdjwt-vc", "");
     assertThatThrownBy(() -> validator.run(null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("signer must be kms");
   }
 
   @Test
+  void productionRefusesSoftwareWrappingKeys() {
+    ProductionStartupValidator validator = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(), mock(VaultKekProvider.class),
+        mock(DataSource.class), "sdjwt-vc", "");
+    assertThatThrownBy(() -> validator.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("vault.kek must be kms");
+  }
+
+  @Test
+  void productionRefusesAConfiguredVaultSeed() {
+    ProductionStartupValidator validator = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(), new KmsVaultKekProvider(),
+        mock(DataSource.class), "sdjwt-vc", "c2VlZA==");
+    assertThatThrownBy(() -> validator.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("vault.seed must be empty");
+  }
+
+  @Test
   void productionRefusesTheSyntheticProfile() {
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("production"), new KmsSigner(), mock(DataSource.class), "synthetic");
+        new SovraMode("production"), new KmsSigner(), new KmsVaultKekProvider(),
+        mock(DataSource.class), "synthetic", "");
     assertThatThrownBy(() -> validator.run(null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("profile must be sdjwt-vc");

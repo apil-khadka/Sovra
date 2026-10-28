@@ -825,7 +825,7 @@ Implementation evidence (G1 synthetic):
 
 - `GET /api/health/ready` (7 live probes, 200/503), `GET /api/alerts`,
   `GET /api/telemetry/summary`, `POST /api/telemetry/canary` in
-  `backend/src/main/java/dev/sovra/ops/`; contract 0.4.0; see
+  `backend/src/main/java/dev/sovra/ops/`; contract 0.5.0; see
   [semantic-health.md](semantic-health.md).
 - 33 committed tests in `backend/src/test/java/dev/sovra/ops/` (positive,
   negative, authz, sanitization); `./mvnw verify` green.

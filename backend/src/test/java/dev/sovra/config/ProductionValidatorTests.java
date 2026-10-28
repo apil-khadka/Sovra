@@ -20,6 +20,7 @@ import dev.sovra.tenancy.TenantContext;
 import dev.sovra.tenancy.TenantDataSource;
 import dev.sovra.trust.InvalidProposalException;
 import dev.sovra.trust.TrustService;
+import dev.sovra.vault.KmsVaultKekProvider;
 import dev.sovra.verification.VerificationFixtures;
 import dev.sovra.verification.VerificationService;
 import java.time.Clock;
@@ -80,7 +81,8 @@ class ProductionValidatorTests extends SovraPostgresBase {
   @Test
   void entryScanRefusesTheSyntheticGenesis() {
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("production"), new KmsSigner(), ownerDataSource(), "sdjwt-vc");
+        new SovraMode("production"), new KmsSigner(), new KmsVaultKekProvider(),
+        ownerDataSource(), "sdjwt-vc", "");
     assertThatThrownBy(() -> validator.run(null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("production entry refused");
@@ -108,7 +110,8 @@ class ProductionValidatorTests extends SovraPostgresBase {
           "INSERT INTO issuer_record (scope, issuer_id) VALUES ('adult-status',"
               + " 'https://issuer.example/np-1')");
       ProductionStartupValidator validator = new ProductionStartupValidator(
-          new SovraMode("production"), new KmsSigner(), clean, "sdjwt-vc");
+          new SovraMode("production"), new KmsSigner(), new KmsVaultKekProvider(),
+          clean, "sdjwt-vc", "");
       validator.run(null);
       setup.update("INSERT INTO tenant (slug) VALUES ('sovra-demo')");
       assertThatThrownBy(() -> validator.run(null))

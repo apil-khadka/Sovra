@@ -2,6 +2,8 @@ package dev.sovra.config;
 
 import dev.sovra.issuance.IssuerSigner;
 import dev.sovra.issuance.KmsSigner;
+import dev.sovra.vault.KmsVaultKekProvider;
+import dev.sovra.vault.VaultKekProvider;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,18 +29,24 @@ public class ProductionStartupValidator implements ApplicationRunner {
 
   private final SovraMode mode;
   private final IssuerSigner signer;
+  private final VaultKekProvider kek;
   private final JdbcTemplate global;
   private final String profile;
+  private final String vaultSeed;
 
   public ProductionStartupValidator(
       SovraMode mode,
       IssuerSigner signer,
+      VaultKekProvider kek,
       DataSource globalDataSource,
-      @Value("${sovra.profile:synthetic}") String profile) {
+      @Value("${sovra.profile:synthetic}") String profile,
+      @Value("${sovra.vault.seed:}") String vaultSeed) {
     this.mode = mode;
     this.signer = signer;
+    this.kek = kek;
     this.global = new JdbcTemplate(globalDataSource);
     this.profile = profile;
+    this.vaultSeed = vaultSeed;
   }
 
   @Override
@@ -48,6 +56,14 @@ public class ProductionStartupValidator implements ApplicationRunner {
     }
     if (!(signer instanceof KmsSigner)) {
       fail("sovra.signer must be kms in production; the synthetic dev signer cannot serve");
+    }
+    if (!(kek instanceof KmsVaultKekProvider)) {
+      fail("sovra.vault.kek must be kms in production;"
+          + " software-derived wrapping keys cannot serve");
+    }
+    if (vaultSeed != null && !vaultSeed.isBlank()) {
+      fail("sovra.vault.seed must be empty in production;"
+          + " synthetic KEK material cannot be configured");
     }
     if (!"sdjwt-vc".equals(profile)) {
       fail("sovra.profile must be sdjwt-vc in production; was: " + profile);

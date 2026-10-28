@@ -83,6 +83,14 @@ sovra:
   synthetic-issuers:
     enabled: ${SOVRA_SYNTHETIC_ISSUERS_ENABLED:false}
     acknowledge-non-production: ${SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION:false}
+  vault:
+    # Wrapping keys: software (SOV-016 synthetic double, needs the seed
+    # plus acknowledgement below) or kms (production; G2 provider pick).
+    kek: ${SOVRA_VAULT_KEK:software}
+    # Base64 seed for synthetic KEK derivation; empty by default so an
+    # unconfigured node cannot seal. Production refuses a configured seed.
+    seed: ${SOVRA_VAULT_SEED:}
+    acknowledge-non-production: ${SOVRA_VAULT_ACKNOWLEDGE_NON_PRODUCTION:false}
   # SOV-006 BFF trust registry: exact allowlist entries, validated at
   # startup. Demo defaults point at local Keycloak over loopback; any
   # other issuer must be https (see BffProperties).
