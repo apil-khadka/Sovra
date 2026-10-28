@@ -25,7 +25,26 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <spring-ai.version>2.0.2</spring-ai.version>
     <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
+    <!-- SOV-036 pinned protocol modules; see SOV-001 conditions 1-4. -->
+    <waltid.version>1.2.0</waltid.version>
   </properties>
+
+  <!-- SOV-004 section 1: releases only; the /snapshots repository is
+       excluded from all builds. id.walt.* is absent from Maven Central. -->
+  <repositories>
+    <repository>
+      <id>waltid-releases</id>
+      <name>walt-id releases</name>
+      <url>https://maven.waltid.dev/releases</url>
+      <releases>
+        <enabled>true</enabled>
+        <checksumPolicy>fail</checksumPolicy>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
 
   <dependencyManagement>
     <dependencies>
@@ -76,12 +95,42 @@
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- JOSE substrate for Sovra-owned code (SOV-004 section 1); protocol
-         modules arrive via walt-id only after SOV-036 passes. -->
+    <!-- JOSE substrate for Sovra-owned code (SOV-004 section 1). Our
+         direct 10.3 pin wins over walt-id's transitive 10.10 by
+         nearest-first resolution; SOV-036 API-compatibility evidence in
+         WaltIdQualificationTests. -->
     <dependency>
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
       <version>10.3</version>
+    </dependency>
+    <!-- SOV-036: pinned walt-id protocol modules. Never depend on
+         waltid-openid4vc (legacy draft line, planned deprecation). -->
+    <dependency>
+      <groupId>id.walt.sdjwt</groupId>
+      <artifactId>waltid-sdjwt-jvm</artifactId>
+      <version>${waltid.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>id.walt.openid4vci</groupId>
+      <artifactId>waltid-openid4vci-jvm</artifactId>
+      <version>${waltid.version}</version>
+      <!-- SOV-036: mDL/mdoc is outside the SOV-001 profile, and this
+           module drags org.cose:cose-java:1.1.1-WALT-SNAPSHOT, which
+           exists only in the excluded /snapshots repository. Excluding
+           it keeps the closure snapshot-free; WaltIdQualificationTests
+           prove the exercised SD-JWT paths never touch mdoc classes. -->
+      <exclusions>
+        <exclusion>
+          <groupId>id.walt.mdoc-credentials</groupId>
+          <artifactId>waltid-mdoc-credentials-jvm</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>id.walt.protocols</groupId>
+      <artifactId>waltid-openid4vp-verifier-jvm</artifactId>
+      <version>${waltid.version}</version>
     </dependency>
     <!-- OpenAI-compatible chat adapter for live planning (SOV-013). The
          Meta Llama API endpoint, model, and key arrive from environment

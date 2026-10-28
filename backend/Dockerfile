@@ -6,7 +6,10 @@ FROM eclipse-temurin:25.0.4.1_1-jdk AS build
 WORKDIR /app
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
-RUN ./mvnw -q -DskipTests dependency:go-offline
+# Cache-warm with the lifecycle itself, not dependency:go-offline: the
+# go-offline goal resolves excluded artifacts (SOV-036 excludes walt-id's
+# unresolvable mdoc snapshot), while compile honors exclusions.
+RUN ./mvnw -q -DskipTests test-compile
 COPY src src
 RUN ./mvnw -q -DskipTests package
 

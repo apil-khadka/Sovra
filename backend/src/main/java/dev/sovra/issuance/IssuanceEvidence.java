@@ -20,4 +20,8 @@ public record IssuanceEvidence(
     Instant issuedAt,
     Instant expiresAt,
     long trustSnapshotVersion,
-    String statusUri) {}
+    String statusUri,
+    // Holder public key, validated before assembly. Ignored by the
+    // synthetic encoder; required by the SD-JWT VC encoder for cnf
+    // holder binding. Never logged or audited.
+    tools.jackson.databind.JsonNode holderJwk) {}

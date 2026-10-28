@@ -152,7 +152,8 @@ public class IssuanceService {
         new IssuanceEvidence(
             credentialId, request.issuerId(), authorization.keyRef(), request.vct(),
             Map.of("adultOver18", Boolean.TRUE), validated.thumbprint(),
-            now, request.expiresAt(), snapshot.version(), statusUri);
+            now, request.expiresAt(), snapshot.version(), statusUri,
+            request.holderJwk());
     CredentialEncoder.EncodedCredential encoded = encoder.encode(evidence);
 
     String response = responseBody(credentialId, encoded.artifact(), request.expiresAt(),

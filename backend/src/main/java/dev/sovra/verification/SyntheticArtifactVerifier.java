@@ -21,9 +21,9 @@ import tools.jackson.databind.ObjectMapper;
  * signature, and claim bindings. Every failure carries a safe reason
  * code; callers turn it into a REJECTED decision, never an acceptance.
  *
- * <p>The interoperable SD-JWT VC/OpenID4VP gate stays closed until
- * SOV-036 qualifies a profile; this path only ever verifies content
- * labelled synthetic.
+ * <p>This path only ever verifies content labelled synthetic; the
+ * SD-JWT VC profile verifies through {@code WaltIdArtifactVerifier},
+ * selected with {@code sovra.profile=sdjwt-vc}.
  */
 public final class SyntheticArtifactVerifier {
 

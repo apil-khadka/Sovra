@@ -20,6 +20,7 @@ They are implementation candidates to pin and resolve together, not an installed
 | Spring Security | 7.1.2, managed by Boot | [Boot BOM](https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-dependencies/4.1.2/spring-boot-dependencies-4.1.2.pom) |
 | Spring AI | 2.0.2, with its separate BOM | [Release](https://github.com/spring-projects/spring-ai/releases/tag/v2.0.2), [Boot compatibility](https://docs.spring.io/spring-ai/reference/getting-started.html), [AI BOM](https://repo.maven.apache.org/maven2/org/springframework/ai/spring-ai-bom/2.0.2/spring-ai-bom-2.0.2.pom) |
 | Nimbus JOSE+JWT | 10.3 (Sovra-owned JOSE substrate; not a protocol implementation) | [Product](https://connect2id.com/products/nimbus-jose-jwt), [Central](https://repo.maven.apache.org/maven2/com/nimbusds/nimbus-jose-jwt/10.3/) |
+| walt-id SD-JWT / OpenID4VCI / OpenID4VP verifier | v1.2.0 `waltid-sdjwt-jvm`, `waltid-openid4vci-jvm`, `waltid-openid4vp-verifier-jvm` from `https://maven.waltid.dev/releases` (releases-only, snapshots disabled); `id.walt.mdoc-credentials` excluded (unresolvable snapshot; mDL out of profile) | [Releases](https://github.com/walt-id/waltid-identity/releases), [SOV-001 section 11](decisions/SOV-001-proof-profile.md#11-sov-036-artifact-layer-qualification-v04-revision) |
 
 Java 27 is a newer feature release but is not LTS.
 Boot 4.1.2 documents compatibility with Java 17 through 27, which includes Java 25.
@@ -67,6 +68,17 @@ Set narrow CORS, serialization, request-size, concurrency, and timeout policies 
 Restrict [Actuator endpoints](https://docs.spring.io/spring-boot/reference/actuator/endpoints.html) by exposure, authorization, and network access.
 Detailed environment, heap, logs, and configuration information must not become public troubleshooting endpoints.
 Test the packaged production configuration rather than relying on default behavior observed in a test profile.
+
+Credential profile selection is a deployment input, not a code branch:
+`SOVRA_PROFILE=synthetic` (default, labelled G1 JWT) or `sdjwt-vc`
+(walt-id SD-JWT VC, qualified at the artifact layer under SOV-036).
+Encoder beans and verifier dispatch key off `sovra.profile`, compose
+passes the variable through to both app instances, and every decision
+receipt stores the profile that evaluated it (migration V10).
+The Dockerfile cache-warms with `test-compile`, never
+`dependency:go-offline`: the go-offline goal resolves excluded
+artifacts and fails on the deliberately excluded mdoc snapshot, while
+the lifecycle honors exclusions.
 
 ## Spring AI boundary
 

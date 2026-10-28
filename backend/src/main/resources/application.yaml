@@ -46,6 +46,9 @@ sovra:
   # Signing backend: local-dev (G1 synthetic double, needs both arming
   # flags below) or kms (production; arrives with the G2 provider pick).
   signer: ${SOVRA_SIGNER:local-dev}
+  # Credential profile: synthetic (labelled G1 JWT, default) or sdjwt-vc
+  # (walt-id SD-JWT VC, qualified under SOV-036).
+  profile: ${SOVRA_PROFILE:synthetic}
   synthetic-issuers:
     enabled: ${SOVRA_SYNTHETIC_ISSUERS_ENABLED:false}
     acknowledge-non-production: ${SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION:false}

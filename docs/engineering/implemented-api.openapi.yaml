@@ -531,7 +531,7 @@ paths:
                     presentation message (label, request id, nonce,
                     audience, holder thumbprint)
       responses:
-        '200': { description: '{decisionId, requestId, outcome, reasonCode, synthetic, profile, trustSnapshot, keyRef, statusVersion, decidedAt}' }
+        '200': { description: '{decisionId, requestId, outcome, reasonCode, synthetic, profile, trustSnapshot, keyRef, statusVersion, decidedAt; profile is sovra-g1-synthetic/0.2 or sovra-g1-sdjwt-vc/0.2}' }
         '400': { description: Malformed submission envelope }
         '401': { description: Anonymous }
         '403': { description: Lacks RP_CLIENT }
@@ -555,7 +555,9 @@ paths:
           description: Exact ETag from a previous read; matches return 304
       responses:
         '200':
-          description: Stored decision with outcome, reason, keyRef, and statusVersion
+          description: Stored decision with outcome, reason, keyRef, statusVersion,
+            and the stored evaluated profile (sovra-g1-synthetic/0.2 or
+            sovra-g1-sdjwt-vc/0.2)
           headers:
             ETag:
               schema: { type: string }

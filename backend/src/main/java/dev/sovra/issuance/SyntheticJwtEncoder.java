@@ -4,6 +4,7 @@ import com.nimbusds.jose.util.Base64URL;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -16,6 +17,7 @@ import tools.jackson.databind.ObjectMapper;
  * Verifiers must reject this content type outside synthetic use.
  */
 @Service
+@ConditionalOnProperty(name = "sovra.profile", havingValue = "synthetic", matchIfMissing = true)
 public class SyntheticJwtEncoder implements CredentialEncoder {
 
   public static final String CONTENT_TYPE = "vnd.sovra.synthetic-credential+jwt";

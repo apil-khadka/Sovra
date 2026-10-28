@@ -190,9 +190,11 @@ class VerificationFlowTests extends SovraAppRoleBase {
     // instances would hold; enforcement lives in the database, not in
     // either process.
     VerificationService first = new VerificationService(authz, audit, snapshots, status,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
+        "synthetic");
     VerificationService second = new VerificationService(authz, audit, snapshots, status,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
+        "synthetic");
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     JsonNode holderJwk = stage.holder().jwk();
     String binding = VerificationFixtures.bindingProof(
@@ -244,7 +246,8 @@ class VerificationFlowTests extends SovraAppRoleBase {
     // trust-dependency outage.
     TrustSnapshotProvider outage = Optional::empty;
     VerificationService instance = new VerificationService(authz, audit, outage, status,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
+        "synthetic");
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(
         UUID.fromString(stage.requestId()), nonce, ConsentFixtures.AUDIENCE,
@@ -308,7 +311,8 @@ class VerificationFlowTests extends SovraAppRoleBase {
       Stage stage,
       String nonce) throws Exception {
     VerificationService instance = new VerificationService(authz, audit, snapshots, fetcher,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
+        "synthetic");
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(
         UUID.fromString(stage.requestId()), nonce, ConsentFixtures.AUDIENCE,
         stage.holder().jwk(),

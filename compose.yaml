@@ -34,6 +34,9 @@ services:
       # Smoke/dev only: G1 synthetic double. Production sets SOVRA_SIGNER=kms
       # and leaves the synthetic flags off.
       SOVRA_SIGNER: local-dev
+      # Credential profile: synthetic (default) or sdjwt-vc
+      # (walt-id SD-JWT VC, qualified under SOV-036).
+      SOVRA_PROFILE: ${SOVRA_PROFILE:-synthetic}
       SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
       SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
     depends_on:
@@ -55,6 +58,9 @@ services:
       # Smoke/dev only: G1 synthetic double. Production sets SOVRA_SIGNER=kms
       # and leaves the synthetic flags off.
       SOVRA_SIGNER: local-dev
+      # Credential profile: synthetic (default) or sdjwt-vc
+      # (walt-id SD-JWT VC, qualified under SOV-036).
+      SOVRA_PROFILE: ${SOVRA_PROFILE:-synthetic}
       SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
       SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
     depends_on:

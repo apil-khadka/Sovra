@@ -86,7 +86,8 @@ class VerificationFreshnessTests extends SovraAppRoleBase {
       Stage stage,
       String nonce) throws Exception {
     VerificationService instance = new VerificationService(authz, audit, provider, fetcher,
-        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry);
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
+        "synthetic");
     String binding = VerificationFixtures.bindingProof(
         stage.holder(), stage.requestId(), nonce, ConsentFixtures.AUDIENCE, mapper);
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(

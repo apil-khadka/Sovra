@@ -61,14 +61,16 @@ import tools.jackson.databind.ObjectMapper;
  * and unexpected persistence failures propagate instead of inventing
  * an outcome.
  *
- * <p>G1 synthetic profile only: only artifacts labelled synthetic
- * verify here. The interoperable SD-JWT VC/OpenID4VP gate stays
- * closed until SOV-036 qualifies a profile.
+ * <p>Two artifact profiles behind {@code sovra.profile}: {@code synthetic}
+ * (default, labelled G1 JWT) and {@code sdjwt-vc} (walt-id SD-JWT VC,
+ * qualified under SOV-036). OpenID4VCI/OpenID4VP protocol flows stay
+ * out of scope until SOV-041 full-profile evidence lands.
  */
 @Service
 public class VerificationService {
 
   public static final String PROFILE = "sovra-g1-synthetic/0.2";
+  public static final String SDJWT_VC_PROFILE = "sovra-g1-sdjwt-vc/0.2";
   static final String PRESENTATION_LABEL = "sovra-presentation/v1";
   static final String OUTCOME_ACCEPTED = "ACCEPTED";
   static final String OUTCOME_REJECTED = "REJECTED";
@@ -82,6 +84,7 @@ public class VerificationService {
   private final Clock clock;
   private final ObjectMapper mapper;
   private final TelemetryService telemetry;
+  private final String profile;
 
   public VerificationService(
       AuthorizationService authz,
@@ -91,7 +94,9 @@ public class VerificationService {
       JdbcTemplate tenantJdbcTemplate,
       Clock clock,
       ObjectMapper mapper,
-      TelemetryService telemetry) {
+      TelemetryService telemetry,
+      @org.springframework.beans.factory.annotation.Value("${sovra.profile:synthetic}")
+          String profile) {
     this.authz = authz;
     this.audit = audit;
     this.snapshots = snapshots;
@@ -100,6 +105,7 @@ public class VerificationService {
     this.clock = clock;
     this.mapper = mapper;
     this.telemetry = telemetry;
+    this.profile = profile;
   }
 
   public record VerifyRequest(
@@ -171,12 +177,12 @@ public class VerificationService {
     try {
       tenant.update(
           "INSERT INTO verification_decision (id, tenant_id, request_id, credential_id, nonce,"
-              + " request_hash, rp_id, audience, outcome, reason_code, response_body,"
+              + " request_hash, rp_id, audience, outcome, reason_code, profile, response_body,"
               + " trust_snapshot_version, key_ref, status_version, decided_at, decided_by)"
-              + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           decisionId, caller.tenantId(), request.requestId(), stored.credentialId(),
           request.nonce(), validated.hash(), stored.rpId(), request.audience(),
-          evaluated.outcome(), evaluated.reason(), response, evaluated.snapshot(),
+          evaluated.outcome(), evaluated.reason(), responseProfile(), response, evaluated.snapshot(),
           evaluated.keyRef(), evaluated.statusVersion(),
           java.sql.Timestamp.from(now), caller.name());
       connection.releaseSavepoint(savepoint);
@@ -220,7 +226,7 @@ public class VerificationService {
     }
     List<DecisionView> rows =
         tenant.query(
-            "SELECT id, request_id, outcome, reason_code, trust_snapshot_version, key_ref,"
+            "SELECT id, request_id, outcome, reason_code, profile, trust_snapshot_version, key_ref,"
                 + " status_version, decided_at"
                 + " FROM verification_decision WHERE id = ? AND tenant_id = ?",
             (rs, row) ->
@@ -230,7 +236,7 @@ public class VerificationService {
                     rs.getString("outcome"),
                     rs.getString("reason_code"),
                     true,
-                    PROFILE,
+                    rs.getString("profile"),
                     rs.getLong("trust_snapshot_version"),
                     rs.getString("key_ref"),
                     rs.getLong("status_version"),
@@ -347,13 +353,25 @@ public class VerificationService {
     String keyRef = credential.keyRef();
     long statusVersion = evidence.version();
     try {
-      SyntheticArtifactVerifier.verify(
-          credential.artifact(),
-          new SyntheticArtifactVerifier.Expected(
-              credential.issuerId(), credential.vct(), credential.holderThumbprint(),
-              credential.id(), credential.expiresAt()),
-          snapshot, tenant, mapper, now);
+      if ("sdjwt-vc".equals(profile)) {
+        WaltIdArtifactVerifier.verify(
+            credential.artifact(),
+            new WaltIdArtifactVerifier.Expected(
+                credential.issuerId(), credential.vct(), credential.holderThumbprint(),
+                credential.id(), credential.expiresAt()),
+            snapshot, tenant, mapper, now);
+      } else {
+        SyntheticArtifactVerifier.verify(
+            credential.artifact(),
+            new SyntheticArtifactVerifier.Expected(
+                credential.issuerId(), credential.vct(), credential.holderThumbprint(),
+                credential.id(), credential.expiresAt()),
+            snapshot, tenant, mapper, now);
+      }
     } catch (SyntheticArtifactVerifier.ArtifactFailure e) {
+      return new Evaluated(OUTCOME_REJECTED, e.reason(), snapshot.version(), keyRef,
+          statusVersion);
+    } catch (WaltIdArtifactVerifier.ArtifactFailure e) {
       return new Evaluated(OUTCOME_REJECTED, e.reason(), snapshot.version(), keyRef,
           statusVersion);
     }
@@ -512,6 +530,10 @@ public class VerificationService {
     return rows.get(0);
   }
 
+  private String responseProfile() {
+    return "sdjwt-vc".equals(profile) ? SDJWT_VC_PROFILE : PROFILE;
+  }
+
   private String responseBody(
       UUID decisionId, UUID requestId, Evaluated evaluated, Instant decidedAt) {
     Map<String, Object> body = new LinkedHashMap<>();
@@ -520,7 +542,7 @@ public class VerificationService {
     body.put("outcome", evaluated.outcome());
     body.put("reasonCode", evaluated.reason());
     body.put("synthetic", Boolean.TRUE);
-    body.put("profile", PROFILE);
+    body.put("profile", responseProfile());
     body.put("trustSnapshot", evaluated.snapshot());
     body.put("keyRef", evaluated.keyRef());
     body.put("statusVersion", evaluated.statusVersion());

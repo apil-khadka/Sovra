@@ -1,7 +1,7 @@
 # SOV-001: proof profile decision record
 
-**Version:** 0.3 (selected development profile; qualification and independent review pending).
-**Date:** 2026-10-28 (v0.1 through v0.3; sections 9 and 10 record sequencing revisions).
+**Version:** 0.4 (artifact-layer qualification recorded; protocol flows and independent review pending).
+**Date:** 2026-10-28 (v0.1 through v0.4; sections 9, 10, and 11 record sequencing revisions).
 **Task:** [SOV-001](https://github.com/apil-khadka/Sovra/issues/5)
 (freeze proof profile, issuer assurance, freshness and session semantics).
 **Owner decision:** full interoperable profile now; the narrow-attestation
@@ -139,7 +139,7 @@ constitutes an interoperability certification.
 ## 8. Approval
 
 - [ ] Independent review under SOV-037 before real-data provisioning/processing; synthetic work may proceed against the selected contracts without claiming interoperability qualification.
-- [ ] Library conditions 1-4 evidenced in SOV-004/SOV-036.
+- [ ] Library conditions 1-4 evidenced in SOV-004/SOV-036 (v0.4: conditions 1 and 4 pass; 2 and 3 pass at the SD-JWT VC artifact layer only — see section 11).
 - [ ] Record revision on any profile, algorithm, library, or value change.
 
 ## 9. G1 issuance implementation note (v0.2 revision)
@@ -179,3 +179,79 @@ It does not depend on the final whole-product SEC suite or holder-custody releas
 SOV-041 subsequently exercises the actual packaged consent-to-verification path, and SOV-032/034 retain full integrated/independent release assessment.
 Library coordinates and protocol versions remain candidates until their source, support, dependency/provenance, Java 25 and exact-profile tests pass.
 An available `.sha1` file is not a substitute for an independently trusted artifact origin and strong digest/provenance policy.
+
+## 11. SOV-036 artifact-layer qualification (v0.4 revision)
+
+SOV-036 qualifies the SD-JWT VC artifact layer now; the OpenID4VCI /
+OpenID4VP protocol flows stay sequenced work. Nothing here claims
+protocol-flow conformance, third-party wallet interop, or independent
+review — those remain open with the owners named below.
+
+### 11.1 Condition verdicts
+
+| Condition (section 3) | Verdict | Evidence |
+| --- | --- | --- |
+| 1. Artifact registry | Pass | Pinned `id.walt.sdjwt:waltid-sdjwt-jvm`, `id.walt.openid4vci:waltid-openid4vci-jvm`, `id.walt.protocols:waltid-openid4vp-verifier-jvm`, all v1.2.0, from `https://maven.waltid.dev/releases` with releases-only, snapshots-disabled, checksum-fail repository policy (`backend/pom.xml`). |
+| 2. Conformance + adversarial corpus | Partial: artifact layer only | Sovra adversarial corpus passes (see 11.3). OpenID conformance suites are not run: no VCI/VP flows are implemented yet, so there is nothing conformant to claim. No third-party wallet/issuer/verifier fixtures yet. |
+| 3. License / transitive / support review | Partial: exercised path only | Resolved closure reviewed: walt-id modules Apache-2.0 via parent chain, transitive BSD-3-Clause/JNA-dual acceptable, no snapshot in the resolved graph (`id.walt.mdoc-credentials` excluded: it drags `org.cose:cose-java:1.1.1-WALT-SNAPSHOT`, and mDL is outside section 1). Community-edition API coverage is confirmed for the exercised SD-JWT path only; the pinned VCI/VP modules are unexercised. Nimbus 10.3 wins over walt-id's transitive 10.10 by nearest-first resolution, with an API-compatibility test pinning the 10.10 surface walt-id compiled against. |
+| 4. Java 25 packaged behavior | Pass | Docker build on Temurin 25 plus the packaged two-instance e2e suite passing in both profiles (see 11.3). |
+
+Strong digest pinning beyond repository checksums is still open:
+Maven resolves by version from a releases-only repository, not by
+caller-pinned artifact digest. Recording this as a residual gap, not a
+pass.
+
+### 11.2 Adapters and seams
+
+- `SovraIssuerCryptoProvider` bridges the constrained `IssuerSigner`
+  into walt-id's `JWTCryptoProvider`: one authorized key, no extra
+  headers, no verify path. Refusals are tested, including zero signer
+  calls on refusal.
+- `WaltIdSdJwtVcEncoder` mints profile `sdjwt-vc`, type `dc+sd-jwt`,
+  ES256 only, holder `cnf` binding, `adultOver18` disclosure, and the
+  section 2 `vct` allowlist (`SOVRA_PROFILE=sdjwt-vc`; default stays
+  `synthetic`).
+- `WaltIdArtifactVerifier` verifies against the registered trust key —
+  never a key from the artifact — then runs the same shared gates as
+  the synthetic path (consent approval/expiry, credential expiry,
+  status freshness, trust snapshot, holder binding, audience/nonce)
+  with the same reason-code vocabulary.
+- The profiles are mutually exclusive by test: neither parser accepts
+  the other's artifacts.
+- Decision receipts store the evaluated profile (`V10__decision_profile`,
+  `sovra-g1-synthetic/0.2` / `sovra-g1-sdjwt-vc/0.2`) so a mixed fleet
+  cannot mislabel stored evidence.
+
+### 11.3 Validation evidence
+
+- `WaltIdSdJwtTests` (5): constrained-signer round trip, disclosure
+  digests recomputed with JDK SHA-256 independently of walt-id's walk,
+  provider refusals, claim allowlist, Nimbus 10.3 compatibility.
+- `WaltIdVerificationParityTests` (10): walt-path acceptance, mutual
+  exclusion, freshness/trust/outage/binding parity with the synthetic
+  path, JWT tamper, disclosure tamper, stripped disclosures
+  (`CLAIMS_MISMATCH`), byte-identical replay.
+- `WaltProfileIssuanceTests` (4): full HTTP consent-to-verification
+  under `sovra.profile=sdjwt-vc`, artifact shape, tamper rejection.
+- `scripts/e2e-verification.py`: PASS in both profiles (two instances,
+  real PostgreSQL, concurrency, negative matrix, restart and DB-restart
+  recovery, audit/decision consistency); the script asserts the
+  decision profile label matching `SOVRA_PROFILE`.
+- Full backend suite: 281/281 green on Java 25.
+
+### 11.4 Sequenced deviations from section 1 (recorded, not silent)
+
+The frozen table in section 1 still defines "done". The following are
+built later, in this order, and every receipt until then names the
+profile that actually evaluated it:
+
+1. Holder binding is Sovra's `sovra-presentation/v1` consent-bound
+   ECDSA proof, not `kb+jwt`. KeyBinding JWT arrives with the
+   OpenID4VP presentation flow.
+2. No OpenID4VCI flows yet (`pre-authorized_code`, `authorization_code`)
+   and no OpenID4VP transport yet (`direct_post.jwt`); issuance and
+   consent run over Sovra's own versioned APIs (SOV-009/010/011 scope).
+3. Third-party wallet/issuer/verifier fixtures and the applicable
+   OpenID conformance suites run once flows 1-2 exist.
+4. Independent review (SOV-037) stays the gate before real-data
+   provisioning/processing.
