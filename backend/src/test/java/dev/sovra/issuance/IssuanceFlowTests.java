@@ -7,11 +7,17 @@ import dev.sovra.TestAccounts;
 import dev.sovra.TestAccounts.TestAccount;
 import dev.sovra.trust.TrustService;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -122,6 +128,50 @@ class IssuanceFlowTests extends SovraAppRoleBase {
     Map<String, Object> audit = TestAccounts.auditRow(owner, "ISSUE_CREDENTIAL");
     assertThat(audit.get("decision")).isEqualTo("PERMIT");
     assertThat(audit.get("detail").toString()).contains(response.get("credentialId").toString());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void concurrentIssuanceWithOneKeyCommitsOneCredential() throws Exception {
+    TestAccount issuer = TestAccounts.create(owner, "race-issuer", Set.of("ISSUER_OPS"));
+    IssuanceFixtures.HolderKeys holder = IssuanceFixtures.generateHolder(mapper);
+    String key = "race-" + UUID.randomUUID();
+    Map<String, Object> body = issueBody(holder, key);
+
+    int threads = 8;
+    ExecutorService pool = Executors.newFixedThreadPool(threads);
+    CountDownLatch gate = new CountDownLatch(1);
+    try {
+      List<Future<String>> futures = new ArrayList<>();
+      for (int i = 0; i < threads; i++) {
+        futures.add(pool.submit(() -> {
+          gate.await(10, TimeUnit.SECONDS);
+          return issueRaw(issuer, key, body);
+        }));
+      }
+      gate.countDown();
+      List<String> responses = new ArrayList<>();
+      for (Future<String> future : futures) {
+        responses.add(future.get(60, TimeUnit.SECONDS));
+      }
+      // Every racer saw the same committed issuance; the losers rolled
+      // back to the savepoint and reconciled against the winner's row
+      // instead of dying on an aborted transaction.
+      assertThat(responses).allSatisfy(
+          response -> assertThat(response).isEqualTo(responses.get(0)));
+      Map<String, Object> response = mapper.readValue(responses.get(0), Map.class);
+      assertThat(response.get("status")).isEqualTo("VALID");
+    } finally {
+      pool.shutdownNow();
+    }
+    Integer credentials = owner.queryForObject(
+        "SELECT COUNT(*) FROM credential_artifact WHERE tenant_id = ?", Integer.class,
+        issuer.tenantId());
+    assertThat(credentials).isEqualTo(1);
+    Integer mappings = owner.queryForObject(
+        "SELECT COUNT(*) FROM issuance_idempotency WHERE tenant_id = ? AND idempotency_key = ?",
+        Integer.class, issuer.tenantId(), key);
+    assertThat(mappings).isEqualTo(1);
   }
 
   @Test

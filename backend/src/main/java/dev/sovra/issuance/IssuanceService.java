@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -154,27 +155,58 @@ public class IssuanceService {
             now, request.expiresAt(), snapshot.version(), statusUri);
     CredentialEncoder.EncodedCredential encoded = encoder.encode(evidence);
 
-    tenant.update(
-        "INSERT INTO credential_artifact (id, tenant_id, issuer_id, vct, holder_thumbprint,"
-            + " key_ref, issued_at, expires_at, status, artifact, trust_snapshot_version,"
-            + " created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'VALID', ?, ?, ?)",
-        credentialId, caller.tenantId(), request.issuerId(), request.vct(),
-        validated.thumbprint(), authorization.keyRef().encode(),
-        java.sql.Timestamp.from(now), java.sql.Timestamp.from(request.expiresAt()),
-        encoded.artifact(), snapshot.version(), caller.name());
-
     String response = responseBody(credentialId, encoded.artifact(), request.expiresAt(),
         snapshot.version());
+    // A savepoint around the contested writes: PostgreSQL aborts the
+    // whole transaction on a unique violation, so the loser rolls back
+    // to the savepoint — discarding its orphan credential row — before
+    // reconciling against the winner's idempotency record. Same shape
+    // as VerificationService. The savepoint rides the
+    // transaction-bound connection, so this works for
+    // container-managed and programmatic transactions alike.
+    java.sql.Connection connection = DataSourceUtils.getConnection(tenant.getDataSource());
+    java.sql.Savepoint savepoint;
     try {
+      savepoint = connection.setSavepoint();
+    } catch (java.sql.SQLException e) {
+      DataSourceUtils.releaseConnection(connection, tenant.getDataSource());
+      throw new IllegalStateException("savepoint failed", e);
+    }
+    try {
+      tenant.update(
+          "INSERT INTO credential_artifact (id, tenant_id, issuer_id, vct, holder_thumbprint,"
+              + " key_ref, issued_at, expires_at, status, artifact, trust_snapshot_version,"
+              + " created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'VALID', ?, ?, ?)",
+          credentialId, caller.tenantId(), request.issuerId(), request.vct(),
+          validated.thumbprint(), authorization.keyRef().encode(),
+          java.sql.Timestamp.from(now), java.sql.Timestamp.from(request.expiresAt()),
+          encoded.artifact(), snapshot.version(), caller.name());
       tenant.update(
           "INSERT INTO issuance_idempotency (tenant_id, idempotency_key, credential_id,"
               + " request_hash, response_body, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
           caller.tenantId(), idempotencyKey, credentialId, hash, response,
           java.sql.Timestamp.from(now.plus(IDEMPOTENCY_TTL)));
+      connection.releaseSavepoint(savepoint);
     } catch (DuplicateKeyException e) {
       // Lost a race with the same key: reconcile against durable state.
+      try {
+        connection.rollback(savepoint);
+      } catch (java.sql.SQLException rollback) {
+        throw new IllegalStateException("savepoint rollback failed", rollback);
+      }
       return checkIdempotency(caller, decision, idempotencyKey, hash, now)
           .orElseThrow(() -> new IllegalStateException("idempotency record vanished"));
+    } catch (RuntimeException e) {
+      try {
+        connection.rollback(savepoint);
+      } catch (java.sql.SQLException rollback) {
+        e.addSuppressed(rollback);
+      }
+      throw e;
+    } catch (java.sql.SQLException e) {
+      throw new IllegalStateException("savepoint release failed", e);
+    } finally {
+      DataSourceUtils.releaseConnection(connection, tenant.getDataSource());
     }
     audit.record(caller, Action.ISSUE_CREDENTIAL, resource, decision, "",
         detail(credentialId, request, authorization.keyRef(), snapshot.version(), false));
