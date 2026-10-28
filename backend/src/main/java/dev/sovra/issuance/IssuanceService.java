@@ -10,6 +10,7 @@ import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
 import dev.sovra.ops.TelemetryService;
+import dev.sovra.trust.IssuerKeyService;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -57,6 +58,7 @@ public class IssuanceService {
   private final AuthorizationService authz;
   private final AuditService audit;
   private final TrustSnapshotProvider snapshots;
+  private final IssuerKeyService keyService;
   private final StatusEvidenceFetcher status;
   private final CredentialEncoder encoder;
   private final JdbcTemplate tenant;
@@ -68,6 +70,7 @@ public class IssuanceService {
       AuthorizationService authz,
       AuditService audit,
       TrustSnapshotProvider snapshots,
+      IssuerKeyService keyService,
       StatusEvidenceFetcher status,
       CredentialEncoder encoder,
       JdbcTemplate tenantJdbcTemplate,
@@ -77,6 +80,7 @@ public class IssuanceService {
     this.authz = authz;
     this.audit = audit;
     this.snapshots = snapshots;
+    this.keyService = keyService;
     this.status = status;
     this.encoder = encoder;
     this.tenant = tenantJdbcTemplate;
@@ -508,7 +512,15 @@ public class IssuanceService {
         evidence.maxAge().toSeconds());
   }
 
-  /** Public federation metadata: verification keys of authorized issuers. */
+  /**
+   * Public federation metadata: verification keys of authorized
+   * issuers, minus revoked key versions. The snapshots stay immutable
+   * — this filter applies at serve time only — and unrevoked rotation
+   * keys keep serving for their approved validity window. Removing a
+   * key here is hygiene, not enforcement: verifiers check live key
+   * status independently, since previously cached keys outlive any
+   * single JWKS response.
+   */
   public String jwks() {
     try {
       Instant now = clock.instant();
@@ -521,7 +533,11 @@ public class IssuanceService {
                               issuer ->
                                   "ACTIVE".equals(issuer.status())
                                       && !issuer.validFrom().isAfter(now)
-                                      && !issuer.validThrough().isBefore(now))
+                                      && !issuer.validThrough().isBefore(now)
+                                      && !keyService.revoked(
+                                          issuer.issuerId(),
+                                          issuer.keyId(),
+                                          issuer.keyVersion()))
                           .map(dev.sovra.trust.TrustService.IssuerView::publicKeyJwk)
                           .toList())
               .orElse(List.of());

@@ -396,6 +396,58 @@ class IssuerKeyLifecycleTests extends SovraAppRoleBase {
   }
 
   @Test
+  void revokedKeysLeaveServingJwksWhileSnapshotsStand() {
+    TestAccount maker = TestAccounts.create(owner, "jwks-maker", Set.of("TRUST_ADMIN"));
+    TestAccount checker = TestAccounts.create(owner, "jwks-checker", Set.of("TRUST_ADMIN"));
+    String kid = keyId("jwks-k");
+    try {
+      register(maker, registerBody(ROT_ISSUER, kid, 1, TrustFlowTests.p256Jwk(kid)));
+      Map<String, Object> rotated = new LinkedHashMap<>();
+      rotated.put("issuerId", ROT_ISSUER);
+      rotated.put("displayName", "JWKS rotation test issuer");
+      rotated.put("scope", "adult-status");
+      rotated.put("credentialTypes", List.of(IssuanceFixtures.ADULT_VCT));
+      rotated.put("keyId", kid);
+      rotated.put("keyVersion", 1);
+      rotated.put("publicKeyJwk", TrustFlowTests.p256Jwk(kid));
+      rotated.put("validFrom", Instant.now().minusSeconds(60).toString());
+      rotated.put("validThrough", Instant.now().plusSeconds(3600).toString());
+      rotated.put("status", "ACTIVE");
+      activateIssuers(maker, checker, List.of(synthIssuerJson(), rotated));
+      try {
+        String before =
+            client.get().uri("/api/issuance/jwks.json").retrieve().body(String.class);
+        assertThat(before).contains("\"kid\":\"" + kid + "\"");
+        assertThat(before).contains("\"kid\":\"synth-1\"");
+
+        revoke(checker, revokeBody(ROT_ISSUER, kid, 1, "JWKS serving drill"));
+
+        // The serving set drops the revoked key while the unrevoked
+        // rotation window keeps serving the synth key.
+        String after =
+            client.get().uri("/api/issuance/jwks.json").retrieve().body(String.class);
+        assertThat(after).doesNotContain("\"kid\":\"" + kid + "\"");
+        assertThat(after).contains("\"kid\":\"synth-1\"");
+
+        // The snapshot itself is immutable history: it still pins the
+        // key the revocation retired. Enforcement lives in the live
+        // revocation check, not in rewriting the snapshot.
+        TrustService.SnapshotView current = trust.currentSnapshot().orElseThrow();
+        assertThat(
+                current.issuers().stream()
+                    .filter(i -> ROT_ISSUER.equals(i.issuerId()))
+                    .map(TrustService.IssuerView::keyId)
+                    .toList())
+            .contains(kid);
+      } finally {
+        activateIssuers(maker, checker, List.of(synthIssuerJson()));
+      }
+    } finally {
+      deleteKey(ROT_ISSUER, kid, 1);
+    }
+  }
+
+  @Test
   void snapshotKeyVersionIsValidated() {
     TestAccount maker = TestAccounts.create(owner, "ver-maker", Set.of("TRUST_ADMIN"));
     Map<String, Object> issuer = new LinkedHashMap<>(TrustFlowTests.issuer("bad-ver-k"));

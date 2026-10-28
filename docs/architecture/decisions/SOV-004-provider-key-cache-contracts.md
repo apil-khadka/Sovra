@@ -130,6 +130,15 @@ Privileged signing, unwrap, approval and elevation reauthorize current local sta
 Provider IAM propagation, federated-token validity and active-job containment are separately measured and must not be advertised as a five-second cloud revocation guarantee.
 Cache sizes are enforced; disabling a key does not recall already released plaintext.
 
+Serving JWKS is revocation-filtered: `/api/issuance/jwks.json`
+publishes snapshot-authorized keys inside their validity window minus
+any version with a terminal revocation row. Trust snapshots stay
+immutable history — the filter applies at serve time only — and
+unrevoked rotation keys keep serving for their approved window.
+Removal from the JWKS is hygiene, not enforcement: verifiers check
+live key status independently on every decision, since previously
+cached keys outlive any single JWKS response.
+
 Restored-key inventory: every disaster-recovery restore produces a
 signed inventory (key ID, version, location, hash) reconciled against
 KMS/HSM before serving resumes; unknown key copies block serving until

@@ -58,6 +58,24 @@ public class IssuerKeyService {
   public record KeyView(
       String issuerId, String keyId, int keyVersion, String status, Instant revokedAt) {}
 
+  /**
+   * Public revocation truth for serving federation metadata: a
+   * revocation row terminally retires the key version. No caller
+   * parameter: revocation state is public exactly like the JWKS it
+   * filters, and verifiers enforce it independently anyway.
+   */
+  public boolean revoked(String issuerId, String keyId, int keyVersion) {
+    Integer count =
+        global.queryForObject(
+            "SELECT COUNT(*) FROM issuer_key_revocation"
+                + " WHERE issuer_id = ? AND key_id = ? AND key_version = ?",
+            Integer.class,
+            issuerId,
+            keyId,
+            keyVersion);
+    return count != null && count > 0;
+  }
+
   /** Publishes a key version; idempotent for byte-identical re-registration. */
   @Transactional
   public KeyView register(ServiceAccountPrincipal caller, RegisterRequest request) {
