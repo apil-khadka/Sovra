@@ -3,7 +3,7 @@ info:
   title: Sovra implemented control-plane API (G1)
   version: 0.1.0
   description: >-
-    Exact contract of the implemented backend (SOV-005 through SOV-009).
+    Exact contract of the implemented backend (SOV-005 through SOV-010).
     Authentication is a Bearer service-account token except for the three
     public federation-metadata reads. Error bodies are minimal by design:
     404s carry empty bodies (never confirm or deny another tenant's
@@ -193,6 +193,120 @@ paths:
       security: []
       responses:
         '200': { description: JWKS with public keys only }
+  /api/consent/requests:
+    post:
+      operationId: createProofRequest
+      summary: >-
+        Open a consent-bound proof request against a usable credential.
+        Binds RP, audience, purpose, exact claims, plan hash, challenge,
+        holder, and expiry; the stored request is immutable, so later
+        scope edits invalidate consent instead of widening it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rpId, audience, purpose, credentialId, claims, planHash, challenge, expiresAt]
+              properties:
+                rpId: { type: string }
+                audience: { type: string }
+                purpose: { type: string }
+                credentialId: { type: string, format: uuid }
+                claims:
+                  type: object
+                  description: 'Exactly {adultOver18: true} at G1'
+                planHash:
+                  type: string
+                  pattern: '^[0-9a-f]{64}$'
+                  description: SHA-256 hex of the approved plan
+                challenge:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{16,128}$'
+                  description: Verifier nonce the consent binds
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: More than 1 minute out, at most 24 hours
+      responses:
+        '201': { description: Bound request in PENDING state with trustSnapshot }
+        '400': { description: Invalid request, scope, claims, credential, or validity }
+        '401': { description: Anonymous }
+        '403': { description: Lacks RP_CLIENT }
+        '503': { description: No active trust snapshot governs consent }
+  /api/consent/requests/{id}:
+    get:
+      operationId: reviewProofRequest
+      summary: >-
+        Holder review: the exact bound values plus the derived consent
+        state (PENDING, DENIED, UNAVAILABLE, or VERIFIED with a reason)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Bound request with derived state }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '404': { description: Unknown or other-tenant request (empty body) }
+  /api/consent/requests/{id}/decision:
+    post:
+      operationId: decideProofRequest
+      summary: >-
+        Record the holder's explicit signed approve/deny decision. The
+        consent proof must cover the stored request bytes exactly.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, holderJwk, consentProof]
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, deny]
+                holderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+                consentProof:
+                  type: string
+                  description: >-
+                    ES256 JWS by the holder key over the canonical
+                    consent message (label, request id, decision, RP,
+                    audience, purpose, exact claims, plan hash,
+                    challenge, expiry, holder thumbprint)
+      responses:
+        '200': { description: Request with the post-decision state }
+        '400': { description: Expired, unusable credential, wrong holder, or proof mismatch }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '404': { description: Unknown or other-tenant request (empty body) }
+        '409': { description: Already decided }
+  /api/consent/requests/{id}/presentation:
+    get:
+      operationId: getConsentPresentation
+      summary: >-
+        Authorized presentation (holder-signed consent JWS, labelled
+        synthetic), delivered only while consent is verified
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{requestId, state VERIFIED, synthetic, profile, presentation, claims}' }
+        '400': { description: Malformed id }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '404': { description: No verified consent, or other-tenant request (empty body) }
 components:
   securitySchemes:
     bearerAuth:

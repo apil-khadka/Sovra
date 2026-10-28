@@ -109,3 +109,151 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+.app-nav {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.app-nav button,
+.consent button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-h);
+  padding: 8px 16px;
+}
+
+.app-nav button[aria-pressed='true'] {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.consent button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.consent {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.consent h2 {
+  text-align: center;
+}
+
+.consent-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.consent-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15px;
+}
+
+.consent-form input {
+  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.consent-keyrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.consent-card {
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.consent-card dl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.consent-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.consent-field dt {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.consent-field dd {
+  margin: 0;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.consent-field dd.mono {
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+.mono.wrap {
+  overflow-wrap: anywhere;
+}
+
+.consent-badge {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.state-pending {
+  border-color: #b45309;
+  background: rgba(180, 83, 9, 0.08);
+}
+
+.state-review {
+  border-color: #1d4ed8;
+  background: rgba(29, 78, 216, 0.08);
+}
+
+.state-denied {
+  border-color: #b91c1c;
+  background: rgba(185, 28, 28, 0.08);
+}
+
+.state-unavailable {
+  border-color: #6b7280;
+  background: rgba(107, 114, 128, 0.12);
+}
+
+.state-verified {
+  border-color: #15803d;
+  background: rgba(21, 128, 61, 0.08);
+}

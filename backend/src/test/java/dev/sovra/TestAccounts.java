@@ -28,6 +28,14 @@ public final class TestAccounts {
             UUID.class,
             slug,
             "Test " + slug);
+    return createInTenant(owner, tenantId, name, roles);
+  }
+
+  /** Second and later accounts sharing one tenant (RP, holder agent, issuer). */
+  public static TestAccount createInTenant(
+      JdbcTemplate owner, UUID tenantId, String name, Set<String> roles) {
+    String slug =
+        owner.queryForObject("SELECT slug FROM tenant WHERE id = ?", String.class, tenantId);
     String token = TokenHasher.generate();
     UUID accountId =
         owner.queryForObject(

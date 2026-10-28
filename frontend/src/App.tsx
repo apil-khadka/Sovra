@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ConsentView from './ConsentView'
 
 interface Health {
   status: string
@@ -13,6 +14,7 @@ type State =
 
 export default function App() {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  const [view, setView] = useState<'status' | 'consent'>('status')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -36,20 +38,33 @@ export default function App() {
   return (
     <main>
       <h1>Sovra</h1>
-      {state.kind === 'loading' && <p>Checking backend…</p>}
-      {state.kind === 'ready' && (
-        <dl>
-          <dt>Status</dt>
-          <dd>{state.health.status}</dd>
-          <dt>Service</dt>
-          <dd>{state.health.service}</dd>
-          <dt>Version</dt>
-          <dd>{state.health.version}</dd>
-        </dl>
+      <nav className="app-nav" aria-label="Views">
+        <button type="button" onClick={() => setView('status')} aria-pressed={view === 'status'}>
+          Status
+        </button>
+        <button type="button" onClick={() => setView('consent')} aria-pressed={view === 'consent'}>
+          Holder consent
+        </button>
+      </nav>
+      {view === 'status' && (
+        <>
+          {state.kind === 'loading' && <p>Checking backend…</p>}
+          {state.kind === 'ready' && (
+            <dl>
+              <dt>Status</dt>
+              <dd>{state.health.status}</dd>
+              <dt>Service</dt>
+              <dd>{state.health.service}</dd>
+              <dt>Version</dt>
+              <dd>{state.health.version}</dd>
+            </dl>
+          )}
+          {state.kind === 'error' && (
+            <p role="alert">Backend unreachable: {state.message}</p>
+          )}
+        </>
       )}
-      {state.kind === 'error' && (
-        <p role="alert">Backend unreachable: {state.message}</p>
-      )}
+      {view === 'consent' && <ConsentView />}
     </main>
   )
 }

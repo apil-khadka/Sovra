@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 2;
+  static final long RULES_VERSION = 3;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
       Map.of(
@@ -30,7 +30,12 @@ public class AuthorizationService {
           Action.PROPOSE_TRUST_CHANGE, Set.of("TRUST_ADMIN"),
           Action.APPROVE_TRUST_CHANGE, Set.of("TRUST_ADMIN"),
           Action.ACTIVATE_TRUST_SNAPSHOT, Set.of("TRUST_ADMIN"),
-          Action.READ_AUDIT, Set.of("AUDIT_READER", "TRUST_ADMIN"));
+          Action.READ_AUDIT, Set.of("AUDIT_READER", "TRUST_ADMIN"),
+          Action.REQUEST_PROOF, Set.of("RP_CLIENT"),
+          Action.READ_CONSENT, Set.of("TENANT_MEMBER", "RP_CLIENT"),
+          // Transport authentication only: the holder key proof carries the
+          // decision authority, so either tenant agent may deliver it.
+          Action.DECIDE_CONSENT, Set.of("TENANT_MEMBER", "RP_CLIENT"));
 
   private final ServiceAccountRepository accounts;
   private final EmergencyFlagService emergency;

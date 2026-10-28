@@ -2,6 +2,8 @@ package dev.sovra.web;
 
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.TenantMismatchException;
+import dev.sovra.consent.ConsentNotFoundException;
+import dev.sovra.consent.InvalidConsentException;
 import dev.sovra.issuance.CredentialNotFoundException;
 import dev.sovra.issuance.IdempotencyConflictException;
 import dev.sovra.issuance.InvalidIssuanceException;
@@ -35,7 +37,8 @@ public class ApiExceptionHandler {
   @ExceptionHandler({
     TenantMismatchException.class,
     ProposalNotFoundException.class,
-    CredentialNotFoundException.class
+    CredentialNotFoundException.class,
+    ConsentNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -50,6 +53,7 @@ public class ApiExceptionHandler {
   @ExceptionHandler({
     InvalidProposalException.class,
     InvalidIssuanceException.class,
+    InvalidConsentException.class,
     MethodArgumentNotValidException.class,
     MissingRequestHeaderException.class,
     HttpMessageNotReadableException.class,

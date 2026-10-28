@@ -266,6 +266,80 @@ class LeastPrivilegeTests extends SovraPostgresBase {
   }
 
   @Test
+  void appRoleSeesOnlyOwnTenantProofRequests() throws Exception {
+    TestAccount accountA = TestAccounts.create(owner, "cons-a", Set.of("RP_CLIENT"));
+    TestAccount accountB = TestAccounts.create(owner, "cons-b", Set.of("RP_CLIENT"));
+    UUID idA = seedProofRequest(accountA);
+    UUID idB = seedProofRequest(accountB);
+
+    setTenant(accountA.tenantId());
+    assertThat(proofRequestIds()).containsExactly(idA);
+    setTenant(accountB.tenantId());
+    assertThat(proofRequestIds()).containsExactly(idB);
+  }
+
+  @Test
+  void appRoleCanOnlyDecideProofRequests() throws Exception {
+    TestAccount account = TestAccounts.create(owner, "cons-decide", Set.of("RP_CLIENT"));
+    UUID id = seedProofRequest(account);
+    setTenant(account.tenantId());
+    // Bound scope is immutable: purpose, claims, and bindings cannot move.
+    assertThatThrownBy(
+            () -> {
+              try (Statement stmt = app.createStatement()) {
+                stmt.executeUpdate(
+                    "UPDATE proof_request SET purpose = 'x' WHERE id = '" + id + "'");
+              }
+            })
+        .isInstanceOf(PSQLException.class)
+        .hasMessageContaining("permission denied");
+    assertThatThrownBy(
+            () -> {
+              try (Statement stmt = app.createStatement()) {
+                stmt.executeUpdate("DELETE FROM proof_request WHERE id = '" + id + "'");
+              }
+            })
+        .isInstanceOf(PSQLException.class)
+        .hasMessageContaining("permission denied");
+    // Only the terminal decision columns are writable.
+    try (Statement stmt = app.createStatement()) {
+      int updated =
+          stmt.executeUpdate(
+              "UPDATE proof_request SET state = 'DENIED', decided_at = now(),"
+                  + " consent_artifact = 'p' WHERE id = '"
+                  + id + "'");
+      assertThat(updated).isEqualTo(1);
+    }
+  }
+
+  private UUID seedProofRequest(TestAccount account) {
+    UUID credentialId = seedCredential(account);
+    return owner.queryForObject(
+        "INSERT INTO proof_request (tenant_id, credential_id, rp_id, audience, purpose,"
+            + " claims, plan_hash, challenge, holder_thumbprint, expires_at,"
+            + " trust_snapshot_version, created_by)"
+            + " VALUES (?, ?, 'rp', 'aud', 'purpose', '{\"adultOver18\":true}',"
+            + " '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',"
+            + " '0123456789abcdef0123456789abcdef', 'holder',"
+            + " now() + INTERVAL '1 hour', 1, 't')"
+            + " RETURNING id",
+        UUID.class,
+        account.tenantId(),
+        credentialId);
+  }
+
+  private List<UUID> proofRequestIds() throws Exception {
+    try (Statement stmt = app.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT id FROM proof_request")) {
+      List<UUID> ids = new ArrayList<>();
+      while (rs.next()) {
+        ids.add(rs.getObject(1, UUID.class));
+      }
+      return ids;
+    }
+  }
+
+  @Test
   void appRoleCanReadAccountsForAuthentication() throws Exception {
     TestAccounts.create(owner, "readable", Set.of("TENANT_MEMBER"));
     try (Statement stmt = app.createStatement();
