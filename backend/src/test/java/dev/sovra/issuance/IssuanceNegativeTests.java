@@ -270,11 +270,15 @@ class IssuanceNegativeTests extends SovraAppRoleBase {
         "UPDATE issuer_signing_key SET status = 'REVOKED'"
             + " WHERE issuer_id = ? AND key_id = ? AND key_version = 1",
         IssuanceFixtures.ISSUER_ID, "synth-1");
+    String aad = "issuer=" + IssuanceFixtures.ISSUER_ID + ";key="
+        + new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1).encode()
+        + ";credential=c;purpose=issuance;schema=s";
     try {
       assertThatThrownBy(
               () -> signer.sign(new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1),
-                  "payload".getBytes(), "issuer=" + IssuanceFixtures.ISSUER_ID))
-          .isInstanceOf(SigningRefusedException.class);
+                  "payload".getBytes(), aad))
+          .isInstanceOf(SigningRefusedException.class)
+          .hasMessageContaining("not active");
     } finally {
       owner.update(
           "UPDATE issuer_signing_key SET status = 'ACTIVE'"
@@ -310,6 +314,57 @@ class IssuanceNegativeTests extends SovraAppRoleBase {
   }
 
   @Test
+  void embeddedIssuerSubstringDoesNotSatisfyContext() {
+    // The real issuer field names evil; ours appears only embedded in
+    // another field. A substring check would accept this; exact field
+    // parsing refuses (SOV-040).
+    String aad = "issuer=https://evil.example/;key="
+        + new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1).encode()
+        + ";credential=c;purpose=issuance;schema=sovra-g1-synthetic/0.2;note=x issuer="
+        + IssuanceFixtures.ISSUER_ID;
+    assertThatThrownBy(
+            () -> signer.sign(new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1),
+                "payload".getBytes(), aad))
+        .isInstanceOf(SigningRefusedException.class)
+        .hasMessageContaining("does not name this issuer");
+  }
+
+  @Test
+  void wrongKeyFieldRefusesToSign() {
+    String aad = "issuer=" + IssuanceFixtures.ISSUER_ID + ";key="
+        + new KeyRef(IssuanceFixtures.ISSUER_ID, "other-key", 1).encode()
+        + ";credential=c;purpose=issuance;schema=s";
+    assertThatThrownBy(
+            () -> signer.sign(new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1),
+                "payload".getBytes(), aad))
+        .isInstanceOf(SigningRefusedException.class)
+        .hasMessageContaining("does not name this key");
+  }
+
+  @Test
+  void missingPurposeRefusesToSign() {
+    String aad = "issuer=" + IssuanceFixtures.ISSUER_ID + ";key="
+        + new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1).encode()
+        + ";credential=c;schema=s";
+    assertThatThrownBy(
+            () -> signer.sign(new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1),
+                "payload".getBytes(), aad))
+        .isInstanceOf(SigningRefusedException.class)
+        .hasMessageContaining("not an issuance call");
+  }
+
+  @Test
+  void malformedContextSegmentVoidsTheCall() {
+    String aad = "issuer=" + IssuanceFixtures.ISSUER_ID + ";key="
+        + new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1).encode()
+        + ";credential=c;purpose=issuance;schema=s;BOGUS-SEGMENT";
+    assertThatThrownBy(
+            () -> signer.sign(new KeyRef(IssuanceFixtures.ISSUER_ID, "synth-1", 1),
+                "payload".getBytes(), aad))
+        .isInstanceOf(SigningRefusedException.class);
+  }
+
+  @Test
   void auditOutageFailsIssuanceAtomically() throws Exception {
     TestAccount issuer = TestAccounts.create(owner, "neg-audit", Set.of("ISSUER_OPS"));
     IssuanceFixtures.HolderKeys holder = IssuanceFixtures.generateHolder(mapper);
@@ -338,7 +393,7 @@ class IssuanceNegativeTests extends SovraAppRoleBase {
   void kmsSignerFailsLoudly() {
     assertThatThrownBy(() -> new KmsSigner().sign(
             new KeyRef("i", "k", 1), new byte[0], "issuer=i"))
-        .isInstanceOf(UnsupportedOperationException.class);
+        .isInstanceOf(KmsUnavailableException.class);
   }
 
   @Test

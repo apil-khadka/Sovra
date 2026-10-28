@@ -85,6 +85,7 @@ public class VerificationService {
   private final ObjectMapper mapper;
   private final TelemetryService telemetry;
   private final String profile;
+  private final dev.sovra.config.SovraMode mode;
 
   public VerificationService(
       AuthorizationService authz,
@@ -96,7 +97,8 @@ public class VerificationService {
       ObjectMapper mapper,
       TelemetryService telemetry,
       @org.springframework.beans.factory.annotation.Value("${sovra.profile:synthetic}")
-          String profile) {
+          String profile,
+      dev.sovra.config.SovraMode mode) {
     this.authz = authz;
     this.audit = audit;
     this.snapshots = snapshots;
@@ -106,6 +108,7 @@ public class VerificationService {
     this.mapper = mapper;
     this.telemetry = telemetry;
     this.profile = profile;
+    this.mode = mode;
   }
 
   public record VerifyRequest(
@@ -322,6 +325,11 @@ public class VerificationService {
    */
   private Evaluated evaluate(VerifyRequest request, StoredRequest stored, Credential credential) {
     Instant now = clock.instant();
+    // Production-entry backstop behind the startup scan: the synthetic
+    // profile never decides in production, whatever reached this call.
+    if (mode.isProduction() && !"sdjwt-vc".equals(profile)) {
+      return new Evaluated(OUTCOME_REJECTED, "SYNTHETIC_PROFILE_REJECTED", 0, "", 0);
+    }
     if (!"APPROVED".equals(stored.state()) || stored.consentArtifact() == null) {
       return new Evaluated(OUTCOME_REJECTED, "CONSENT_NOT_APPROVED", 0, "", 0);
     }

@@ -6,6 +6,7 @@ import dev.sovra.SovraAppRoleBase;
 import dev.sovra.audit.AuditService;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.AuthorizationService;
+import dev.sovra.config.SovraMode;
 import dev.sovra.consent.ConsentFixtures;
 import dev.sovra.issuance.IssuanceFixtures;
 import dev.sovra.issuance.StatusEvidenceFetcher;
@@ -87,7 +88,7 @@ class VerificationFreshnessTests extends SovraAppRoleBase {
       String nonce) throws Exception {
     VerificationService instance = new VerificationService(authz, audit, provider, fetcher,
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
-        "synthetic");
+        "synthetic", new SovraMode("demo"));
     String binding = VerificationFixtures.bindingProof(
         stage.holder(), stage.requestId(), nonce, ConsentFixtures.AUDIENCE, mapper);
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(

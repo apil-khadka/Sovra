@@ -6,6 +6,7 @@ import dev.sovra.SovraAppRoleBase;
 import dev.sovra.audit.AuditService;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.AuthorizationService;
+import dev.sovra.config.SovraMode;
 import dev.sovra.consent.ConsentFixtures;
 import dev.sovra.issuance.CredentialEncoder;
 import dev.sovra.issuance.IssuanceEvidence;
@@ -119,7 +120,7 @@ class WaltIdVerificationParityTests extends SovraAppRoleBase {
       Stage stage, String nonce, TrustSnapshotProvider provider, StatusEvidenceFetcher fetcher) {
     VerificationService instance = new VerificationService(authz, audit, provider, fetcher,
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
-        "sdjwt-vc");
+        "sdjwt-vc", new SovraMode("demo"));
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     VerificationService.VerifyRequest submission;
     try {
@@ -144,7 +145,7 @@ class WaltIdVerificationParityTests extends SovraAppRoleBase {
   private String verifyWaltSubmission(Stage stage, VerificationService.VerifyRequest submission) {
     VerificationService instance = new VerificationService(authz, audit, snapshots, status,
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
-        "sdjwt-vc");
+        "sdjwt-vc", new SovraMode("demo"));
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     return new TransactionTemplate(transactions).execute(ignored -> {
       TenantContext.set(principal);
@@ -305,7 +306,7 @@ class WaltIdVerificationParityTests extends SovraAppRoleBase {
     Stage stage = sdJwtStage("walt-bind");
     VerificationService instance = new VerificationService(authz, audit, snapshots, status,
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
-        "sdjwt-vc");
+        "sdjwt-vc", new SovraMode("demo"));
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     // Binding proof signed over a different nonce: consent and
     // verification must disagree loudly.

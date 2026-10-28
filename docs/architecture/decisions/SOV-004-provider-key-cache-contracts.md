@@ -1,6 +1,6 @@
 # SOV-004: identity/key providers, revocation and cache contracts
 
-**Version:** 0.2 (recommended implementation reference; independent/deployment review pending).
+**Version:** 0.3 (task closure with recorded deferrals; independent/deployment review pending).
 **Date:** 2026-10-28.
 **Task:** [SOV-004](https://github.com/apil-khadka/Sovra/issues/8)
 (select identity and key providers with revocation and cache contracts).
@@ -9,7 +9,10 @@
 
 This record selects the implementation reference for OD-10, OD-13 and OD-18.
 It does not close deployment-specific location, provider entitlement, retention or independent-review decisions.
-Version 0.2 supersedes the deferred provider pick, broad cache allowances and pre-G1 external-review sequencing in version 0.1.
+Version 0.2 superseded the deferred provider pick, broad cache allowances and pre-G1 external-review sequencing in version 0.1.
+Version 0.3 records SOV-004 task closure: selections made, implemented
+subset, and explicit deferrals (§7). No coordinate, algorithm, bound,
+or identity changed.
 Read the [architecture assessment](../identity-key-provider-architecture.md) for evidence, alternatives, code findings and remaining gates.
 
 ## 0. Selected reference and development gate
@@ -155,3 +158,44 @@ Read replicas require an approved lag bound and cannot supply ambiguous acceptan
 - [ ] SOV-039 issuer/location/capability approval and SOV-038 deployed attested key-use/input-path evidence.
 - [ ] SOV-001 library conditions 2-4 evidenced in SOV-036.
 - [ ] Record revision on any coordinate, algorithm, bound, or identity change.
+
+## 7. SOV-004 task closure (2026-10-28)
+
+The selections this task required are made; implementation of the
+synthetic subset is verified. The §6 approvals stay open and gate
+real-data and production use.
+
+Selected:
+
+- Human SSO: issuer-local self-hosted Keycloak, OIDC authorization
+  code with forced S256 PKCE through the Spring BFF (SOV-006
+  synthetic implementation verified against compose Keycloak).
+- Key reference: Google Cloud KMS `HSM_SINGLE_TENANT` with
+  Confidential Space attestation-derived federation (§0); P-256,
+  non-exportable, separate signing/wrapping roles.
+- Revocation/cache contracts: §5 bounds, revocation-filtered serving
+  JWKS, immutable snapshots, restored-key inventory rule.
+
+Implemented and tested (G1 synthetic):
+
+- BFF login/logout with server-held tokens, Secure/HttpOnly cookies,
+  CSRF, AMR-gated privileged roles, and exact-registry startup
+  validation; production additionally forbids the demo http
+  backchannel escape hatch.
+- Revocation-filtered `/api/issuance/jwks.json` with live per-decision
+  key-status checks.
+- Sealed trust writes (SOV-040): runtime SELECT-only trust tables,
+  sealed-function writes, activated-version immutability, UUID
+  approval identity, person-verified quorum rule for production.
+- Production-entry refusal of synthetic signer, profile, issuers,
+  keys, and seed data at startup and on the activation, quorum,
+  and verification paths.
+
+Explicitly deferred (not selected, not implemented):
+
+- KMS/HSM provisioning and the production signing adapter
+  (G2 provider pick, SOV-038; `KmsSigner` fails loud with 503).
+- Live Token Status List endpoints (issuer-operated; G1 status
+  service implements the same shapes synthetically).
+- Production identity tenant, regions, and entitlements (SOV-039);
+  independent assessment (SOV-037); final release (SOV-034).

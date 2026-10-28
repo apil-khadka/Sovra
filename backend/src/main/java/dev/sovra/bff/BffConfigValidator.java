@@ -1,5 +1,6 @@
 package dev.sovra.bff;
 
+import dev.sovra.config.SovraMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,16 +25,24 @@ public class BffConfigValidator implements ApplicationListener<ApplicationReadyE
 
   private final BffProperties properties;
   private final ClientRegistrationRepository registrations;
+  private final SovraMode mode;
 
   public BffConfigValidator(
-      BffProperties properties, ClientRegistrationRepository registrations) {
+      BffProperties properties, ClientRegistrationRepository registrations, SovraMode mode) {
     this.properties = properties;
     this.registrations = registrations;
+    this.mode = mode;
   }
 
   @Override
   public void onApplicationEvent(ApplicationReadyEvent event) {
     properties.validateSelf();
+    // The demo escape hatch (plain-http backchannel to loopback
+    // Keycloak) must never serve production logins (SOV-040).
+    if (mode.isProduction() && !properties.requireHttpsIssuer()) {
+      throw new IllegalStateException(
+          "sovra.bff.require-https-issuer must be true in production");
+    }
     ClientRegistration registration = find(properties.registrationId());
     validate(properties, registration);
     log.info("BFF trust registry matches OAuth2 registration '{}'", properties.registrationId());

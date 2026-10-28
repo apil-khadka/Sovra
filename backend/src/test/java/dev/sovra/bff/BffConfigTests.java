@@ -143,4 +143,25 @@ class BffConfigTests {
             properties.issuer(), properties.clientId(), properties.redirectUri(), null)))
         .doesNotThrowAnyException();
   }
+
+  @Test
+  void productionForbidsTheDemoHttpEscapeHatch() {
+    BffProperties base = valid(true);
+    BffProperties demoHttp = new BffProperties(
+        true, "http://keycloak:8080/realms/sovra", base.clientId(), base.redirectUri(),
+        base.postLogoutRedirectUri(), "http://keycloak:8080/logout", false,
+        base.tenantClaim(), base.groupsClaim(), base.allowedTenantSlugs(), base.groupRoleMap(),
+        base.privilegedRoles(), base.hardwareAmr(), base.registrationId());
+    var repository = new org.springframework.security.oauth2.client.registration
+        .InMemoryClientRegistrationRepository(registration(
+            demoHttp.issuer(), demoHttp.clientId(), demoHttp.redirectUri(), List.of("ES256")));
+    BffConfigValidator demo =
+        new BffConfigValidator(demoHttp, repository, new dev.sovra.config.SovraMode("demo"));
+    assertThatCode(() -> demo.onApplicationEvent(null)).doesNotThrowAnyException();
+    BffConfigValidator production = new BffConfigValidator(
+        demoHttp, repository, new dev.sovra.config.SovraMode("production"));
+    assertThatThrownBy(() -> production.onApplicationEvent(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("require-https-issuer");
+  }
 }

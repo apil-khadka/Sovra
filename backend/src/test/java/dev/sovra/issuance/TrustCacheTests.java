@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.UUID;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -42,6 +43,18 @@ class TrustCacheTests extends SovraPostgresBase {
 
   @AfterEach
   void restore() {
+    // Newer versions than the setup tip are this class's fixtures or
+    // other classes' unactivated leftovers (the shared container); all
+    // of them go, children before parents. Activated versions carry no
+    // fixture issuer rows, so the seal never fires here.
+    owner.update(
+        "DELETE FROM trust_proposal_decision WHERE proposal_id IN"
+            + " (SELECT id FROM trust_change_proposal WHERE snapshot_version > ?)",
+        baseVersion);
+    owner.update(
+        "DELETE FROM trust_change_proposal WHERE snapshot_version > ?", baseVersion);
+    owner.update("DELETE FROM issuer_record WHERE snapshot_version > ?", baseVersion);
+    owner.update("DELETE FROM rp_policy WHERE snapshot_version > ?", baseVersion);
     owner.update("DELETE FROM trust_snapshot_activation WHERE snapshot_version > ?",
         baseVersion);
     owner.update("DELETE FROM trust_snapshot WHERE version > ?", baseVersion);
@@ -54,6 +67,17 @@ class TrustCacheTests extends SovraPostgresBase {
             "INSERT INTO trust_snapshot (created_by, note) VALUES ('cache-test', '')"
                 + " RETURNING version",
             Long.class);
+    // The seal (V13) admits activation only for approved versions, so
+    // the fixture carries a proposal plus decision first.
+    UUID proposal =
+        owner.queryForObject(
+            "INSERT INTO trust_change_proposal (snapshot_version, proposed_by)"
+                + " VALUES (?, 'cache-maker') RETURNING id",
+            UUID.class,
+            version);
+    owner.update(
+        "INSERT INTO trust_proposal_decision (proposal_id, approved_by) VALUES (?, 'cache-checker')",
+        proposal);
     owner.update(
         "INSERT INTO trust_snapshot_activation (snapshot_version, activated_by)"
             + " VALUES (?, 'cache-test')",
@@ -126,6 +150,14 @@ class TrustCacheTests extends SovraPostgresBase {
     verify(mock, times(5)).currentSnapshot();
 
     // Back to the first version: evicted means a reload, not a hit.
+    owner.update(
+        "DELETE FROM trust_proposal_decision WHERE proposal_id IN"
+            + " (SELECT id FROM trust_change_proposal WHERE snapshot_version > ?)",
+        baseVersion);
+    owner.update(
+        "DELETE FROM trust_change_proposal WHERE snapshot_version > ?", baseVersion);
+    owner.update("DELETE FROM issuer_record WHERE snapshot_version > ?", baseVersion);
+    owner.update("DELETE FROM rp_policy WHERE snapshot_version > ?", baseVersion);
     owner.update("DELETE FROM trust_snapshot_activation WHERE snapshot_version > ?",
         baseVersion);
     owner.update("DELETE FROM trust_snapshot WHERE version > ?", baseVersion);

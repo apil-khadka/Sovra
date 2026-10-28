@@ -189,7 +189,7 @@
         "Approve provider, region/operator, key algorithms, envelope/AAD/nonce format and signing/unwrap interfaces.",
         "Specify MFA enrollment/recovery, JIT elevation, independent approvals and separate workload/deploy/migration/key/audit identities.",
         "Define measurable token, grant, DEK and positive-permission cache bounds, restored-key inventories and control/data-plane outage rules.",
-        "Use SOV-004 v0.2: issuer-local Keycloak and the Google Cloud Single-tenant HSM/Confidential Space reference; actual issuer regions remain subject to SOV-039 and independent assessment to SOV-037.",
+        "Use SOV-004 v0.3: issuer-local Keycloak and the Google Cloud Single-tenant HSM/Confidential Space reference; actual issuer regions remain subject to SOV-039 and independent assessment to SOV-037.",
         "Disable cross-request plaintext-DEK caching, distinguish local five-second stop freshness from cloud IAM/token propagation, and qualify attested key-use/input channels under SOV-038.",
         "Initial delivery is a public synthetic-data demo with no new paid services or hardware; the cloud HSM/TEE reference is deferred qualification and is not a demo provisioning dependency."
       ],
@@ -295,7 +295,7 @@
         "Exercise stolen sessions, removed roles, weak recovery and warm authorization caches within approved containment bounds.",
         "Implement issuer-local Keycloak OIDC authorization code with S256 PKCE through a Spring BFF, server-held tokens, protected cookies/CSRF and an allowlisted issuer/audience/redirect registry; keep machine authentication separate.",
         "Enforce verified hardware-bound privileged authentication context, controlled enrollment/recovery without weak-factor fallback, stable (iss, sub) membership and independently approved action-bound elevation.",
-        "Local synthetic Keycloak development may proceed under SOV-004 v0.2; production identity tenant, cloud credentials and independent release approvals are not prerequisites for writing that synthetic implementation and are not claimed completed.",
+        "Local synthetic Keycloak development may proceed under SOV-004 v0.3; production identity tenant, cloud credentials and independent release approvals are not prerequisites for writing that synthetic implementation and are not claimed completed.",
         "Pin a maintained Keycloak server/container and its supported runtime; enforce reviewed attestation trust/AAGUID and user-verification policy at privileged enrollment, reject weaker legacy credentials/fallback, and test configuration drift and recovery.",
         "For the public synthetic demo, use self-hosted Keycloak on existing or verified no-charge resources with restricted demo accounts; do not require paid hosted identity, SMS, email or new security-key purchases, and do not claim unavailable hardware assurance passed."
       ],

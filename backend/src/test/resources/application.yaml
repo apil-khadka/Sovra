@@ -57,6 +57,7 @@ sovra:
   # flags below) or kms (production; arrives with the G2 provider pick).
   signer: local-dev
   profile: synthetic
+  mode: demo
   synthetic-issuers:
     enabled: true
     acknowledge-non-production: true

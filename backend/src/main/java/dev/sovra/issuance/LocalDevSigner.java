@@ -14,6 +14,7 @@ import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPrivateKeySpec;
 import java.security.spec.EllipticCurve;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
@@ -160,8 +161,17 @@ public class LocalDevSigner implements IssuerSigner {
     if (!keyRef.equals(ref)) {
       throw new SigningRefusedException("unknown signing key");
     }
-    if (aad == null || !aad.contains("issuer=" + ISSUER_ID)) {
+    // Exact field match, never substring: an embedded "issuer=<ours>"
+    // inside another field must not satisfy the check (SOV-040).
+    Map<String, String> context = parseContext(aad);
+    if (!ISSUER_ID.equals(context.get("issuer"))) {
       throw new SigningRefusedException("call context does not name this issuer");
+    }
+    if (!keyRef.encode().equals(context.get("key"))) {
+      throw new SigningRefusedException("call context does not name this key");
+    }
+    if (!"issuance".equals(context.get("purpose"))) {
+      throw new SigningRefusedException("call context is not an issuance call");
     }
     if (!registryActive()) {
       throw new SigningRefusedException("signing key is not active");
@@ -177,6 +187,26 @@ public class LocalDevSigner implements IssuerSigner {
     } catch (Exception e) {
       throw new SigningRefusedException("signing failed");
     }
+  }
+
+  /**
+   * Strict {@code k=v;k=v} parse. Any malformed segment voids the whole
+   * context: the encoders always emit well-formed AAD, so anything else
+   * is a confused or forged call.
+   */
+  private static Map<String, String> parseContext(String aad) {
+    Map<String, String> fields = new LinkedHashMap<>();
+    if (aad == null || aad.isBlank()) {
+      return fields;
+    }
+    for (String segment : aad.split(";", -1)) {
+      int eq = segment.indexOf('=');
+      if (eq <= 0 || eq == segment.length() - 1) {
+        return Map.of();
+      }
+      fields.put(segment.substring(0, eq), segment.substring(eq + 1));
+    }
+    return fields;
   }
 
   private boolean registryActive() {

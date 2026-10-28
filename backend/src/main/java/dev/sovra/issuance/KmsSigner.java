@@ -14,7 +14,7 @@ public class KmsSigner implements IssuerSigner {
 
   @Override
   public byte[] sign(KeyRef keyRef, byte[] payload, String aad) {
-    throw new UnsupportedOperationException(
+    throw new KmsUnavailableException(
         "production KMS signer arrives with the G2 provider pick (SOV-004)");
   }
 }

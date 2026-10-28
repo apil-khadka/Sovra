@@ -478,7 +478,7 @@ Development/test environments shall use documented finite conservative settings.
 | Freshness | Per-assurance trust/status age, permitted clock skew, unknown/error handling | Open - OD-03 | Security/policy approver |
 | Sessions/retries | Consent/session lifetime, nonce entropy, attempt limits, idempotency lifetime, retry classes | Open - OD-06 | Security/engineering |
 | Data lifecycle | Per-class retention/deletion, backup expiry, audit exceptions, approved locations | Open - OD-07/OD-08 | Product/security/privacy reviewer |
-| Privileged/key caches | No cross-request plaintext-DEK cache; privileged actions check current local authority; local stop max age 5 s; external credential/IAM propagation and active-job/copy containment measured separately | Reference selected in SOV-004 v0.2; deployment qualification remains OD-18 | Security/identity/key owners |
+| Privileged/key caches | No cross-request plaintext-DEK cache; privileged actions check current local authority; local stop max age 5 s; external credential/IAM propagation and active-job/copy containment measured separately | Reference selected in SOV-004 v0.3; deployment qualification remains OD-18 | Security/identity/key owners |
 
 ## 13. Verification and traceability
 

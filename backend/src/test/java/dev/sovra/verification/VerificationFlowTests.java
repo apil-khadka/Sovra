@@ -6,6 +6,7 @@ import dev.sovra.SovraAppRoleBase;
 import dev.sovra.audit.AuditService;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.AuthorizationService;
+import dev.sovra.config.SovraMode;
 import dev.sovra.consent.ConsentFixtures;
 import dev.sovra.issuance.IssuanceFixtures;
 import dev.sovra.issuance.StatusEvidenceFetcher;
@@ -191,10 +192,10 @@ class VerificationFlowTests extends SovraAppRoleBase {
     // either process.
     VerificationService first = new VerificationService(authz, audit, snapshots, status,
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
-        "synthetic");
+        "synthetic", new SovraMode("demo"));
     VerificationService second = new VerificationService(authz, audit, snapshots, status,
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
-        "synthetic");
+        "synthetic", new SovraMode("demo"));
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     JsonNode holderJwk = stage.holder().jwk();
     String binding = VerificationFixtures.bindingProof(
@@ -247,7 +248,7 @@ class VerificationFlowTests extends SovraAppRoleBase {
     TrustSnapshotProvider outage = Optional::empty;
     VerificationService instance = new VerificationService(authz, audit, outage, status,
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
-        "synthetic");
+        "synthetic", new SovraMode("demo"));
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(
         UUID.fromString(stage.requestId()), nonce, ConsentFixtures.AUDIENCE,
@@ -312,7 +313,7 @@ class VerificationFlowTests extends SovraAppRoleBase {
       String nonce) throws Exception {
     VerificationService instance = new VerificationService(authz, audit, snapshots, fetcher,
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
-        "synthetic");
+        "synthetic", new SovraMode("demo"));
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(
         UUID.fromString(stage.requestId()), nonce, ConsentFixtures.AUDIENCE,
         stage.holder().jwk(),

@@ -147,16 +147,37 @@ class TrustNegativeTests extends SovraPostgresBase {
             "INSERT INTO trust_snapshot (created_by) VALUES ('trig') RETURNING version", Long.class);
     var proposalId = java.util.UUID.randomUUID();
     owner.update(
-        "INSERT INTO trust_change_proposal (id, snapshot_version, proposed_by) VALUES (?, ?, ?)",
+        "INSERT INTO trust_change_proposal (id, snapshot_version, proposed_by, proposed_by_account)"
+            + " VALUES (?, ?, ?, ?)",
         proposalId,
         version,
-        maker.name());
+        maker.name(),
+        maker.accountId());
+    // Same account UUID: rejected even though the label differs, because
+    // the trigger compares identity, never names.
     assertThatThrownBy(
             () ->
                 owner.update(
-                    "INSERT INTO trust_proposal_decision (proposal_id, approved_by) VALUES (?, ?)",
+                    "INSERT INTO trust_proposal_decision"
+                        + " (proposal_id, approved_by, approved_by_account) VALUES (?, ?, ?)",
                     proposalId,
-                    maker.name()))
+                    "a-different-label",
+                    maker.accountId()))
         .hasMessageContaining("self-approval");
+    // NULL identities (migration-seed shape) stay permitted: the sealed
+    // function, not the trigger, requires identity for new runtime rows.
+    Long seedVersion =
+        owner.queryForObject(
+            "INSERT INTO trust_snapshot (created_by) VALUES ('seed') RETURNING version", Long.class);
+    var seedProposal = java.util.UUID.randomUUID();
+    owner.update(
+        "INSERT INTO trust_change_proposal (id, snapshot_version, proposed_by) VALUES (?, ?, ?)",
+        seedProposal,
+        seedVersion,
+        "seed");
+    owner.update(
+        "INSERT INTO trust_proposal_decision (proposal_id, approved_by) VALUES (?, ?)",
+        seedProposal,
+        "seed");
   }
 }

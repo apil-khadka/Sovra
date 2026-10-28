@@ -76,6 +76,10 @@ sovra:
   # Credential profile: synthetic (labelled G1 JWT, default) or sdjwt-vc
   # (walt-id SD-JWT VC, qualified under SOV-036).
   profile: ${SOVRA_PROFILE:synthetic}
+  # Deployment mode: demo (synthetic fixture stack) or production
+  # (refuses synthetic issuers, keys, profiles, and seed config on
+  # every path; SOV-040). Unknown values fail boot.
+  mode: ${SOVRA_MODE:demo}
   synthetic-issuers:
     enabled: ${SOVRA_SYNTHETIC_ISSUERS_ENABLED:false}
     acknowledge-non-production: ${SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION:false}

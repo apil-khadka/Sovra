@@ -166,6 +166,15 @@ public class ApiExceptionHandler {
         .body(Map.of("error", "planning_unavailable"));
   }
 
+  @ExceptionHandler(dev.sovra.issuance.KmsUnavailableException.class)
+  public ResponseEntity<Object> kmsUnavailable(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.SERVICE_UNAVAILABLE, "dependency_unavailable", true);
+    }
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body(Map.of("error", "kms_unavailable"));
+  }
+
   @ExceptionHandler(AlreadyDecidedException.class)
   public ResponseEntity<Object> conflict(HttpServletRequest request) {
     if (wantsProblem(request)) {
