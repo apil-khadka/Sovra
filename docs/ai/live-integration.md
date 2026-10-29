@@ -2,7 +2,10 @@
 
 **Status:** fixture mode implemented and tested. The smoke procedure
 below PASSED against the Baseten hackathon grant on 2026-10-29 (see
-evidence); OD-02 remains partially resolved pending verified no-charge limits, processing/retention terms and complete frozen live-evaluation evidence.
+evidence), and a Stage 5 re-verification run PASSED the same day with
+fresh usage evidence; OD-02 remains partially resolved pending
+console-verified no-charge limits, processing/retention terms and the
+complete frozen live-evaluation corpus comparison.
 Owner acknowledgement records evidence; it does not substitute for those checks.
 
 ## Adapter
@@ -170,3 +173,63 @@ for the policy `version` member (models emit `"version": 1`;
 default output budget raised 2000 -> 8000 because reasoning consumes
 it (one turn measured 2119 reasoning tokens); prompt v2 pins the
 evidence convention (policy documents only).
+
+## Stage 5 live re-verification (2026-10-29, OD-02)
+
+`scripts/smoke-live-planning.py` PASSED on its first attempt against
+the armed compose stack (app-a on :8080), so no second run was
+needed. Exactly one provider planning call fired this stage: the
+invalid intent returned 400 before any model contact, and status and
+guard checks are local. Synthetic inputs only; no key, prompt, or
+proof text recorded.
+
+- Status `LIVE` / `liveEnabled` / `modelConfigured`;
+  `sovra-planner-prompts/2`, `sovra-planner-tools/1`, baseline
+  `sovra-baseline-planner/1`, five discovery tools; tool-schema hash
+  matched the pinned `2cb3ae5f…dbff2`.
+- `POST /api/plans/propose` (age-over-18 intent, frozen policy
+  binding) returned a `LIVE` candidate: model
+  `meta-models/muse-spark-open-1026`, `CANDIDATE_ONLY`, 5 tool calls,
+  12671 ms latency, 10853 usage tokens, cost `unreported`.
+- The candidate carried mode `LIVE` with `liveAcceptance: true`,
+  satisfying the `PlanningService.requireLive` /
+  `PlanningEvaluator.scoreLive` gate; the committed
+  `PlanningEvaluationTests.liveShapedResultsSatisfyLiveAcceptance`
+  pins that positive path without any provider call (scoreLive
+  validates shape only, it never contacts the model).
+- `POST /api/guard/validate` returned `GUARD_ACCEPTED` under
+  `sovra-guard/1` (snapshot 1).
+- Planning backend suite: 33/33 green (Canary 3, Config 6,
+  Evaluation 5, LiveFailure 3, Mode 4, ToolBounds 12).
+
+## Spend visibility and cap/alert guidance
+
+Spend visibility is console-only: the OpenAI-compatible inference
+endpoint returns usage tokens but no cost field (every run records
+cost `unreported`), and no provider spend API was verified from this
+environment. Per-call budgets (`SOVRA_AI_MAX_TOKENS` 8000,
+`SOVRA_AI_MAX_TOOL_CALLS` 8, `SOVRA_AI_TIMEOUT` 10s,
+`SOVRA_AI_MAX_RETRIES` 1, `SOVRA_AI_MAX_PROMPT_CHARS` 8000) bound
+each request and fail closed, but no application-level cumulative
+usage ledger exists across the two app instances — per-call limits
+and alerts are not a total spend cap.
+
+Before any further live run, the owner must capture in the Baseten
+console and keep out of the repo (account screens carry
+identifiers; never commit them):
+
+1. Credit/grant balance immediately before and after the run date,
+   with the grant expiry date.
+2. Usage attributed to `meta-models/muse-spark-open-1026` on the
+   run date, reconciled against the recorded token counts above.
+3. Written confirmation of no-overage / no-auto-charge behavior for
+   the grant account (or the exact overage terms if any exist).
+4. Any available per-key or per-account spend alert / budget
+   setting, with its threshold and notification channel.
+
+Operating rule until cumulative controls land: keep
+`SOVRA_AI_LIVE_ENABLED=false` by default, arm only for a bounded
+manual session with a pre-declared call/token budget, disarm (and
+recycle) immediately after, and rotate or revoke the key when an
+evaluation window closes. Spend alerts stay supplementary
+notifications, never the cap.

@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.sovra.SovraAppRoleBase;
+import dev.sovra.guard.CandidatePlan;
+import dev.sovra.guard.EvidenceCitation;
+import dev.sovra.guard.GuardPolicies;
 import dev.sovra.guard.Recommendation;
 import dev.sovra.issuance.IssuanceFixtures;
 import dev.sovra.issuance.TrustSnapshotProvider;
@@ -154,5 +157,39 @@ class PlanningEvaluationTests extends SovraAppRoleBase {
         .isInstanceOf(InvalidPlanningException.class);
     assertThatThrownBy(() -> planning.requireLive(null))
         .isInstanceOf(InvalidPlanningException.class);
+  }
+
+  @Test
+  void liveShapedResultsSatisfyLiveAcceptance() {
+    // The evaluator live arm (scoreLive path) makes no provider call:
+    // it accepts exactly the live shape LivePlanner returns and the
+    // OD-02 smoke verifies over HTTP (mode LIVE, liveAcceptance true).
+    String toolHash = PlanningVersions.toolSchemaHash(tools.callbacks());
+    var plan =
+        new CandidatePlan(
+            "pln_live_shape_001",
+            "age_over_18",
+            IssuanceFixtures.ISSUER_ID,
+            IssuanceFixtures.ADULT_VCT,
+            List.of("adultOver18"),
+            List.of(new EvidenceCitation(GuardPolicies.POLICY_ID, GuardPolicies.SECTION_ID)),
+            GuardPolicies.POLICY_ID,
+            GuardPolicies.POLICY_VERSION,
+            Recommendation.CANDIDATE_ONLY);
+    PlanningResult live =
+        PlanningResult.live(
+            plan,
+            Recommendation.CANDIDATE_ONLY,
+            "live-shaped harness result",
+            "test-only-live-model",
+            toolHash,
+            5,
+            12671L,
+            10853L);
+
+    assertThat(live.liveAcceptance()).isTrue();
+    assertThat(live.mode()).isEqualTo(PlanningMode.LIVE);
+    assertThat(planning.requireLive(live)).isSameAs(live);
+    assertThat(evaluator.scoreLive(live)).isSameAs(live);
   }
 }
