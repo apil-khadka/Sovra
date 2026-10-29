@@ -122,16 +122,49 @@ public class IssuanceService {
         TelemetryService.Stage.ISSUANCE_ISSUE,
         Set.of(InvalidIssuanceException.class, TrustUnavailableException.class,
             IdempotencyConflictException.class, SigningRefusedException.class),
-        () -> issueInner(caller, request, idempotencyKey));
+        () -> issueInner(caller, request, idempotencyKey, null, Action.ISSUE_CREDENTIAL));
+  }
+
+  /**
+   * OpenID4VCI issuance (SOV-036). Identical gates to {@link #issue},
+   * except the holder proof is an OpenID4VCI {@code jwt} proof bound to
+   * the token's single-use {@code c_nonce} instead of the Sovra proof
+   * message. The VCI service consumes the {@code c_nonce} before
+   * delegating here; this method verifies the proof itself, so no
+   * caller can reach encoding without a valid proof.
+   *
+   * <p>{@code grantAuthority} is the authority behind the redeemed
+   * grant: {@code ISSUE_CREDENTIAL} for pre-authorized redemptions
+   * (issuer-operator authority) or {@code VCI_AUTHORIZE} for
+   * authorization-code redemptions (synthetic-AS holder authority).
+   * Anything else is rejected.
+   */
+  @Transactional
+  public String issueVci(
+      ServiceAccountPrincipal caller, IssueRequest request, String idempotencyKey,
+      String cNonce, Action grantAuthority) {
+    if (cNonce == null || cNonce.isBlank()) {
+      throw new InvalidIssuanceException("credential nonce is missing");
+    }
+    if (grantAuthority != Action.ISSUE_CREDENTIAL && grantAuthority != Action.VCI_AUTHORIZE) {
+      throw new IllegalArgumentException("vci grant authority is not issuable");
+    }
+    return telemetry.time(
+        caller.tenantId(),
+        TelemetryService.Stage.ISSUANCE_ISSUE,
+        Set.of(InvalidIssuanceException.class, TrustUnavailableException.class,
+            IdempotencyConflictException.class, SigningRefusedException.class),
+        () -> issueInner(caller, request, idempotencyKey, cNonce, grantAuthority));
   }
 
   private String issueInner(
-      ServiceAccountPrincipal caller, IssueRequest request, String idempotencyKey) {
+      ServiceAccountPrincipal caller, IssueRequest request, String idempotencyKey,
+      String vciNonce, Action authority) {
     ResourceRef resource =
         ResourceRef.tenantScoped("credential", "issuance", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.ISSUE_CREDENTIAL, resource);
+    Decision decision = authz.authorize(Optional.of(caller), authority, resource);
     if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.ISSUE_CREDENTIAL, resource, decision.reasonCode(),
+      audit.recordDenial(caller, authority, resource, decision.reasonCode(),
           decision.policyVersion());
       throw new ForbiddenException(decision.reasonCode());
     }
@@ -139,10 +172,11 @@ public class IssuanceService {
       throw new InvalidIssuanceException("idempotency key is malformed");
     }
     Instant now = clock.instant();
-    Validated validated = validate(request, idempotencyKey, now);
+    Validated validated = validate(request, idempotencyKey, now, vciNonce);
     String hash = requestHash(request, validated.holderKey());
 
-    Optional<String> replay = checkIdempotency(caller, decision, idempotencyKey, hash, now);
+    Optional<String> replay =
+        checkIdempotency(caller, decision, authority, idempotencyKey, hash, now);
     if (replay.isPresent()) {
       return replay.get();
     }
@@ -199,7 +233,7 @@ public class IssuanceService {
       } catch (java.sql.SQLException rollback) {
         throw new IllegalStateException("savepoint rollback failed", rollback);
       }
-      return checkIdempotency(caller, decision, idempotencyKey, hash, now)
+      return checkIdempotency(caller, decision, authority, idempotencyKey, hash, now)
           .orElseThrow(() -> new IllegalStateException("idempotency record vanished"));
     } catch (RuntimeException e) {
       try {
@@ -213,13 +247,14 @@ public class IssuanceService {
     } finally {
       DataSourceUtils.releaseConnection(connection, tenant.getDataSource());
     }
-    audit.record(caller, Action.ISSUE_CREDENTIAL, resource, decision, "",
+    audit.record(caller, authority, resource, decision, "",
         detail(credentialId, request, authorization.keyRef(), snapshot.version(), false));
     return response;
   }
 
   private Optional<String> checkIdempotency(
-      ServiceAccountPrincipal caller, Decision decision, String key, String hash, Instant now) {
+      ServiceAccountPrincipal caller, Decision decision, Action authority, String key, String hash,
+      Instant now) {
     List<IdempotencyRow> rows =
         tenant.query(
             "SELECT credential_id, request_hash, response_body, expires_at"
@@ -246,7 +281,7 @@ public class IssuanceService {
       throw new IdempotencyConflictException();
     }
     audit.record(
-        caller, Action.ISSUE_CREDENTIAL,
+        caller, authority,
         ResourceRef.tenantScoped("credential", row.credentialId().toString(), caller.tenantId()),
         decision, "", Map.of("credential", row.credentialId().toString(), "replay", "true"));
     return Optional.of(row.responseBody());
@@ -310,7 +345,8 @@ public class IssuanceService {
   private record IssuerAuthorization(KeyRef keyRef) {}
 
   /** Shape, allowlist, holder-key, proof-of-possession, and validity checks. */
-  private Validated validate(IssueRequest request, String idempotencyKey, Instant now) {
+  private Validated validate(
+      IssueRequest request, String idempotencyKey, Instant now, String vciNonce) {
     if (request == null
         || request.issuerId() == null || request.issuerId().isBlank()
         || request.vct() == null || request.vct().isBlank()
@@ -327,7 +363,12 @@ public class IssuanceService {
     ECPublicKey holderKey = parseHolderKey(request.holderJwk());
     String thumbprint =
         LocalDevSigner.thumbprint(holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
-    verifyProof(holderKey, request.holderProof(), proofMessage(idempotencyKey, request, thumbprint));
+    if (vciNonce != null) {
+      verifyVciProof(holderKey, request, vciNonce, now);
+    } else {
+      verifyProof(
+          holderKey, request.holderProof(), proofMessage(idempotencyKey, request, thumbprint));
+    }
     return new Validated(holderKey, thumbprint);
   }
 
@@ -385,6 +426,65 @@ public class IssuanceService {
           message.getBytes(StandardCharsets.UTF_8),
           expectedMessage.getBytes(StandardCharsets.UTF_8))) {
         throw new InvalidIssuanceException("holder proof does not match this request");
+      }
+      Signature signature = Signature.getInstance("SHA256withECDSA");
+      signature.initVerify(holderKey);
+      signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
+      byte[] der = ECDSA.transcodeSignatureToDER(Base64URL.from(parts[2]).decode());
+      if (!signature.verify(der)) {
+        throw new InvalidIssuanceException("holder proof signature is invalid");
+      }
+    } catch (InvalidIssuanceException e) {
+      throw e;
+    } catch (JacksonException e) {
+      throw new InvalidIssuanceException("holder proof is malformed");
+    } catch (Exception e) {
+      throw new InvalidIssuanceException("holder proof is invalid");
+    }
+  }
+
+  /**
+   * OpenID4VCI {@code jwt} proof (SOV-036): ES256, {@code typ}
+   * {@code openid4vci-proof+jwt}, holder key in the {@code jwk} header
+   * matching the request key, {@code aud} naming this credential
+   * issuer, and {@code nonce} equal to the token's single-use
+   * {@code c_nonce}. Freshness comes from the single-use nonce; the
+   * {@code iat} must additionally sit inside the 5-minute skew window.
+   */
+  private void verifyVciProof(
+      ECPublicKey holderKey, IssueRequest request, String cNonce, Instant now) {
+    try {
+      String[] parts = request.holderProof().split("\\.", -1);
+      if (parts.length != 3) {
+        throw new InvalidIssuanceException("holder proof is malformed");
+      }
+      JsonNode header = mapper.readTree(Base64URL.from(parts[0]).decode());
+      if (!"ES256".equals(text(header, "alg"))
+          || !"openid4vci-proof+jwt".equals(text(header, "typ"))) {
+        throw new InvalidIssuanceException("holder proof must be an ES256 VCI proof JWT");
+      }
+      JsonNode proofJwk = header.get("jwk");
+      if (proofJwk == null || !proofJwk.isObject()) {
+        throw new InvalidIssuanceException("holder proof must carry its key");
+      }
+      ECPublicKey proofKey = parseHolderKey(proofJwk);
+      if (!proofKey.getW().getAffineX().equals(holderKey.getW().getAffineX())
+          || !proofKey.getW().getAffineY().equals(holderKey.getW().getAffineY())) {
+        throw new InvalidIssuanceException("holder proof key does not match this request");
+      }
+      JsonNode body = mapper.readTree(Base64URL.from(parts[1]).decode());
+      if (!request.issuerId().equals(text(body, "aud"))) {
+        throw new InvalidIssuanceException("holder proof audience is wrong");
+      }
+      if (!MessageDigest.isEqual(
+          String.valueOf(text(body, "nonce")).getBytes(StandardCharsets.UTF_8),
+          cNonce.getBytes(StandardCharsets.UTF_8))) {
+        throw new InvalidIssuanceException("holder proof nonce is wrong");
+      }
+      JsonNode iat = body.get("iat");
+      if (iat == null || !iat.isNumber()
+          || Math.abs(now.getEpochSecond() - iat.asLong()) > 5 * 60) {
+        throw new InvalidIssuanceException("holder proof is stale");
       }
       Signature signature = Signature.getInstance("SHA256withECDSA");
       signature.initVerify(holderKey);

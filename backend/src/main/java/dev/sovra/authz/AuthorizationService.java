@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 10;
+  static final long RULES_VERSION = 11;
 
   private static final Map<Action, Set<String>> REQUIRED_ROLES =
       Map.ofEntries(
@@ -83,7 +83,17 @@ public class AuthorizationService {
           Map.entry(Action.QUARANTINE_ADMIT, Set.of("ISSUER_OPS")),
           Map.entry(
               Action.QUARANTINE_READ, Set.of("ISSUER_OPS", "AUDIT_READER", "TRUST_ADMIN")),
-          Map.entry(Action.QUARANTINE_PROMOTE, Set.of("ISSUER_OPS")));
+          Map.entry(Action.QUARANTINE_PROMOTE, Set.of("ISSUER_OPS")),
+          // OpenID4VCI (SOV-036): issuer operators publish offers; the
+          // holder's tenant agent drives the synthetic authorization
+          // server. Wallet token/credential calls carry no service
+          // account and are bound to single-use grants instead.
+          Map.entry(Action.VCI_CREATE_OFFER, Set.of("ISSUER_OPS")),
+          Map.entry(Action.VCI_AUTHORIZE, Set.of("TENANT_MEMBER")),
+          // OpenID4VP (SOV-036): the consuming relying party opens
+          // the session; the wallet response is bound to the session
+          // nonce and the verifier encryption key.
+          Map.entry(Action.VP_CREATE_REQUEST, Set.of("RP_CLIENT")));
 
   private final ServiceAccountRepository accounts;
   private final HumanMembershipRepository humans;

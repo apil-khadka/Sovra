@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.6.0
+  version: 0.7.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -13,8 +13,10 @@ info:
     of the legacy bodies; 404s stay empty in both variants. Mutation
     preconditions beyond single-shot 409s, async jobs, and cursor
     pagination beyond audit events are reserved, not implemented.
-    Authentication is a Bearer service-account token except for the three
-    public federation-metadata reads. Error bodies are minimal by design:
+    Authentication is a Bearer service-account token except for the
+    public probes, federation metadata, and OpenID4VCI/OpenID4VP
+    wallet calls (bound to single-use grants, tokens, and sessions).
+    Error bodies are minimal by design:
     404s carry empty bodies (never confirm or deny another tenant's
     objects), 403s carry only a machine-readable reason code.
 servers:
@@ -1035,6 +1037,234 @@ paths:
         '401': { description: Anonymous }
         '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
         '503': { description: No active trust snapshot governs adjudication }
+  /.well-known/openid-credential-issuer:
+    get:
+      operationId: vciIssuerMetadata
+      x-sovra-scopes: []
+      summary: >-
+        Public OpenID4VCI credential-issuer metadata (SOV-036): the G1
+        issuer identifier, token/credential/nonce endpoints, and the
+        single sovra-adult-status-1 credential configuration
+        (dc+sd-jwt, ES256, jwt proofs).
+      security: []
+      responses:
+        '200': { description: Credential-issuer metadata document }
+  /api/vci/offers:
+    post:
+      operationId: vciCreateOffer
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Publish a pre-authorized credential offer (SOV-036): stores a
+        single-use 5-minute grant and returns the credential offer plus
+        the openid-credential-offer URI for the wallet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuerId, vct]
+              properties:
+                issuerId: { type: string }
+                vct: { type: string }
+      responses:
+        '200': { description: '{credential_offer, credential_offer_uri}' }
+        '400': { description: Unknown configuration or untrusted issuer }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+  /api/vci/authorize:
+    post:
+      operationId: vciAuthorize
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Synthetic authorization server (SOV-036): the holder agent binds
+        a PKCE S256 challenge and receives a single-use 5-minute
+        authorization code for the wallet redemption.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuerId, vct, codeChallenge]
+              properties:
+                issuerId: { type: string }
+                vct: { type: string }
+                codeChallenge: { type: string, description: PKCE S256 challenge }
+      responses:
+        '200': { description: '{code, expires_in}' }
+        '400': { description: Unknown configuration, untrusted issuer, or bad challenge }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TENANT_MEMBER }
+  /api/vci/token:
+    post:
+      operationId: vciToken
+      x-sovra-scopes: []
+      summary: >-
+        Public wallet token redemption (SOV-036): exchanges a single-use
+        pre-authorized or authorization code (PKCE-verified) for a
+        5-minute bearer access token plus the first c_nonce. Unknown,
+        expired, or consumed grants answer invalid_grant without
+        distinguishing detail.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type: { type: string }
+                pre-authorized_code: { type: string }
+                code: { type: string }
+                code_verifier: { type: string }
+          application/json:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type: { type: string }
+                pre-authorized_code: { type: string }
+                code: { type: string }
+                code_verifier: { type: string }
+      responses:
+        '200': { description: '{access_token, token_type Bearer, expires_in, c_nonce}' }
+        '400': { description: '{error: invalid_grant|invalid_request|unsupported_grant_type}' }
+  /api/vci/nonce:
+    post:
+      operationId: vciNonce
+      x-sovra-scopes: []
+      summary: >-
+        Public wallet c_nonce rotation (SOV-036): mints a fresh
+        single-use holder-proof nonce for a live unspent access token.
+      security: []
+      responses:
+        '200': { description: '{c_nonce}' }
+        '400': { description: '{error: invalid_token|invalid_grant}' }
+  /api/vci/credential:
+    post:
+      operationId: vciCredential
+      x-sovra-scopes: []
+      summary: >-
+        Public wallet credential issuance (SOV-036): consumes the
+        c_nonce and issues one dc+sd-jwt credential for a jwt proof
+        bound to it, through the same trust, allowlist, key,
+        idempotency, and audit gates as native issuance.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [format, credential_configuration_id, proof]
+              properties:
+                format: { type: string, enum: [dc+sd-jwt] }
+                credential_configuration_id: { type: string }
+                proof:
+                  type: object
+                  required: [proof_type, jwt]
+                  properties:
+                    proof_type: { type: string, enum: [jwt] }
+                    jwt: { type: string }
+      responses:
+        '200': { description: '{credentials: [{credential}]}' }
+        '400':
+          description: >-
+            {error: invalid_token|invalid_proof|invalid_credential_request|
+            invalid_request}
+        '503': { description: Trust dependency unavailable }
+  /api/vp/requests:
+    post:
+      operationId: vpCreateRequest
+      x-sovra-scopes: [RP_CLIENT]
+      summary: >-
+        Open a VP session for one proof request (SOV-036): mints a
+        5-minute session nonce and returns the request_uri serving the
+        signed authorization request object (DCQL query,
+        response_mode direct_post.jwt).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proofRequestId]
+              properties:
+                proofRequestId: { type: string, format: uuid }
+      responses:
+        '200': { description: '{session_id, request_uri, expires_in}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks RP_CLIENT }
+        '404': { description: Empty; unknown proof request }
+  /api/vp/requests/{id}/object:
+    get:
+      operationId: vpRequestObject
+      x-sovra-scopes: []
+      summary: >-
+        Public signed authorization request object (SOV-036): ES256
+        request JWT with client_id, nonce, state, DCQL query, and
+        direct_post.jwt response instructions, served verbatim.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Request-object JWT (application/oauth-authz-req+jwt) }
+        '400': { description: Expired session }
+        '404': { description: Empty; unknown session }
+  /api/vp/jwks.json:
+    get:
+      operationId: vpJwks
+      x-sovra-scopes: []
+      summary: >-
+        Public verifier JWKS (SOV-036): the synthetic P-256 key for
+        request-object signatures and direct_post.jwt encryption.
+      security: []
+      responses:
+        '200': { description: '{keys: [verifier JWK]}' }
+  /api/vp/responses/{id}:
+    post:
+      operationId: vpSubmitResponse
+      x-sovra-scopes: []
+      summary: >-
+        Public wallet response submission (SOV-036): accepts the
+        JWE-encrypted direct_post.jwt response (vp_token SD-JWT plus
+        KeyBinding JWT with presentation submission and state), checks
+        transport, session, and DCQL fulfillment, then commits the
+        verification decision through the native gates. Unencrypted
+        direct_post is rejected outside loopback harness runs.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                response: { type: string, description: direct_post.jwt JWE }
+                vp_token: { type: string, description: Loopback-harness plain fallback only }
+                presentation_submission: { type: string }
+          application/json:
+            schema:
+              type: object
+              properties:
+                response: { type: string, description: direct_post.jwt JWE }
+                vp_token: { type: string, description: Loopback-harness plain fallback only }
+                presentation_submission:
+                  description: Submission object or JSON string
+      responses:
+        '200': { description: Verification decision body (ACCEPTED, REJECTED, or UNKNOWN) }
+        '400': { description: '{error: invalid_request} or invalid envelope' }
+        '404': { description: Empty; unknown session }
 components:
   securitySchemes:
     bearerAuth:

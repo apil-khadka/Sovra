@@ -1,7 +1,7 @@
 # SOV-001: proof profile decision record
 
-**Version:** 0.4 (artifact-layer qualification recorded; protocol flows and independent review pending).
-**Date:** 2026-10-28 (v0.1 through v0.4; sections 9, 10, and 11 record sequencing revisions).
+**Version:** 0.5 (protocol-layer qualification recorded against the Sovra corpus; external conformance suites and independent review pending).
+**Date:** 2026-10-29 (v0.1 through v0.5; sections 9, 10, 11, and 12 record sequencing revisions).
 **Task:** [SOV-001](https://github.com/apil-khadka/Sovra/issues/5)
 (freeze proof profile, issuer assurance, freshness and session semantics).
 **Owner decision:** full interoperable profile now; the narrow-attestation
@@ -139,7 +139,7 @@ constitutes an interoperability certification.
 ## 8. Approval
 
 - [ ] Independent review under SOV-037 before real-data provisioning/processing; synthetic work may proceed against the selected contracts without claiming interoperability qualification.
-- [ ] Library conditions 1-4 evidenced in SOV-004/SOV-036 (v0.4: conditions 1 and 4 pass; 2 and 3 pass at the SD-JWT VC artifact layer only — see section 11).
+- [ ] Library conditions 1-4 evidenced in SOV-004/SOV-036 (v0.5: conditions 1 and 4 pass; 2 and 3 pass at the artifact layer plus the Sovra protocol corpus — external conformance suites still not run, see section 12).
 - [ ] Record revision on any profile, algorithm, library, or value change.
 
 ## 9. G1 issuance implementation note (v0.2 revision)
@@ -255,3 +255,130 @@ profile that actually evaluated it:
    OpenID conformance suites run once flows 1-2 exist.
 4. Independent review (SOV-037) stays the gate before real-data
    provisioning/processing.
+
+## 12. SOV-036 protocol-layer qualification (v0.5 revision)
+
+SOV-036 now qualifies the G1 OpenID4VCI / OpenID4VP protocol layer
+against Sovra's own corpus: an independent Nimbus-only wallet,
+third-party issuer fixtures, DCQL matching, and VCI/VP adversarial
+suites. Section 11.4 items 1-3 are implemented at this level;
+nothing here claims external conformance-suite certification,
+production wallet interop, or independent review — those remain
+open with the owners named below. Full evidence is recorded in the
+[protocol assessment](../../engineering/sov-036-protocol-assessment.md).
+
+### 12.1 Condition verdicts
+
+| Condition (section 3) | Verdict | Evidence |
+| --- | --- | --- |
+| 1. Artifact registry | Pass (unchanged) | Same pinned v1.2.0 coordinates and releases-only policy as 11.1; no new dependencies. |
+| 2. Conformance + adversarial corpus | Partial: artifact layer + Sovra protocol corpus | 68 protocol tests green (see 12.3): VCI pre-authorized/authorization-code flows, `direct_post.jwt` with pinned ECDH-ES+A256KW/A256GCM transport, `kb+jwt` binding, DCQL fulfillment, replay/expiry/downgrade/foreign-issuer negatives. The applicable OpenID conformance suites are still not run: they need networked registered deployments outside this environment. No production-wallet interop is claimed. |
+| 3. License / transitive / support review | Partial: exercised path only | Exercised protocol path adds no new dependency: Sovra-owned transports over Nimbus JOSE 10.3 (the section 3 substrate) plus the qualified walt-id SD-JWT classes (`SDJwt`, `KeyBindingJwt`). The pinned `waltid-openid4vci-jvm` issuer-side endpoint handlers and `waltid-openid4vp-verifier-jvm` verifier2 session machinery remain unexercised (see 12.2); their Community-edition API coverage is still unconfirmed. |
+| 4. Java 25 packaged behavior | Pass | Full backend suite 460/460 green on Java 25; the two-instance packaged e2e suites pass in both profiles (see 12.3). |
+
+Strong digest pinning beyond repository checksums is still open
+(recorded in 11.1, unchanged).
+
+### 12.2 Adapters, seams, and the session-handler decision
+
+- `VciService` / `VciController` implement the G1 OpenID4VCI
+  subset: issuer metadata, operator-published `pre-authorized_code`
+  offers, a synthetic authorization server (`authorization_code`
+  with PKCE S256), token redemption, `c_nonce` rotation, and the
+  credential endpoint delegating to `IssuanceService.issueVci` —
+  identical trust, allowlist, key, idempotency, and audit gates
+  as native issuance. Codes, tokens, and nonces are 256-bit
+  CSPRNG values stored as hashes, 5-minute single-use
+  (`V16__openid.sql`, `V17__openid_resolvers.sql`).
+- `VpService` / `VpController` implement the G1 OpenID4VP subset:
+  RP-opened sessions serving signed request objects (ES256,
+  DCQL query, `response_mode=direct_post.jwt`), JWE-encrypted
+  responses to the verifier key, submission-shape and DCQL
+  fulfillment checks, then delegation to `VerificationService`
+  — identical consent, freshness, trust, replay, and audit
+  gates as native verification. Plain `direct_post` is
+  rejected outside loopback harness runs.
+- `KeyBindingVerifier` verifies RFC 9901 section 8 KeyBinding
+  JWTs through the qualified walt-id `KeyBindingJwt` interface
+  against the `cnf` holder key, with Sovra-owned header pins
+  (`alg` ES256, `typ` `kb+jwt`), the section 4 freshness
+  window, and a JDK-recomputed `sd_hash`. The `sdjwt-vc`
+  profile binds with `kb+jwt`; the `synthetic` profile keeps
+  the Sovra proof message.
+- `Dcql` builds the verifier query and matches format, `vct`
+  allowlist, and disclosed claim paths/values for the G1
+  single-credential profile; multi-credential shapes are
+  rejected, not partially evaluated.
+- `OpenIdKeys` holds the synthetic P-256 verifier key (scalar
+  2, memory-only, same two-flag arming as the issuance
+  scalar 1) for request-object signing and response
+  decryption, served publicly as JWKS.
+- Session-handler decision (recorded, not silent): walt-id
+  1.2.0 ships issuer-side VCI endpoint handlers and VP
+  verifier2 session machinery, but they carry their own
+  session/token stores, coroutine runtime shape, and crypto
+  providers that would bypass Sovra's control plane
+  (authorization decisions, trust snapshots, audit events,
+  idempotency records, RLS tenancy, the constrained signer).
+  Adopting them is re-triage work under SOV-037, not a
+  drop-in swap: the G1 transports stay Sovra-owned over the
+  section 3 Nimbus substrate, with format and binding
+  verification through the qualified walt-id SD-JWT
+  interfaces. The pinned VCI/VP modules remain dependencies
+  so the selection stays convertible.
+
+### 12.3 Validation evidence
+
+- `VciFlowTests` (10): metadata, both grants, single-use
+  `c_nonce` proofs, nonce rotation after failed proof,
+  VCI-to-ACCEPTED consent circle, RBAC.
+- `VciConformanceTests` (14): grant confusion, expiry,
+  audience/key/alg proof forgeries, replay, unknown
+  configuration/format/proof-type, batch rejection, token
+  abuse, wallet-call audit.
+- `VpFlowTests` (10): signed request objects verified
+  against the JWKS, encrypted-response acceptance,
+  byte-identical replay, wrong-nonce binding rejection,
+  pending-consent rejection, plain-post/JWE-tamper/state/
+  expiry rejections, RBAC.
+- `VpConformanceTests` (12): wrong-key/truncated/downgraded
+  JWEs, missing binding, wrong-type/tampered-hash/
+  audience-confused bindings, cross-session replay,
+  submission mismatch, foreign-issuer and tampered-
+  disclosure presentations.
+- `KeyBindingTests` (6), `DcqlTests` (11),
+  `OpenIdKeysTests` (3), `ThirdPartyFixturesTests` (2):
+  independent-wallet binding qualification, DCQL unit
+  coverage, verifier-key round trip, checked-in third-party
+  issuer key pinned to the minting key.
+- `WaltIdVerificationParityTests` (10) and
+  `WaltProfileIssuanceTests` (4) now drive KeyBinding
+  proofs in the `sdjwt-vc` profile.
+- `scripts/e2e-verification.py`: PASS in both profiles
+  (two instances, real PostgreSQL, concurrency, negative
+  matrix, restart and DB-restart recovery); the script
+  builds profile-matching bindings (Sovra message under
+  `synthetic`, `kb+jwt` under `sdjwt-vc`).
+- Full backend suite: 460/460 green on Java 25.
+- Implemented contract 0.7.0
+  (`docs/engineering/implemented-api.openapi.yaml`).
+
+### 12.4 Remaining deviations from section 1 (recorded, not silent)
+
+1. External OpenID conformance suites are not run
+   (networked registered deployments; infeasible in this
+   environment). Interop is evidenced by the independent
+   Nimbus wallet, third-party fixtures, and the Sovra
+   adversarial corpus only.
+2. Walt-id VCI issuer-side endpoint handlers and VP
+   verifier2 session machinery are pinned but unexercised;
+   adopting them (or re-confirming the Sovra-owned
+   transports) is SOV-037 re-triage input.
+3. Strong artifact-digest pinning beyond repository
+   checksums is still open (from 11.1).
+4. `invalid_token` at the credential endpoint answers
+   HTTP 400 with the OAuth2 error shape (uniform with the
+   other wallet errors) rather than HTTP 401; recorded G1
+   simplification.
+5. Independent review (SOV-037) stays the gate before
+   real-data provisioning/processing.

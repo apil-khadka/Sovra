@@ -12,10 +12,12 @@ cross-tenant reads). Always tears the stack down, even on failure.
 
 Canonical shapes are read from server code, never guessed:
   consent: ConsentService.consentMessage / ConsentFixtures.consentMessage
-  binding: VerificationService.presentationMessage
+  binding: VerificationService.presentationMessage (synthetic profile) or
+    RFC 9901 section 8 KeyBinding JWT over the stored artifact bytes
+    (sdjwt-vc profile, via KeyBindingVerifier)
   plan hash: PlanGuard.canonicalHash (sovra-plan/v1, trailing newline)
   thumbprint: RFC 7638 P-256 (LocalDevSigner.thumbprint)
-All proofs are compact ES256 JWS (header {"alg":"ES256"}, raw R||S).
+All proofs are compact ES256 JWS (raw R||S).
 
 Requires: docker compose, psql inside the db container, and the python
 `cryptography` package. Prints no secrets; exits nonzero on any failure.
@@ -191,12 +193,40 @@ def thumbprint(jwk: dict[str, str]) -> str:
 
 
 def sign_compact(private: ec.EllipticCurvePrivateKey, message: str) -> str:
-    signing_input = (b64u_encode(b'{"alg":"ES256"}') + "."
-                     + b64u_encode(message.encode("utf-8")))
+    return sign_compact_with_header(private, '{"alg":"ES256"}', message)
+
+
+def sign_compact_with_header(private: ec.EllipticCurvePrivateKey,
+                             header: str, payload: str) -> str:
+    signing_input = (b64u_encode(header.encode("utf-8")) + "."
+                     + b64u_encode(payload.encode("utf-8")))
     der = private.sign(signing_input.encode("ascii"), ec.ECDSA(hashes.SHA256()))
     r, s = decode_dss_signature(der)
     return signing_input + "." + b64u_encode(
         r.to_bytes(32, "big") + s.to_bytes(32, "big"))
+
+
+def key_binding(private: ec.EllipticCurvePrivateKey, audience: str,
+                nonce: str, artifact: str) -> str:
+    # RFC 9901 section 8 KeyBinding JWT: sd_hash binds the exact
+    # presented bytes (here the full-disclosure stored artifact).
+    sd_hash = b64u_encode(hashlib.sha256(artifact.encode("ascii")).digest())
+    payload = json.dumps({
+        "aud": audience,
+        "nonce": nonce,
+        "sd_hash": sd_hash,
+        "iat": int(datetime.now(timezone.utc).timestamp()),
+    }, separators=(",", ":"))
+    return sign_compact_with_header(
+        private, '{"alg":"ES256","typ":"kb+jwt"}', payload)
+
+
+def stored_artifact(credential_id: str) -> str:
+    row = psql("SELECT artifact FROM credential_artifact "
+               f"WHERE id = '{credential_id}';").splitlines()
+    if not row or not row[0]:
+        fail("stored artifact missing for issued credential")
+    return row[0].strip()
 
 
 def verify_compact(compact: str, jwk: dict[str, str]) -> str:
@@ -332,6 +362,16 @@ def binding_message(request_id: str, nonce: str, audience: str, thumb: str) -> s
     ])
 
 
+def binding_proof(private: ec.EllipticCurvePrivateKey, request_id: str,
+                  nonce: str, audience: str, thumb: str, artifact: str) -> str:
+    # Profile-dependent holder binding, mirroring VerificationService:
+    # the synthetic profile takes the Sovra proof message, the
+    # interoperable profile takes a KeyBinding JWT.
+    if ACTIVE_PROFILE == "sdjwt-vc":
+        return key_binding(private, audience, nonce, artifact)
+    return sign_compact(private, binding_message(request_id, nonce, audience, thumb))
+
+
 def verify(auth: dict[str, str], base: str, request_id: str, nonce: str,
            audience: str, jwk: dict, proof: str) -> tuple[int, bytes]:
     body = json.dumps({
@@ -366,6 +406,7 @@ def main() -> int:
         private, jwk = holder_key()
         thumb = thumbprint(jwk)
         credential_id = issue_credential(auth, jwk, private, thumb)
+        artifact = stored_artifact(credential_id)
         print(f"E2E verification: credential issued ({credential_id[:8]}...)",
               flush=True)
 
@@ -404,8 +445,7 @@ def main() -> int:
         print("E2E verification: approved, presentation verifies", flush=True)
 
         nonce = secrets.token_urlsafe(16)
-        binding = sign_compact(
-            private, binding_message(request_id, nonce, AUDIENCE, thumb))
+        binding = binding_proof(private, request_id, nonce, AUDIENCE, thumb, artifact)
         status, first = verify(auth, BASE_A, request_id, nonce, AUDIENCE,
                                jwk, binding)
         if status != 200:
@@ -455,9 +495,8 @@ def main() -> int:
         nonce_evil = secrets.token_urlsafe(16)
         status, raw = verify(auth, BASE_A, request_id, nonce_evil,
                              "https://evil.example/callback", jwk,
-                             sign_compact(private, binding_message(
-                                 request_id, nonce_evil,
-                                 "https://evil.example/callback", thumb)))
+                             binding_proof(private, request_id, nonce_evil,
+                                           "https://evil.example/callback", thumb, artifact))
         # Note: mismatched audience must not accept (400 malformed or REJECTED).
         if status == 200 and json.loads(raw).get("outcome") == "ACCEPTED":
             fail("wrong-audience proof was accepted")
@@ -469,8 +508,8 @@ def main() -> int:
         nonce2 = secrets.token_urlsafe(16)
         status, raw = verify(auth, BASE_A, pending["requestId"], nonce2,
                              AUDIENCE, jwk,
-                             sign_compact(private, binding_message(
-                                 pending["requestId"], nonce2, AUDIENCE, thumb)))
+                             binding_proof(private, pending["requestId"], nonce2,
+                                           AUDIENCE, thumb, artifact))
         if status != 200 or json.loads(raw).get("outcome") != "REJECTED":
             fail(f"unapproved request returned {status}/{raw[:120]!r}")
         denied_req = create_request(auth, credential_id)
@@ -485,9 +524,8 @@ def main() -> int:
         nonce3 = secrets.token_urlsafe(16)
         status, raw = verify(auth, BASE_A, denied_req["requestId"], nonce3,
                              AUDIENCE, jwk,
-                             sign_compact(private, binding_message(
-                                 denied_req["requestId"], nonce3, AUDIENCE,
-                                 thumb)))
+                             binding_proof(private, denied_req["requestId"], nonce3,
+                                           AUDIENCE, thumb, artifact))
         if status != 200 or json.loads(raw).get("outcome") != "REJECTED":
             fail(f"denied request returned {status}/{raw[:120]!r}")
         status, _ = verify(auth, BASE_A, request_id, nonce,
@@ -504,8 +542,8 @@ def main() -> int:
             fail(f"revoke returned {status}")
         nonce4 = secrets.token_urlsafe(16)
         status, raw = verify(auth, BASE_A, request_id, nonce4, AUDIENCE, jwk,
-                             sign_compact(private, binding_message(
-                                 request_id, nonce4, AUDIENCE, thumb)))
+                             binding_proof(private, request_id, nonce4,
+                                           AUDIENCE, thumb, artifact))
         if status != 200 or json.loads(raw).get("outcome") != "REJECTED":
             fail(f"revoked credential returned {status}/{raw[:120]!r}")
         print("E2E verification: revoked credential rejects on fresh nonce",

@@ -83,8 +83,9 @@ class WaltProfileIssuanceTests extends SovraAppRoleBase {
     VerificationFixtures.Stage stage =
         VerificationFixtures.approvedStage(client, owner, mapper, "wprof-e2e");
     Map<String, Object> decided = VerificationFixtures.verify(client, stage.rp(),
-        VerificationFixtures.verifyBody(stage.holder(), stage.requestId(),
-            VerificationFixtures.nonce(), ConsentFixtures.AUDIENCE, mapper));
+        dev.sovra.openid.OpenIdFixtures.kbVerifyBody(owner, stage.holder(),
+            stage.credentialId(), stage.requestId(), VerificationFixtures.nonce(),
+            ConsentFixtures.AUDIENCE, mapper));
     assertThat(decided.get("outcome")).isEqualTo("ACCEPTED");
     assertThat(decided.get("reasonCode")).isEqualTo("OK");
     assertThat(decided.get("profile")).isEqualTo(VerificationService.SDJWT_VC_PROFILE);
@@ -109,8 +110,9 @@ class WaltProfileIssuanceTests extends SovraAppRoleBase {
         stored.substring(0, dot + 4) + replacement + stored.substring(dot + 5),
         UUID.fromString(stage.credentialId()));
     Map<String, Object> decided = VerificationFixtures.verify(client, stage.rp(),
-        VerificationFixtures.verifyBody(stage.holder(), stage.requestId(),
-            VerificationFixtures.nonce(), ConsentFixtures.AUDIENCE, mapper));
+        dev.sovra.openid.OpenIdFixtures.kbVerifyBody(owner, stage.holder(),
+            stage.credentialId(), stage.requestId(), VerificationFixtures.nonce(),
+            ConsentFixtures.AUDIENCE, mapper));
     assertThat(decided.get("outcome")).isEqualTo("REJECTED");
     assertThat(decided.get("reasonCode")).isEqualTo("ARTIFACT_SIGNATURE_INVALID");
   }

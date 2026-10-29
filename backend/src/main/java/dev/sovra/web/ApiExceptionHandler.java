@@ -85,10 +85,21 @@ public class ApiExceptionHandler {
     IssuerKeyNotFoundException.class,
     dev.sovra.auth.ServiceAccountService.ServiceAccountNotFoundException.class,
     dev.sovra.vault.VaultNotFoundException.class,
-    dev.sovra.quarantine.QuarantineNotFoundException.class
+    dev.sovra.quarantine.QuarantineNotFoundException.class,
+    dev.sovra.openid.OpenIdNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+  }
+
+  @ExceptionHandler(dev.sovra.openid.OpenIdProtocolException.class)
+  public ResponseEntity<Object> openIdProtocol(
+      dev.sovra.openid.OpenIdProtocolException e, HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.BAD_REQUEST, e.error(), false);
+    }
+    // OAuth2 error shape: registered code only, no oracle detail.
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.error()));
   }
 
   @ExceptionHandler(ForbiddenException.class)
@@ -106,6 +117,7 @@ public class ApiExceptionHandler {
     InvalidConsentException.class,
     InvalidVerificationException.class,
     InvalidPlanningException.class,
+    dev.sovra.openid.InvalidOpenIdRequestException.class,
     dev.sovra.auth.ServiceAccountService.InvalidServiceAccountException.class,
     AuditCursorException.class,
     GuardRejectedException.class,

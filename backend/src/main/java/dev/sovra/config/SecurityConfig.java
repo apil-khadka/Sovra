@@ -144,6 +144,24 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/issuance/jwks.json")
                     .permitAll()
+                    // OpenID4VCI/OpenID4VP wallet calls (SOV-036): public
+                    // metadata and grant/token/nonce/response endpoints.
+                    // The services bind every call to its single-use
+                    // grant, token, or session; no service account is
+                    // involved on these paths.
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/.well-known/openid-credential-issuer",
+                        "/api/vp/jwks.json",
+                        "/api/vp/requests/*/object")
+                    .permitAll()
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/vci/token",
+                        "/api/vci/nonce",
+                        "/api/vci/credential",
+                        "/api/vp/responses/*")
+                    .permitAll()
                     // Container error dispatches must not be re-authenticated:
                     // without this, framework 400s surface as 401s.
                     .requestMatchers("/error")

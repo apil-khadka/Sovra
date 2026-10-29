@@ -1058,13 +1058,14 @@ Required closure evidence:
 Owner role: Credential interoperability.
 Gate: G1; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: SD-JWT artifact adapters and both-profile HTTP tests exist; kb+jwt, VCI/VP/DCQL/encrypted response flows, independent conformance and digest pinning remain.
+Remaining/evidence scope: SD-JWT artifact adapters, kb+jwt binding, VCI/VP/DCQL/encrypted-response flows, and the independent-wallet adversarial corpus exist with both-profile HTTP evidence; external conformance suites, walt-id session-handler adoption, strong digest pinning, and SOV-037 review remain. Keep issue 40 open.
 Dependencies: SOV-001, SOV-003, SOV-004, SOV-009, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/40).
 Requirements: FR-14, FR-15, DR-02, DR-16, SR-03, NFR-12.
 Validation: SEC-04, SEC-05, SEC-06, SEC-30.
 Open decisions: OD-01.
 Evidence reference: `docs/architecture/decisions/SOV-001-proof-profile.md`.
+Evidence reference: `docs/engineering/sov-036-protocol-assessment.md`.
 
 Acceptance criteria:
 

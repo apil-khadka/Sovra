@@ -127,8 +127,9 @@ class WaltIdVerificationParityTests extends SovraAppRoleBase {
       submission = new VerificationService.VerifyRequest(
           UUID.fromString(stage.requestId()), nonce, ConsentFixtures.AUDIENCE,
           stage.holder().jwk(),
-          VerificationFixtures.bindingProof(
-              stage.holder(), stage.requestId(), nonce, ConsentFixtures.AUDIENCE, mapper));
+          dev.sovra.openid.OpenIdFixtures.kbProof(
+              owner, stage.holder(), stage.credentialId(), nonce, ConsentFixtures.AUDIENCE,
+              mapper));
     } catch (Exception e) {
       throw new IllegalStateException(e);
     }
@@ -280,8 +281,9 @@ class WaltIdVerificationParityTests extends SovraAppRoleBase {
     VerificationService.VerifyRequest submission = new VerificationService.VerifyRequest(
         UUID.fromString(stage.requestId()), nonce, ConsentFixtures.AUDIENCE,
         stage.holder().jwk(),
-        VerificationFixtures.bindingProof(
-            stage.holder(), stage.requestId(), nonce, ConsentFixtures.AUDIENCE, mapper));
+        dev.sovra.openid.OpenIdFixtures.kbProof(
+            owner, stage.holder(), stage.credentialId(), nonce, ConsentFixtures.AUDIENCE,
+            mapper));
     String first = verifyWaltSubmission(stage, submission);
     assertThat(mapper.readTree(first).get("outcome").asString()).isEqualTo("ACCEPTED");
     assertThat(verifyWaltSubmission(stage, submission)).isEqualTo(first);
@@ -308,14 +310,16 @@ class WaltIdVerificationParityTests extends SovraAppRoleBase {
         new JdbcTemplate(new TenantDataSource(dataSource)), clock, mapper, telemetry,
         "sdjwt-vc", new SovraMode("demo"));
     ServiceAccountPrincipal principal = IssuanceFixtures.asPrincipal(stage.rp());
-    // Binding proof signed over a different nonce: consent and
+    // KeyBinding JWT bound to a different nonce: consent and
     // verification must disagree loudly.
     String nonce = VerificationFixtures.nonce();
     JsonNode holderJwk = stage.holder().jwk();
     String wrongBinding;
     try {
-      wrongBinding = VerificationFixtures.bindingProof(stage.holder(), stage.requestId(),
-          VerificationFixtures.nonce(), ConsentFixtures.AUDIENCE, mapper);
+      wrongBinding =
+          dev.sovra.openid.OpenIdFixtures.kbProof(
+              owner, stage.holder(), stage.credentialId(), VerificationFixtures.nonce(),
+              ConsentFixtures.AUDIENCE, mapper);
     } catch (Exception e) {
       throw new IllegalStateException(e);
     }

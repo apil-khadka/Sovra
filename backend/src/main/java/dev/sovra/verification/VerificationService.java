@@ -62,9 +62,11 @@ import tools.jackson.databind.ObjectMapper;
  * an outcome.
  *
  * <p>Two artifact profiles behind {@code sovra.profile}: {@code synthetic}
- * (default, labelled G1 JWT) and {@code sdjwt-vc} (walt-id SD-JWT VC,
- * qualified under SOV-036). OpenID4VCI/OpenID4VP protocol flows stay
- * out of scope until SOV-041 full-profile evidence lands.
+ * (default, labelled G1 JWT, Sovra proof message) and {@code sdjwt-vc}
+ * (walt-id SD-JWT VC bound with KeyBinding JWT, qualified under
+ * SOV-036). The OpenID4VCI/OpenID4VP transports live in
+ * {@code dev.sovra.openid} and delegate decisions here, so every
+ * protocol presentation passes these same gates.
  */
 @Service
 public class VerificationService {
@@ -405,12 +407,22 @@ public class VerificationService {
           statusVersion);
     }
     try {
-      HolderProofs.verifyEs256(
-          holderKey,
-          request.bindingProof(),
-          presentationMessage(
-              request.requestId(), request.nonce(), request.audience(), thumbprint),
-          mapper);
+      if ("sdjwt-vc".equals(profile)) {
+        // SOV-036: the interoperable profile binds with KeyBinding JWT
+        // (RFC 9901 section 8) over the stored full-disclosure
+        // presentation — the consented claim set is the whole claim
+        // set at G1 — instead of the Sovra proof message.
+        dev.sovra.openid.KeyBindingVerifier.verify(
+            request.bindingProof(), holderKey, request.audience(), request.nonce(),
+            credential.artifact(), clock);
+      } else {
+        HolderProofs.verifyEs256(
+            holderKey,
+            request.bindingProof(),
+            presentationMessage(
+                request.requestId(), request.nonce(), request.audience(), thumbprint),
+            mapper);
+      }
     } catch (HolderProofException e) {
       return new Evaluated(OUTCOME_REJECTED, "BINDING_INVALID", snapshot.version(), keyRef,
           statusVersion);

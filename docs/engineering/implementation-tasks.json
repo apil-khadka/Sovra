@@ -2175,10 +2175,11 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/40",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "SD-JWT artifact adapters and both-profile HTTP tests exist; kb+jwt, VCI/VP/DCQL/encrypted response flows, independent conformance and digest pinning remain.",
+      "implementation_observation": "SD-JWT artifact adapters, kb+jwt binding, VCI/VP/DCQL/encrypted-response flows, and the independent-wallet adversarial corpus exist with both-profile HTTP evidence; external conformance suites, walt-id session-handler adoption, strong digest pinning, and SOV-037 review remain. Keep issue 40 open.",
       "progress_reviewed_on": "2026-10-29",
       "progress_evidence": [
-        "docs/architecture/decisions/SOV-001-proof-profile.md"
+        "docs/architecture/decisions/SOV-001-proof-profile.md",
+        "docs/engineering/sov-036-protocol-assessment.md"
       ]
     },
     {

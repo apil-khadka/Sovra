@@ -48,7 +48,7 @@ public class LocalDevSigner implements IssuerSigner {
 
   private static final Logger log = LoggerFactory.getLogger(LocalDevSigner.class);
 
-  static final String ISSUER_ID = "https://sovra.example/issuers/synth-1";
+  public static final String ISSUER_ID = "https://sovra.example/issuers/synth-1";
   static final String KEY_ID = "synth-1";
   static final int KEY_VERSION = 1;
   static final String CURVE = "P-256";
