@@ -2507,11 +2507,12 @@
         "AC-08"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Both artifact-profile HTTP E2E suites exist, and the packaged same-origin SPA/BFF delivery is implemented with HTTP evidence; no real DOM/JS holder/browser automation or full external selected-profile flow evidence. Keep issue 45 open.",
+      "implementation_observation": "Both artifact-profile HTTP E2E suites exist, the packaged same-origin SPA/BFF delivery is implemented with HTTP evidence, and a pinned Playwright/Chromium suite proves DOM/JS login, holder consent, and verification with a CI job; full external selected-profile flow evidence remains. Keep issue 45 open.",
       "progress_reviewed_on": "2026-10-29",
       "progress_evidence": [
         "docs/engineering/sov-041-holder-browser-assessment.md",
         "docs/engineering/sov-041-same-origin-packaging.md",
+        "docs/engineering/sov-041-browser-e2e.md",
         "scripts/e2e-verification.py",
         "scripts/e2e-bff-login.py"
       ]

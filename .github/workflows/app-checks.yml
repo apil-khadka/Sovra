@@ -58,3 +58,37 @@ jobs:
         run: pnpm --dir frontend run build
       - name: Lint
         run: pnpm --dir frontend run lint
+
+  browser-e2e:
+    name: Real-browser login/consent/verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --dir frontend exec playwright install --with-deps chromium
+      - name: Start disposable compose stack
+        run: docker compose up --build -d
+      - name: Run browser suite
+        run: pnpm --dir frontend run test:e2e
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs app-a keycloak db-seed
+      - name: Tear down disposable stack
+        if: always()
+        run: docker compose down -v

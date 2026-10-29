@@ -9,6 +9,7 @@ pnpm install
 pnpm run build    # typecheck + production bundle (packaged into the backend image)
 pnpm run dev      # :5173, proxies /api /oauth2 /login to :8080 for local iteration
 pnpm run lint
+pnpm run test:e2e # real-browser login/consent/verification against compose (needs the stack up)
 ```
 
 The packaged demo serves this bundle from the backend origin
@@ -16,6 +17,34 @@ itself (`http://localhost:8080` via `docker compose up --build`):
 SPA, BFF session, authorization callback, and logout share one
 origin, and the `:5173` dev server is never part of the login
 loop. See `docs/engineering/sov-041-same-origin-packaging.md`.
+
+## Real-browser E2E (SOV-041)
+
+Playwright + Chromium specs live in `e2e/` with shared setup in
+`e2e/sovra.ts` and `playwright.config.ts` at this directory root.
+One-time browser install:
+
+```sh
+pnpm exec playwright install chromium
+```
+
+Then, from the repository root with the compose stack up:
+
+```sh
+docker compose up --build -d
+pnpm --dir frontend run test:e2e
+```
+
+The suite drives DOM/JS login through Keycloak, holder consent
+review/approval/refusal, and verification through the packaged
+`:8080` origin; issuer/RP setup calls use a disposable machine
+account minted by global setup. Overrides: `SOVRA_BROWSER_BASE`
+(default `http://localhost:8080`), `SOVRA_E2E_DB_CONTAINER`
+(default `sovra-db-1`), `SOVRA_DB_ADMIN_PASSWORD`,
+`SOVRA_PROFILE` (asserts the matching decision profile label).
+CI runs the same command in the `browser-e2e` job against a
+disposable stack. Scope and observed behavior are recorded in
+`docs/engineering/sov-041-browser-e2e.md`.
 
 Keep `pnpm-lock.yaml` pinned; it is the reproducible dependency record.
 

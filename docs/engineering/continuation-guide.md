@@ -145,7 +145,7 @@ Use `scripts/e2e-issuance.py`, `scripts/e2e-verification.py`, `scripts/e2e-bff-l
 Several scripts rebuild/restart services, and `e2e-verification.py` ends with `docker compose down -v`; never point them at a shared or valuable database.
 Qualify an isolated Compose project plus supported container/origin overrides before running suites beside an existing demo stack; do not assume every script supports the same overrides.
 Repeat verification in both artifact profiles after protocol/security changes and retain the result profile labels.
-The future real-browser command and CI evidence must be added when that harness exists, not invented in advance.
+The real-browser harness exists since 2026-10-29: run `pnpm --dir frontend run test:e2e` with the compose stack up (one-time `pnpm --dir frontend exec playwright install chromium`); CI evidence comes from the `browser-e2e` job in `.github/workflows/app-checks.yml`. Scope and observed behavior are recorded in [sov-041-browser-e2e.md](sov-041-browser-e2e.md).
 `scripts/smoke-live-planning.py` is an explicitly credit-consuming procedure and is excluded from the offline/default CI list.
 
 ## Instruction for the next implementation agent
