@@ -1,0 +1,38 @@
+# Public-demo deployment profile (SOV-027). Layered over compose.yaml; it is
+# NOT the local dev default. Usage:
+#
+#   docker compose -f compose.yaml -f compose.public-demo.yaml up --build
+#
+# Boundary enforced by this profile:
+# - SOVRA_DEMO_SYNTHETIC_ONLY=true on both app instances: vault
+#   object/version stores and quarantine admissions reject
+#   caller-supplied bytes (403 demo_synthetic_only), even from
+#   authenticated privileged callers. The demo serves server-seeded
+#   synthetic fixtures only; visitor uploads are impossible.
+# - SOVRA_AI_LIVE_ENABLED=false on both instances regardless of the
+#   shell/.env: public traffic can never reach the metered provider.
+#   Fixture planning answers; live stays a controlled local procedure.
+#
+# Still operator-owned before any public URL (see
+# docs/engineering/sov-027-public-demo-assessment.md): approved HTTPS
+# origin with exact Keycloak redirect/logout URIs, rotated deployment
+# credentials (no dev-default passwords), private database/Keycloak
+# admin/worker interfaces, restricted demo accounts, and a
+# rollback/stop procedure. No host is provisioned by this file.
+
+services:
+  app-a:
+    environment:
+      SOVRA_DEMO_SYNTHETIC_ONLY: 'true'
+      SOVRA_AI_LIVE_ENABLED: 'false'
+      SOVRA_AI_BASE_URL: ''
+      SOVRA_AI_MODEL: ''
+      SOVRA_AI_API_KEY: ''
+
+  app-b:
+    environment:
+      SOVRA_DEMO_SYNTHETIC_ONLY: 'true'
+      SOVRA_AI_LIVE_ENABLED: 'false'
+      SOVRA_AI_BASE_URL: ''
+      SOVRA_AI_MODEL: ''
+      SOVRA_AI_API_KEY: ''

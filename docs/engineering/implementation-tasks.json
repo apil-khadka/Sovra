@@ -1521,9 +1521,9 @@
         "AC-14"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Local Compose includes migrations and worker isolation; same-origin public profile, TLS, private admin, runtime privilege and actual host qualification remain.",
+      "implementation_observation": "Local Compose includes migrations and worker isolation; synthetic-only demo admission (403 demo_synthetic_only on vault/quarantine ingestion) plus compose.public-demo.yaml profile with hard live-planner disarm added 2026-10-29. TLS, private admin, runtime privilege, credential rotation and actual host qualification remain.",
       "progress_reviewed_on": "2026-10-29",
-      "progress_evidence": []
+      "progress_evidence": ["docs/engineering/sov-027-public-demo-assessment.md"]
     },
     {
       "id": "SOV-028",

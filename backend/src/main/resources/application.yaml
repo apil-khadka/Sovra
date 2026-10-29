@@ -80,6 +80,13 @@ sovra:
   # (refuses synthetic issuers, keys, profiles, and seed config on
   # every path; SOV-040). Unknown values fail boot.
   mode: ${SOVRA_MODE:demo}
+  # SOV-027 public-demo admission: true rejects caller-supplied
+  # vault/quarantine bytes on every externally reachable path
+  # (403 demo_synthetic_only). Local/dev default false so
+  # synthetic API tests can seal; the public-demo deployment
+  # profile sets SOVRA_DEMO_SYNTHETIC_ONLY=true.
+  demo:
+    synthetic-only: ${SOVRA_DEMO_SYNTHETIC_ONLY:false}
   synthetic-issuers:
     enabled: ${SOVRA_SYNTHETIC_ISSUERS_ENABLED:false}
     acknowledge-non-production: ${SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION:false}

@@ -2,6 +2,7 @@ package dev.sovra.quarantine;
 
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ReasonCode;
+import dev.sovra.config.DemoProperties;
 import dev.sovra.quarantine.QuarantineService.AdmissionView;
 import dev.sovra.quarantine.QuarantineService.Admitted;
 import dev.sovra.quarantine.QuarantineService.Promoted;
@@ -33,9 +34,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class QuarantineController {
 
   private final QuarantineService quarantine;
+  private final DemoProperties demo;
 
-  public QuarantineController(QuarantineService quarantine) {
+  public QuarantineController(QuarantineService quarantine, DemoProperties demo) {
     this.quarantine = quarantine;
+    this.demo = demo;
   }
 
   public record AdmitRequest(
@@ -52,6 +55,9 @@ public class QuarantineController {
   public ResponseEntity<Map<String, Object>> admit(@Valid @RequestBody AdmitRequest request) {
     var caller =
         CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+    if (demo.syntheticOnly()) {
+      throw new ForbiddenException(ReasonCode.DEMO_SYNTHETIC_ONLY);
+    }
     Admitted admitted = quarantine.admit(
         caller, decode(request.contentBase64()), request.claimedType(), request.issuerId());
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(

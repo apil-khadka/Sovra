@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.7.0
+  version: 0.8.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -247,7 +247,7 @@ paths:
         '201': { description: '{objectId, version 1}' }
         '400': { description: Malformed shape, bounds, or digest mismatch }
         '401': { description: Anonymous }
-        '403': { description: Lacks ISSUER_OPS }
+        '403': { description: Lacks ISSUER_OPS, or caller uploads disabled under synthetic-only demo (demo_synthetic_only) }
         '503': { description: Wrapping backend unavailable (kms_unavailable) }
   /api/vault/objects/{id}/versions:
     post:
@@ -278,7 +278,7 @@ paths:
         '201': { description: '{objectId, version}' }
         '400': { description: Malformed shape, bounds, or digest mismatch }
         '401': { description: Anonymous }
-        '403': { description: Lacks ISSUER_OPS }
+        '403': { description: Lacks ISSUER_OPS, or caller uploads disabled under synthetic-only demo (demo_synthetic_only) }
         '404': { description: Unknown or other-tenant object (empty body) }
         '503': { description: Wrapping backend unavailable (kms_unavailable) }
   /api/vault/objects/{id}:
@@ -440,7 +440,7 @@ paths:
         '202': { description: '{admissionId, objectId, status QUARANTINED, actualType, sizeBytes}' }
         '400': { description: Malformed shape, bounds, or non-allowlisted magic }
         '401': { description: Anonymous }
-        '403': { description: Lacks ISSUER_OPS }
+        '403': { description: Lacks ISSUER_OPS, or caller uploads disabled under synthetic-only demo (demo_synthetic_only) }
         '503': { description: Wrapping backend unavailable (kms_unavailable) }
   /api/quarantine/admissions/{id}:
     get:
