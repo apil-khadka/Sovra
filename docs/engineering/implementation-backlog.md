@@ -1,7 +1,7 @@
 # Implementation backlog
 
 **Baseline:** business SRS v0.6, 2026-10-28.
-**State:** partial synthetic implementations exist; acceptance and release evidence require maintainer triage.
+**State:** 2026-10-29 source/evidence audit recorded; issue triage and full acceptance remain separate.
 
 This backlog contains 41 tasks for the Java/Spring business application, issuer-local identity/documents, protocol qualification, SDKs, dashboards, deployed security and independent release evidence.
 The [SRS](../requirements/software-requirements-specification.md) defines requirements and the [implementation plan](implementation-plan.md) defines delivery gates.
@@ -48,51 +48,55 @@ Do not attach identity data, credentials, secrets or private research to public 
 G2 completion alone does not authorize real-data collection, signing, decryption or customer operation.
 All selected-profile, authority, locality, consent and replay requirements remain applicable across rollback and recovery.
 
+Read the [current continuation guide](continuation-guide.md) for the implementation inventory, exact next steps, no-credit verification and public-demo blockers.
+Implementation progress below is source/evidence scope, not a maintainer status or completed security gate.
+All 41 remote issues were observed open during this audit.
+
 ## Task index
 
-| ID | Task | Gate | Proposed priority | Dependencies | Tracker |
+| ID | Task | Phase | Progress | Dependencies | Tracker |
 | --- | --- | --- | --- | --- | --- |
-| [SOV-001](#sov-001) | Freeze proof profile, issuer assurance, freshness and session semantics | G0 | p0 | None | [Issue](https://github.com/apil-khadka/Sovra/issues/5) |
-| [SOV-002](#sov-002) | Approve issuer locality, lifecycle, custody and root trust boundaries | G0 | p0 | None | [Issue](https://github.com/apil-khadka/Sovra/issues/6) |
-| [SOV-003](#sov-003) | Bootstrap Java 25 and Spring workspace with integration harness | G1 | p0 | None | [Issue](https://github.com/apil-khadka/Sovra/issues/7) |
-| [SOV-004](#sov-004) | Select identity and key providers with revocation and cache contracts | G0 | p0 | SOV-001, SOV-002 | [Issue](https://github.com/apil-khadka/Sovra/issues/8) |
-| [SOV-005](#sov-005) | Implement tenant, issuer, RP and object authorization | G1 | p0 | SOV-002, SOV-003, SOV-004 | [Issue](https://github.com/apil-khadka/Sovra/issues/9) |
-| [SOV-006](#sov-006) | Implement privileged access and application credential lifecycle | G2 | p0 | SOV-004, SOV-005 | [Issue](https://github.com/apil-khadka/Sovra/issues/10) |
-| [SOV-007](#sov-007) | Implement durable privacy-minimized audit and decision evidence | G1 | p0 | SOV-002, SOV-003, SOV-004, SOV-005 | [Issue](https://github.com/apil-khadka/Sovra/issues/11) |
-| [SOV-008](#sov-008) | Implement versioned trust registry and approved RP policies | G1 | p0 | SOV-001, SOV-003, SOV-005, SOV-007 | [Issue](https://github.com/apil-khadka/Sovra/issues/12) |
-| [SOV-009](#sov-009) | Implement issuer-scoped issuance and constrained signing | G1 | p0 | SOV-001, SOV-003, SOV-004, SOV-005, SOV-007, SOV-008 | [Issue](https://github.com/apil-khadka/Sovra/issues/13) |
-| [SOV-010](#sov-010) | Implement consent-bound proof requests and minimal holder flow | G1 | p0 | SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/14) |
-| [SOV-011](#sov-011) | Implement durable multi-instance verification and replay-safe acceptance | G1 | p0 | SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-009, SOV-010, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/15) |
-| [SOV-012](#sov-012) | Implement freshness, revocation and key-compromise lifecycle | G1 | p0 | SOV-001, SOV-004, SOV-007, SOV-008, SOV-009, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/16) |
-| [SOV-013](#sov-013) | Integrate live Meta planning through bounded Spring AI tools | G1 | p1 | SOV-003, SOV-005, SOV-008, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/18) |
-| [SOV-014](#sov-014) | Port deterministic plan guard and citation validation | G1 | p0 | SOV-001, SOV-003, SOV-008 | [Issue](https://github.com/apil-khadka/Sovra/issues/19) |
-| [SOV-015](#sov-015) | Finalize business APIs and compatibility contracts | G1 | p1 | SOV-001, SOV-002, SOV-003, SOV-004 | [Issue](https://github.com/apil-khadka/Sovra/issues/17) |
-| [SOV-016](#sov-016) | Implement encrypted local vault and purpose-bound document access | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-005, SOV-007, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/20) |
-| [SOV-017](#sov-017) | Implement encrypted quarantine and isolated hostile-image admission | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-016, SOV-027 | [Issue](https://github.com/apil-khadka/Sovra/issues/22) |
-| [SOV-018](#sov-018) | Implement local extraction, protected digests and provenance revisions | G2 | p1 | SOV-002, SOV-003, SOV-015, SOV-016, SOV-017 | [Issue](https://github.com/apil-khadka/Sovra/issues/23) |
-| [SOV-019](#sov-019) | Implement enrollment review, corrections and claim eligibility | G2 | p0 | SOV-001, SOV-002, SOV-005, SOV-007, SOV-008, SOV-015, SOV-018, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/24) |
-| [SOV-020](#sov-020) | Implement holder credential custody and secure recovery | G2 | p0 | SOV-001, SOV-002, SOV-004, SOV-005, SOV-006, SOV-010, SOV-012, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/25) |
-| [SOV-021](#sov-021) | Ship tested Java and TypeScript SDKs | G3 | p1 | SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/26) |
-| [SOV-022](#sov-022) | Build developer portal, sandbox and integration onboarding | G3 | p1 | SOV-005, SOV-006, SOV-015, SOV-021 | [Issue](https://github.com/apil-khadka/Sovra/issues/27) |
-| [SOV-023](#sov-023) | Build issuer information-management dashboard | G3 | p1 | SOV-005, SOV-006, SOV-007, SOV-012, SOV-015, SOV-016, SOV-019 | [Issue](https://github.com/apil-khadka/Sovra/issues/28) |
-| [SOV-024](#sov-024) | Build holder enrollment, consent and credential dashboard | G3 | p1 | SOV-005, SOV-010, SOV-015, SOV-019, SOV-020 | [Issue](https://github.com/apil-khadka/Sovra/issues/29) |
-| [SOV-025](#sov-025) | Build RP and organization integration dashboard | G3 | p1 | SOV-005, SOV-006, SOV-015, SOV-021, SOV-022 | [Issue](https://github.com/apil-khadka/Sovra/issues/30) |
-| [SOV-026](#sov-026) | Build governed federation and security operations dashboard | G3 | p1 | SOV-005, SOV-006, SOV-007, SOV-008, SOV-015, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/32) |
-| [SOV-027](#sov-027) | Implement approved issuer-local deployment and isolation | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-037, SOV-039 | [Issue](https://github.com/apil-khadka/Sovra/issues/21) |
-| [SOV-028](#sov-028) | Implement supply-chain provenance and artifact admission | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-027 | [Issue](https://github.com/apil-khadka/Sovra/issues/33) |
-| [SOV-029](#sov-029) | Implement semantic health, safe telemetry and security alerts | G1 | p0 | SOV-003, SOV-005, SOV-007, SOV-008, SOV-011, SOV-012 | [Issue](https://github.com/apil-khadka/Sovra/issues/31) |
-| [SOV-030](#sov-030) | Approve and enforce service, resource and recovery budgets | G2 | p0 | SOV-002, SOV-003, SOV-004, SOV-015, SOV-027, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/34) |
-| [SOV-031](#sov-031) | Implement replay-safe recovery, key-copy containment and rollback | G2 | p0 | SOV-007, SOV-008, SOV-009, SOV-011, SOV-012, SOV-016, SOV-020, SOV-027, SOV-029, SOV-030 | [Issue](https://github.com/apil-khadka/Sovra/issues/35) |
-| [SOV-032](#sov-032) | Complete SEC suite and ASVS applicability evidence | G3 | p0 | SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-036, SOV-038, SOV-040, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/36) |
-| [SOV-033](#sov-033) | Execute mission-critical attack, load, failover and rollback exercises | G3 | p0 | SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-032 | [Issue](https://github.com/apil-khadka/Sovra/issues/37) |
-| [SOV-034](#sov-034) | Obtain independent review and production release decision | G3 | p0 | SOV-032, SOV-033, SOV-035, SOV-036, SOV-037, SOV-038, SOV-039, SOV-040, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/39) |
-| [SOV-035](#sov-035) | Prove clean-checkout Java synthetic cross-issuer vertical slice | G1 | p0 | SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029, SOV-036, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/38) |
-| [SOV-036](#sov-036) | Qualify selected SD-JWT VC and OpenID libraries and profile adapters | G1 | p0 | SOV-001, SOV-003, SOV-004, SOV-009, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/40) |
-| [SOV-037](#sov-037) | Obtain independent G0 architecture, privacy and custody assessment | G0 | p0 | SOV-001, SOV-002, SOV-004, SOV-039 | [Issue](https://github.com/apil-khadka/Sovra/issues/42) |
-| [SOV-038](#sov-038) | Implement attested HSM authorization and confidential input gateways | G2 | p0 | SOV-004, SOV-006, SOV-016, SOV-027, SOV-028, SOV-040 | [Issue](https://github.com/apil-khadka/Sovra/issues/44) |
-| [SOV-039](#sov-039) | Approve the first issuer jurisdiction and complete provider capability matrix | G0 | p0 | SOV-002, SOV-004 | [Issue](https://github.com/apil-khadka/Sovra/issues/41) |
-| [SOV-040](#sov-040) | Harden issuer bindings, immutable approval identity and sealed trust snapshots | G1 | p0 | SOV-004, SOV-005, SOV-008, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/43) |
-| [SOV-041](#sov-041) | Add packaged two-instance consent-to-verification end-to-end suite | G1 | p0 | SOV-010, SOV-011, SOV-012, SOV-015, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/45) |
+| [SOV-001](#sov-001) | Freeze proof profile, issuer assurance, freshness and session semantics | G0 | partial | None | [Issue](https://github.com/apil-khadka/Sovra/issues/5) |
+| [SOV-002](#sov-002) | Approve issuer locality, lifecycle, custody and root trust boundaries | G0 | partial | None | [Issue](https://github.com/apil-khadka/Sovra/issues/6) |
+| [SOV-003](#sov-003) | Bootstrap Java 25 and Spring workspace with integration harness | G1 | demo_implemented | None | [Issue](https://github.com/apil-khadka/Sovra/issues/7) |
+| [SOV-004](#sov-004) | Select identity and key providers with revocation and cache contracts | G0 | partial | SOV-001, SOV-002 | [Issue](https://github.com/apil-khadka/Sovra/issues/8) |
+| [SOV-005](#sov-005) | Implement tenant, issuer, RP and object authorization | G1 | partial | SOV-002, SOV-003, SOV-004 | [Issue](https://github.com/apil-khadka/Sovra/issues/9) |
+| [SOV-006](#sov-006) | Implement privileged access and application credential lifecycle | G2 | partial | SOV-004, SOV-005 | [Issue](https://github.com/apil-khadka/Sovra/issues/10) |
+| [SOV-007](#sov-007) | Implement durable privacy-minimized audit and decision evidence | G1 | partial | SOV-002, SOV-003, SOV-004, SOV-005 | [Issue](https://github.com/apil-khadka/Sovra/issues/11) |
+| [SOV-008](#sov-008) | Implement versioned trust registry and approved RP policies | G1 | partial | SOV-001, SOV-003, SOV-005, SOV-007 | [Issue](https://github.com/apil-khadka/Sovra/issues/12) |
+| [SOV-009](#sov-009) | Implement issuer-scoped issuance and constrained signing | G1 | partial | SOV-001, SOV-003, SOV-004, SOV-005, SOV-007, SOV-008 | [Issue](https://github.com/apil-khadka/Sovra/issues/13) |
+| [SOV-010](#sov-010) | Implement consent-bound proof requests and minimal holder flow | G1 | partial | SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/14) |
+| [SOV-011](#sov-011) | Implement durable multi-instance verification and replay-safe acceptance | G1 | partial | SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-009, SOV-010, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/15) |
+| [SOV-012](#sov-012) | Implement freshness, revocation and key-compromise lifecycle | G1 | partial | SOV-001, SOV-004, SOV-007, SOV-008, SOV-009, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/16) |
+| [SOV-013](#sov-013) | Integrate live Meta planning through bounded Spring AI tools | G1 | partial | SOV-003, SOV-005, SOV-008, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/18) |
+| [SOV-014](#sov-014) | Port deterministic plan guard and citation validation | G1 | demo_implemented | SOV-001, SOV-003, SOV-008 | [Issue](https://github.com/apil-khadka/Sovra/issues/19) |
+| [SOV-015](#sov-015) | Finalize business APIs and compatibility contracts | G1 | partial | SOV-001, SOV-002, SOV-003, SOV-004 | [Issue](https://github.com/apil-khadka/Sovra/issues/17) |
+| [SOV-016](#sov-016) | Implement encrypted local vault and purpose-bound document access | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-005, SOV-007, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/20) |
+| [SOV-017](#sov-017) | Implement encrypted quarantine and isolated hostile-image admission | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-016, SOV-027 | [Issue](https://github.com/apil-khadka/Sovra/issues/22) |
+| [SOV-018](#sov-018) | Implement local extraction, protected digests and provenance revisions | G2 | not_started | SOV-002, SOV-003, SOV-015, SOV-016, SOV-017 | [Issue](https://github.com/apil-khadka/Sovra/issues/23) |
+| [SOV-019](#sov-019) | Implement enrollment review, corrections and claim eligibility | G2 | not_started | SOV-001, SOV-002, SOV-005, SOV-007, SOV-008, SOV-015, SOV-018, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/24) |
+| [SOV-020](#sov-020) | Implement holder credential custody and secure recovery | G2 | not_started | SOV-001, SOV-002, SOV-004, SOV-005, SOV-006, SOV-010, SOV-012, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/25) |
+| [SOV-021](#sov-021) | Ship tested Java and TypeScript SDKs | G3 | not_started | SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/26) |
+| [SOV-022](#sov-022) | Build developer portal, sandbox and integration onboarding | G3 | not_started | SOV-005, SOV-006, SOV-015, SOV-021 | [Issue](https://github.com/apil-khadka/Sovra/issues/27) |
+| [SOV-023](#sov-023) | Build issuer information-management dashboard | G3 | not_started | SOV-005, SOV-006, SOV-007, SOV-012, SOV-015, SOV-016, SOV-019 | [Issue](https://github.com/apil-khadka/Sovra/issues/28) |
+| [SOV-024](#sov-024) | Build holder enrollment, consent and credential dashboard | G3 | partial | SOV-005, SOV-010, SOV-015, SOV-019, SOV-020 | [Issue](https://github.com/apil-khadka/Sovra/issues/29) |
+| [SOV-025](#sov-025) | Build RP and organization integration dashboard | G3 | not_started | SOV-005, SOV-006, SOV-015, SOV-021, SOV-022 | [Issue](https://github.com/apil-khadka/Sovra/issues/30) |
+| [SOV-026](#sov-026) | Build governed federation and security operations dashboard | G3 | not_started | SOV-005, SOV-006, SOV-007, SOV-008, SOV-015, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/32) |
+| [SOV-027](#sov-027) | Implement approved issuer-local deployment and isolation | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-037, SOV-039 | [Issue](https://github.com/apil-khadka/Sovra/issues/21) |
+| [SOV-028](#sov-028) | Implement supply-chain provenance and artifact admission | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-027 | [Issue](https://github.com/apil-khadka/Sovra/issues/33) |
+| [SOV-029](#sov-029) | Implement semantic health, safe telemetry and security alerts | G1 | demo_implemented | SOV-003, SOV-005, SOV-007, SOV-008, SOV-011, SOV-012 | [Issue](https://github.com/apil-khadka/Sovra/issues/31) |
+| [SOV-030](#sov-030) | Approve and enforce service, resource and recovery budgets | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-015, SOV-027, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/34) |
+| [SOV-031](#sov-031) | Implement replay-safe recovery, key-copy containment and rollback | G2 | partial | SOV-007, SOV-008, SOV-009, SOV-011, SOV-012, SOV-016, SOV-020, SOV-027, SOV-029, SOV-030 | [Issue](https://github.com/apil-khadka/Sovra/issues/35) |
+| [SOV-032](#sov-032) | Complete SEC suite and ASVS applicability evidence | G3 | partial | SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-036, SOV-038, SOV-040, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/36) |
+| [SOV-033](#sov-033) | Execute mission-critical attack, load, failover and rollback exercises | G3 | deferred_production | SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-032 | [Issue](https://github.com/apil-khadka/Sovra/issues/37) |
+| [SOV-034](#sov-034) | Obtain independent review and production release decision | G3 | deferred_production | SOV-032, SOV-033, SOV-035, SOV-036, SOV-037, SOV-038, SOV-039, SOV-040, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/39) |
+| [SOV-035](#sov-035) | Prove clean-checkout Java synthetic cross-issuer vertical slice | G1 | partial | SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029, SOV-036, SOV-041 | [Issue](https://github.com/apil-khadka/Sovra/issues/38) |
+| [SOV-036](#sov-036) | Qualify selected SD-JWT VC and OpenID libraries and profile adapters | G1 | partial | SOV-001, SOV-003, SOV-004, SOV-009, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/40) |
+| [SOV-037](#sov-037) | Obtain independent G0 architecture, privacy and custody assessment | G0 | deferred_production | SOV-001, SOV-002, SOV-004, SOV-039 | [Issue](https://github.com/apil-khadka/Sovra/issues/42) |
+| [SOV-038](#sov-038) | Implement attested HSM authorization and confidential input gateways | G2 | deferred_production | SOV-004, SOV-006, SOV-016, SOV-027, SOV-028, SOV-040 | [Issue](https://github.com/apil-khadka/Sovra/issues/44) |
+| [SOV-039](#sov-039) | Approve the first issuer jurisdiction and complete provider capability matrix | G0 | deferred_production | SOV-002, SOV-004 | [Issue](https://github.com/apil-khadka/Sovra/issues/41) |
+| [SOV-040](#sov-040) | Harden issuer bindings, immutable approval identity and sealed trust snapshots | G1 | partial | SOV-004, SOV-005, SOV-008, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/43) |
+| [SOV-041](#sov-041) | Add packaged two-instance consent-to-verification end-to-end suite | G1 | partial | SOV-010, SOV-011, SOV-012, SOV-015, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/45) |
 
 ## Acceptance and evidence
 
@@ -101,12 +105,15 @@ All selected-profile, authority, locality, consent and replay requirements remai
 **Freeze proof profile, issuer assurance, freshness and session semantics**
 
 Owner role: Architecture and security.
-Gate: G0; proposed priority: p0; state: needs-triage.
+Gate: G0; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: SOV-001 v0.4 records artifact-layer qualification; VCI/VP, kb+jwt, independent interoperability and strong digest pinning remain.
 Dependencies: None.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/5).
 Requirements: FR-02, FR-08, FR-14, FR-17, FR-18, FR-21, FR-22, DR-05, DR-16, SR-03, SR-06, INV-03, INV-04, INV-06, INV-08.
 Validation: SEC-04, SEC-05, SEC-06, SEC-07, SEC-10, SEC-11, SEC-12, SEC-30.
-Open decisions to resolve or implement: OD-01, OD-03, OD-06, OD-14.
+Open decisions: OD-01, OD-03, OD-06, OD-14.
+Evidence reference: `docs/architecture/decisions/SOV-001-proof-profile.md`.
 
 Acceptance criteria:
 
@@ -125,12 +132,14 @@ Required closure evidence:
 **Approve issuer locality, lifecycle, custody and root trust boundaries**
 
 Owner role: Architecture, issuer authority and privacy.
-Gate: G0; proposed priority: p0; state: needs-triage.
+Gate: G0; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Locality/custody reference recorded; actual issuer locations, legal retention and independent custody approval remain.
 Dependencies: None.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/6).
 Requirements: DR-01, DR-04, DR-09, DR-10, DR-11, DR-15, DR-16, SR-24, SR-25, SR-33, INV-11, NFR-12.
 Validation: SEC-20, SEC-27, SEC-38, SEC-40, SEC-44, MC-05, MC-06.
-Open decisions to resolve or implement: OD-07, OD-08, OD-09, OD-15, OD-17.
+Open decisions: OD-07, OD-08, OD-09, OD-15, OD-17.
 
 Acceptance criteria:
 
@@ -149,12 +158,13 @@ Required closure evidence:
 **Bootstrap Java 25 and Spring workspace with integration harness**
 
 Owner role: Backend and build engineering.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: demo_implemented (reviewed 2026-10-29).
+Remaining/evidence scope: Java/React build, real PostgreSQL harness, container and CI foundations exist; no production acceptance inferred.
 Dependencies: None.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/7).
 Requirements: NFR-06, NFR-07, NFR-08, SR-14.
 Validation: SEC-29.
-Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
@@ -173,12 +183,14 @@ Required closure evidence:
 **Select identity and key providers with revocation and cache contracts**
 
 Owner role: Security, identity and key operations.
-Gate: G0; proposed priority: p0; state: needs-triage.
+Gate: G0; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Keycloak and deferred cloud reference chosen; synthetic continuation does not require a provider re-pick. Production qualification remains.
 Dependencies: SOV-001, SOV-002.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/8).
 Requirements: IF-05, SR-02, SR-13, SR-19, SR-20, SR-21, SR-26, SR-27, SR-29, DR-12, DR-17.
 Validation: SEC-14, SEC-26, SEC-33, SEC-34, SEC-35, MC-01, MC-04, MC-06, MC-09, MC-10.
-Open decisions to resolve or implement: OD-10, OD-13, OD-18.
+Open decisions: OD-10, OD-13, OD-18.
 
 Acceptance criteria:
 
@@ -200,12 +212,13 @@ Required closure evidence:
 **Implement tenant, issuer, RP and object authorization**
 
 Owner role: Backend security.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Role/resource authorization and tenant guards exist; deployment-specific issuer/legal authority and production assessment remain.
 Dependencies: SOV-002, SOV-003, SOV-004.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/9).
 Requirements: FR-01, FR-16, FR-24, DR-06, IF-02, IF-06, SR-01, SR-15, SR-27, SR-34, SR-35.
 Validation: SEC-01, SEC-02, SEC-03, SEC-25, SEC-26, SEC-31, MC-01, MC-06.
-Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
@@ -226,13 +239,17 @@ Required closure evidence:
 **Implement privileged access and application credential lifecycle**
 
 Owner role: Identity and security.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Keycloak OIDC/BFF and service-account lifecycle exist; browser-origin packaging, hardware/recovery/elevation and full privileged acceptance remain.
 Dependencies: SOV-004, SOV-005.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/10).
 Requirements: FR-26, FR-28, FR-47, SR-02, SR-26, SR-27, SR-29, SR-34, SR-35.
 Validation: SEC-01, SEC-26, SEC-32, SEC-43, MC-01, MC-09.
 SRS acceptance: AC-16.
-Open decisions to resolve or implement: OD-10, OD-18.
+Open decisions: OD-10, OD-18.
+Evidence reference: `backend/src/main/java/dev/sovra/bff`.
+Evidence reference: `scripts/e2e-bff-login.py`.
 
 Acceptance criteria:
 
@@ -256,13 +273,14 @@ Required closure evidence:
 **Implement durable privacy-minimized audit and decision evidence**
 
 Owner role: Backend and security operations.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Transactional audit and integrity/denial tests exist for demo; independent production integrity authority and lifecycle evidence remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/11).
 Requirements: FR-27, DR-08, SR-12, SR-16, INV-02.
 Validation: SEC-20, SEC-28, MC-06, MC-08.
-Open decisions to resolve or implement: OD-07, OD-11.
-Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
+Open decisions: OD-07, OD-11.
 
 Acceptance criteria:
 
@@ -281,12 +299,13 @@ Required closure evidence:
 **Implement versioned trust registry and approved RP policies**
 
 Owner role: Trust and policy backend.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Versioned/sealed trust and policy workflows exist; person-verified human quorum and actual accreditation remain.
 Dependencies: SOV-001, SOV-003, SOV-005, SOV-007.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/12).
 Requirements: FR-03, FR-13, FR-17, FR-18, FR-25, FR-32, DR-05, SR-05, SR-06, INV-03, INV-05, INV-06, SR-35.
 Validation: SEC-11, SEC-12, SEC-13.
-Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
@@ -306,12 +325,13 @@ Required closure evidence:
 **Implement issuer-scoped issuance and constrained signing**
 
 Owner role: Credential backend and key operations.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Constrained synthetic and SD-JWT artifact issuance exists; VCI flows, approved enrollment provenance and real KMS remain.
 Dependencies: SOV-001, SOV-003, SOV-004, SOV-005, SOV-007, SOV-008.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/13).
 Requirements: FR-02, FR-23, DR-05, DR-09, IF-05, SR-03, SR-13, SR-27, INV-03, INV-08, SR-35.
 Validation: SEC-04, SEC-05, SEC-06, SEC-14, SEC-26, MC-06.
-Source observation: Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review.
 
 Acceptance criteria:
 
@@ -331,7 +351,9 @@ Required closure evidence:
 **Implement consent-bound proof requests and minimal holder flow**
 
 Owner role: Verifier backend and holder frontend.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Consent APIs, BFF holder paths and React consent view exist; packaged browser and external wallet/profile evidence remain.
 Dependencies: SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/14).
 Requirements: FR-07, FR-20, FR-21, DR-02, SR-05, UX-01, UX-02, UX-03, UX-04, INV-05.
@@ -354,13 +376,15 @@ Required closure evidence:
 **Implement durable multi-instance verification and replay-safe acceptance**
 
 Owner role: Verifier backend.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Durable verification, atomic replay and HTTP race/restart evidence exist; complete selected protocol/browser acceptance remains.
 Dependencies: SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-009, SOV-010, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/15).
 Requirements: FR-08, FR-19, FR-21, FR-22, FR-31, SR-04, SR-05, SR-06, INV-01, INV-02, INV-05, INV-07, INV-08.
 Validation: SEC-04, SEC-07, SEC-08, SEC-09, SEC-10, SEC-11, SEC-12, SEC-13.
 SRS acceptance: AC-02, AC-03, AC-06.
-Open decisions to resolve or implement: OD-06.
+Open decisions: OD-06.
 
 Acceptance criteria:
 
@@ -380,7 +404,9 @@ Required closure evidence:
 **Implement freshness, revocation and key-compromise lifecycle**
 
 Owner role: Credential backend and security operations.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Synthetic revocation/freshness and filtered serving JWKS exist; production status privacy, lifecycle and compromise drills remain.
 Dependencies: SOV-001, SOV-004, SOV-007, SOV-008, SOV-009, SOV-011.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/16).
 Requirements: FR-18, FR-23, FR-30, DR-05, DR-17, SR-06, SR-13, SR-29, INV-04, INV-06.
@@ -403,13 +429,17 @@ Required closure evidence:
 **Integrate live Meta planning through bounded Spring AI tools**
 
 Owner role: AI integration.
-Gate: G1; proposed priority: p1; state: needs-triage.
+Gate: G1; proposed priority: p1; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Fixture/live adapters and a dated successful Baseten smoke exist; latest changes are uncommitted. Hard no-charge limit, retention and full live evaluation remain.
 Dependencies: SOV-003, SOV-005, SOV-008, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/18).
 Requirements: FR-04, FR-05, FR-06, FR-11, FR-12, FR-29, DR-03, IF-04, IF-07, SR-07, SR-08, SR-09, NFR-03, NFR-10.
 Validation: SEC-15, SEC-16, SEC-17, SEC-18, SEC-19, SEC-20, SEC-22.
 SRS acceptance: AC-05, AC-06, AC-07.
-Open decisions to resolve or implement: OD-02.
+Open decisions: OD-02.
+Evidence reference: `docs/ai/live-integration.md`.
+Evidence reference: `scripts/smoke-live-planning.py`.
 
 Acceptance criteria:
 
@@ -428,7 +458,9 @@ Required closure evidence:
 **Port deterministic plan guard and citation validation**
 
 Owner role: Policy backend.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: demo_implemented (reviewed 2026-10-29).
+Remaining/evidence scope: Deterministic guard, policy/citation validation and planner baseline/evaluation code exist; retain exact corpus evidence at release.
 Dependencies: SOV-001, SOV-003, SOV-008.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/19).
 Requirements: FR-05, FR-06, FR-09, FR-10, FR-11, FR-25, FR-32, DR-02, DR-03, SR-05, SR-07, SR-08, NFR-06, NFR-10.
@@ -452,12 +484,14 @@ Required closure evidence:
 **Finalize business APIs and compatibility contracts**
 
 Owner role: API architecture.
-Gate: G1; proposed priority: p1; state: needs-triage.
+Gate: G1; proposed priority: p1; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Implemented API 0.6.0 and contract tests cover current routes; remaining product APIs, compatibility and profile contracts remain.
 Dependencies: SOV-001, SOV-002, SOV-003, SOV-004.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/17).
 Requirements: IF-01, IF-02, IF-03, IF-07, IF-09, IF-10, IF-11, IF-12, NFR-09.
 Validation: SEC-17, SEC-19, SEC-21, SEC-29, SEC-42, SEC-43.
-Open decisions to resolve or implement: OD-16.
+Open decisions: OD-16.
 
 Acceptance criteria:
 
@@ -476,13 +510,16 @@ Required closure evidence:
 **Implement encrypted local vault and purpose-bound document access**
 
 Owner role: Document backend and key operations.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Software-key vault/grants and HTTP evidence exist; KMS/attestation, key retirement/rewrap, purge and BFF viewing remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-007, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/20).
 Requirements: FR-35, FR-40, DR-09, DR-12, DR-17, SR-19, SR-20, SR-21, SR-29, INV-10, INV-11.
 Validation: SEC-33, SEC-34, SEC-35, SEC-44, MC-04, MC-09, MC-10.
 SRS acceptance: AC-09, AC-12, AC-16.
-Open decisions to resolve or implement: OD-13, OD-18.
+Open decisions: OD-13, OD-18.
+Evidence reference: `docs/engineering/sov-016-vault-assessment.md`.
 
 Acceptance criteria:
 
@@ -502,13 +539,16 @@ Required closure evidence:
 **Implement encrypted quarantine and isolated hostile-image admission**
 
 Owner role: Document processing and platform security.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Isolated PNG/JPEG quarantine worker and HTTP evidence exist; deeper scanning/review, production custody and worker operations remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-016, SOV-027.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/22).
 Requirements: SR-22, SR-23, SR-30, SR-33, NFR-03, NFR-14, INV-09, INV-11.
 Validation: SEC-21, SEC-22, SEC-36, SEC-40, MC-02, MC-05, MC-06.
 SRS acceptance: AC-10, AC-12.
-Open decisions to resolve or implement: OD-13, OD-17.
+Open decisions: OD-13, OD-17.
+Evidence reference: `docs/engineering/sov-017-quarantine-assessment.md`.
 
 Acceptance criteria:
 
@@ -527,13 +567,15 @@ Required closure evidence:
 **Implement local extraction, protected digests and provenance revisions**
 
 Owner role: Document and data engineering.
-Gate: G2; proposed priority: p1; state: needs-triage.
+Gate: G2; proposed priority: p1; triage: needs-triage.
+Progress: not_started (reviewed 2026-10-29).
+Remaining/evidence scope: No OCR/extraction/normalization/provenance revision module found; start synthetic implementation after demo launch foundations.
 Dependencies: SOV-002, SOV-003, SOV-015, SOV-016, SOV-017.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/23).
 Requirements: FR-36, FR-38, DR-11, DR-13, DR-14, DR-15, SR-23, SR-24, INV-09, INV-10.
 Validation: SEC-36, SEC-37, SEC-38, SEC-39, SEC-40.
 SRS acceptance: AC-10, AC-11, AC-12.
-Open decisions to resolve or implement: OD-15.
+Open decisions: OD-15.
 
 Acceptance criteria:
 
@@ -552,13 +594,15 @@ Required closure evidence:
 **Implement enrollment review, corrections and claim eligibility**
 
 Owner role: Issuer enrollment backend.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: not_started (reviewed 2026-10-29).
+Remaining/evidence scope: No enrollment/source-review/correction/claim-eligibility workflow found; build on extraction and vault with explicit maker/checker rules.
 Dependencies: SOV-001, SOV-002, SOV-005, SOV-007, SOV-008, SOV-015, SOV-018, SOV-009.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/24).
 Requirements: FR-33, FR-34, FR-37, FR-38, FR-39, FR-31, DR-14, DR-16, UX-06, INV-09, INV-10.
 Validation: SEC-37, SEC-39, SEC-43.
 SRS acceptance: AC-10, AC-11.
-Open decisions to resolve or implement: OD-14.
+Open decisions: OD-14.
 
 Acceptance criteria:
 
@@ -578,13 +622,15 @@ Required closure evidence:
 **Implement holder credential custody and secure recovery**
 
 Owner role: Holder security.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: not_started (reviewed 2026-10-29).
+Remaining/evidence scope: Demo holder proof helpers do not implement device custody, encrypted backup recovery or loss/theft/reissuance.
 Dependencies: SOV-001, SOV-002, SOV-004, SOV-005, SOV-006, SOV-010, SOV-012, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/25).
 Requirements: FR-14, FR-20, DR-10, DR-16, SR-02, SR-11, UX-05.
 Validation: SEC-07, SEC-13, SEC-14, SEC-24, SEC-32, MC-01, MC-09.
 SRS acceptance: AC-14, AC-16.
-Open decisions to resolve or implement: OD-09, OD-12.
+Open decisions: OD-09, OD-12.
 
 Acceptance criteria:
 
@@ -604,13 +650,15 @@ Required closure evidence:
 **Ship tested Java and TypeScript SDKs**
 
 Owner role: SDK engineering.
-Gate: G3; proposed priority: p1; state: needs-triage.
+Gate: G3; proposed priority: p1; triage: needs-triage.
+Progress: not_started (reviewed 2026-10-29).
+Remaining/evidence scope: No released Java/TypeScript SDK or SDK consumer tests found; frontend fetch helpers are not SDK releases.
 Dependencies: SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/26).
 Requirements: FR-46, IF-13, NFR-09, NFR-13.
 Validation: SEC-29, SEC-42, SEC-43.
 SRS acceptance: AC-13.
-Open decisions to resolve or implement: OD-16.
+Open decisions: OD-16.
 
 Acceptance criteria:
 
@@ -629,13 +677,15 @@ Required closure evidence:
 **Build developer portal, sandbox and integration onboarding**
 
 Owner role: Developer experience.
-Gate: G3; proposed priority: p1; state: needs-triage.
+Gate: G3; proposed priority: p1; triage: needs-triage.
+Progress: not_started (reviewed 2026-10-29).
+Remaining/evidence scope: No complete developer portal/sandbox/onboarding implementation found.
 Dependencies: SOV-005, SOV-006, SOV-015, SOV-021.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/27).
 Requirements: FR-45, FR-47, IF-11, UX-08, NFR-13.
 Validation: SEC-42, SEC-43.
 SRS acceptance: AC-13.
-Open decisions to resolve or implement: OD-16.
+Open decisions: OD-16.
 
 Acceptance criteria:
 
@@ -654,7 +704,9 @@ Required closure evidence:
 **Build issuer information-management dashboard**
 
 Owner role: Issuer frontend.
-Gate: G3; proposed priority: p1; state: needs-triage.
+Gate: G3; proposed priority: p1; triage: needs-triage.
+Progress: not_started (reviewed 2026-10-29).
+Remaining/evidence scope: No issuer enrollment/source-review/issuance dashboard found.
 Dependencies: SOV-005, SOV-006, SOV-007, SOV-012, SOV-015, SOV-016, SOV-019.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/28).
 Requirements: FR-41, UX-06, UX-07, IF-13.
@@ -678,13 +730,15 @@ Required closure evidence:
 **Build holder enrollment, consent and credential dashboard**
 
 Owner role: Holder frontend.
-Gate: G3; proposed priority: p1; state: needs-triage.
+Gate: G3; proposed priority: p1; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Holder consent/verification views exist; full enrollment/documents/history/recovery dashboard and accessibility evidence remain.
 Dependencies: SOV-005, SOV-010, SOV-015, SOV-019, SOV-020.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/29).
 Requirements: FR-42, UX-01, UX-02, UX-03, UX-04, UX-05, UX-06, UX-07, IF-13.
 Validation: SEC-13, SEC-23, SEC-24, SEC-32, SEC-41.
 SRS acceptance: AC-04, AC-14.
-Open decisions to resolve or implement: OD-12.
+Open decisions: OD-12.
 
 Acceptance criteria:
 
@@ -703,7 +757,9 @@ Required closure evidence:
 **Build RP and organization integration dashboard**
 
 Owner role: RP frontend.
-Gate: G3; proposed priority: p1; state: needs-triage.
+Gate: G3; proposed priority: p1; triage: needs-triage.
+Progress: not_started (reviewed 2026-10-29).
+Remaining/evidence scope: No complete RP/organization application-management dashboard found.
 Dependencies: SOV-005, SOV-006, SOV-015, SOV-021, SOV-022.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/30).
 Requirements: FR-43, UX-07, UX-08, IF-13.
@@ -727,7 +783,9 @@ Required closure evidence:
 **Build governed federation and security operations dashboard**
 
 Owner role: Federation frontend and security operations.
-Gate: G3; proposed priority: p1; state: needs-triage.
+Gate: G3; proposed priority: p1; triage: needs-triage.
+Progress: not_started (reviewed 2026-10-29).
+Remaining/evidence scope: Operational APIs exist, but no governed federation/security operations dashboard found.
 Dependencies: SOV-005, SOV-006, SOV-007, SOV-008, SOV-015, SOV-029.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/32).
 Requirements: FR-44, FR-26, UX-07, IF-13.
@@ -751,13 +809,15 @@ Required closure evidence:
 **Implement approved issuer-local deployment and isolation**
 
 Owner role: Platform security and operations.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Local Compose includes migrations and worker isolation; same-origin public profile, TLS, private admin, runtime privilege and actual host qualification remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-037, SOV-039.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/21).
 Requirements: DR-01, DR-04, DR-11, IF-08, SR-09, SR-11, SR-15, SR-25, SR-27, SR-30, SR-33, INV-11, INV-13, NFR-14.
 Validation: SEC-17, SEC-23, SEC-25, SEC-26, SEC-31, SEC-40, SEC-41, MC-02, MC-05, MC-06.
 SRS acceptance: AC-12, AC-14.
-Open decisions to resolve or implement: OD-08, OD-17.
+Open decisions: OD-08, OD-17.
 
 Acceptance criteria:
 
@@ -778,7 +838,9 @@ Required closure evidence:
 **Implement supply-chain provenance and artifact admission**
 
 Owner role: Build and platform security.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Build/CI and dependency artifacts exist; strong digest/provenance pinning, scanning and enforced deployment admission remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-027.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/33).
 Requirements: SR-14, SR-31, NFR-08, NFR-09.
@@ -802,12 +864,15 @@ Required closure evidence:
 **Implement semantic health, safe telemetry and security alerts**
 
 Owner role: Observability and security operations.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: demo_implemented (reviewed 2026-10-29).
+Remaining/evidence scope: Semantic readiness, safe telemetry/alerts and outage checks exist; retain deployment-specific evidence and approved operational objectives.
 Dependencies: SOV-003, SOV-005, SOV-007, SOV-008, SOV-011, SOV-012.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/31).
 Requirements: FR-29, DR-08, SR-12, SR-32, NFR-02, NFR-11.
 Validation: SEC-19, SEC-20, SEC-28, MC-08, MC-10.
 SRS acceptance: AC-07, AC-17.
+Evidence reference: `docs/engineering/semantic-health.md`.
 
 Acceptance criteria:
 
@@ -821,27 +886,19 @@ Required closure evidence:
 - Reproducible positive and negative validation, actual configuration/version references and sanitized results.
 - Independent review of security-critical behavior and retest of findings where applicable.
 
-Implementation evidence (G1 synthetic):
-
-- `GET /api/health/ready` (7 live probes, 200/503), `GET /api/alerts`,
-  `GET /api/telemetry/summary`, `POST /api/telemetry/canary` in
-  `backend/src/main/java/dev/sovra/ops/`; contract 0.5.0; see
-  [semantic-health.md](semantic-health.md).
-- 33 committed tests in `backend/src/test/java/dev/sovra/ops/` (positive,
-  negative, authz, sanitization); `./mvnw verify` green.
-- Independent security review of the ops surfaces remains open.
-
 ### SOV-030
 
 **Approve and enforce service, resource and recovery budgets**
 
 Owner role: Product, performance and operations.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Finite request/tool/token/worker budgets exist; aggregate grant enforcement, measured capacity and approved recovery/service targets remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-015, SOV-027, SOV-029.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/34).
 Requirements: NFR-02, NFR-03, NFR-04, NFR-11, NFR-14, NFR-15.
 Validation: SEC-19, SEC-21, SEC-22, SEC-27, MC-02, MC-08, MC-09, MC-10.
-Open decisions to resolve or implement: OD-04, OD-05, OD-13, OD-18.
+Open decisions: OD-04, OD-05, OD-13, OD-18.
 
 Acceptance criteria:
 
@@ -860,13 +917,15 @@ Required closure evidence:
 **Implement replay-safe recovery, key-copy containment and rollback**
 
 Owner role: Operations and security.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: HTTP instance/database-restart replay evidence exists; stale-backup fencing, independent key copies, deletion and full rollback/restore drills remain.
 Dependencies: SOV-007, SOV-008, SOV-009, SOV-011, SOV-012, SOV-016, SOV-020, SOV-027, SOV-029, SOV-030.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/35).
 Requirements: FR-30, FR-48, DR-07, DR-09, DR-17, SR-13, SR-25, SR-28, SR-29, INV-04, INV-12, INV-13, NFR-05, NFR-11, NFR-16.
 Validation: SEC-14, SEC-27, SEC-44, MC-03, MC-04, MC-05, MC-09, MC-10.
 SRS acceptance: AC-14, AC-15, AC-16, AC-17.
-Open decisions to resolve or implement: OD-05, OD-07, OD-18.
+Open decisions: OD-05, OD-07, OD-18.
 
 Acceptance criteria:
 
@@ -885,7 +944,9 @@ Required closure evidence:
 **Complete SEC suite and ASVS applicability evidence**
 
 Owner role: Security validation.
-Gate: G3; proposed priority: p0; state: needs-triage.
+Gate: G3; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Layered tests and assessment notes exist; no complete applicable ASVS/SEC evidence mapping or independent assessment established.
 Dependencies: SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-036, SOV-038, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/36).
 Requirements: SR-10, SR-17, SR-18, NFR-01, NFR-06, NFR-15, NFR-17.
@@ -909,13 +970,15 @@ Required closure evidence:
 **Execute mission-critical attack, load, failover and rollback exercises**
 
 Owner role: Security exercise and operations.
-Gate: G3; proposed priority: p0; state: needs-triage.
+Gate: G3; proposed priority: p0; triage: needs-triage.
+Progress: deferred_production (reviewed 2026-10-29).
+Remaining/evidence scope: Representative deployed MC attack/load/failover exercises have not been established; not a paid-infrastructure blocker for local synthetic work.
 Dependencies: SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-032.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/37).
 Requirements: SR-26, SR-27, SR-28, SR-29, SR-30, SR-31, SR-32, SR-33, INV-12, INV-13, NFR-15, NFR-16, NFR-17.
 Validation: MC-01, MC-02, MC-03, MC-04, MC-05, MC-06, MC-07, MC-08, MC-09, MC-10.
 SRS acceptance: AC-12, AC-15, AC-16, AC-17.
-Open decisions to resolve or implement: OD-05, OD-17, OD-18.
+Open decisions: OD-05, OD-17, OD-18.
 
 Acceptance criteria:
 
@@ -934,13 +997,15 @@ Required closure evidence:
 **Obtain independent review and production release decision**
 
 Owner role: Independent security reviewer and release authority.
-Gate: G3; proposed priority: p0; state: needs-triage.
+Gate: G3; proposed priority: p0; triage: needs-triage.
+Progress: deferred_production (reviewed 2026-10-29).
+Remaining/evidence scope: Independent production release approval is not complete; do not infer it from passing demo tests.
 Dependencies: SOV-032, SOV-033, SOV-035, SOV-036, SOV-037, SOV-038, SOV-039, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/39).
 Requirements: SR-18, SR-33, NFR-04, NFR-12, NFR-17.
 Validation: SEC-30, MC-01, MC-02, MC-03, MC-04, MC-05, MC-06, MC-07, MC-08, MC-09, MC-10.
 SRS acceptance: AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17.
-Open decisions to resolve or implement: OD-01, OD-04, OD-05, OD-07, OD-08, OD-09, OD-10, OD-11, OD-12, OD-13, OD-14, OD-15, OD-16, OD-17, OD-18.
+Open decisions: OD-01, OD-04, OD-05, OD-07, OD-08, OD-09, OD-10, OD-11, OD-12, OD-13, OD-14, OD-15, OD-16, OD-17, OD-18.
 
 Acceptance criteria:
 
@@ -960,13 +1025,16 @@ Required closure evidence:
 **Prove clean-checkout Java synthetic cross-issuer vertical slice**
 
 Owner role: Backend integration and E2E.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Demo UI, prior clean-checkout proof and live smoke exist; reproducible packaged browser journey, protocol qualification and zero-charge public release evidence remain.
 Dependencies: SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029, SOV-036, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/38).
 Requirements: FR-04, FR-09, FR-10, FR-11, FR-12, FR-19, FR-20, FR-21, FR-22, NFR-01, NFR-07, NFR-10.
 Validation: SEC-04, SEC-08, SEC-09, SEC-11, SEC-12, SEC-13, SEC-15, SEC-16, SEC-18, SEC-19, SEC-20.
 SRS acceptance: AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08.
-Open decisions to resolve or implement: OD-02.
+Open decisions: OD-02.
+Evidence reference: `docs/engineering/first-vertical-slice.md`.
 
 Acceptance criteria:
 
@@ -983,29 +1051,20 @@ Required closure evidence:
 - Reproducible positive and negative validation, actual configuration/version references and sanitized results.
 - Independent review of security-critical behavior and retest of findings where applicable.
 
-Implementation evidence (G1 synthetic, partial):
-
-- Clean-checkout vertical-slice proof: clone, backend `./mvnw verify`,
-  frontend build, and `scripts/e2e-issuance.py` reproduced without private
-  files; see [first-vertical-slice.md](first-vertical-slice.md#clean-checkout-reproduction-sov-035).
-- Public-demo frontend flows run over synthetic fixtures only (Demo view);
-  no real-ID upload path exists in the app and no production issuer
-  connectivity is configured.
-- Still open: SOV-036 profile qualification, SOV-041 packaged
-  consent-to-verification suite, live-model acceptance (OD-02), and
-  independent review. This gate grants no real-data authorization.
-
 ### SOV-036
 
 **Qualify selected SD-JWT VC and OpenID libraries and profile adapters**
 
 Owner role: Credential interoperability.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: SD-JWT artifact adapters and both-profile HTTP tests exist; kb+jwt, VCI/VP/DCQL/encrypted response flows, independent conformance and digest pinning remain.
 Dependencies: SOV-001, SOV-003, SOV-004, SOV-009, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/40).
 Requirements: FR-14, FR-15, DR-02, DR-16, SR-03, NFR-12.
 Validation: SEC-04, SEC-05, SEC-06, SEC-30.
-Open decisions to resolve or implement: OD-01.
+Open decisions: OD-01.
+Evidence reference: `docs/architecture/decisions/SOV-001-proof-profile.md`.
 
 Acceptance criteria:
 
@@ -1025,12 +1084,14 @@ Required closure evidence:
 **Obtain independent G0 architecture, privacy and custody assessment**
 
 Owner role: Independent security/privacy assessor and issuer authority.
-Gate: G0; proposed priority: p0; state: needs-triage.
+Gate: G0; proposed priority: p0; triage: needs-triage.
+Progress: deferred_production (reviewed 2026-10-29).
+Remaining/evidence scope: No named independent assessor/date or accepted independent design/privacy report is recorded.
 Dependencies: SOV-001, SOV-002, SOV-004, SOV-039.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/42).
 Requirements: SR-18, SR-26, SR-27, SR-33, SR-34, SR-35, DR-10, NFR-12.
 Validation: SEC-26, SEC-30, SEC-32, MC-01, MC-05, MC-06.
-Open decisions to resolve or implement: OD-07, OD-08, OD-09, OD-10, OD-13, OD-17, OD-18.
+Open decisions: OD-07, OD-08, OD-09, OD-10, OD-13, OD-17, OD-18.
 
 Acceptance criteria:
 
@@ -1049,13 +1110,15 @@ Required closure evidence:
 **Implement attested HSM authorization and confidential input gateways**
 
 Owner role: Confidential platform, key and security engineering.
-Gate: G2; proposed priority: p0; state: needs-triage.
+Gate: G2; proposed priority: p0; triage: needs-triage.
+Progress: deferred_production (reviewed 2026-10-29).
+Remaining/evidence scope: KMS sign/unwrap paths remain fail-closed placeholders; no deployed attestation/key/input-channel qualification established.
 Dependencies: SOV-004, SOV-006, SOV-016, SOV-027, SOV-028, SOV-040.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/44).
 Requirements: IF-05, SR-13, SR-19, SR-21, SR-25, SR-27, SR-29, SR-33, SR-35, INV-11, INV-13.
 Validation: SEC-14, SEC-26, SEC-33, SEC-35, SEC-40, MC-02, MC-04, MC-05, MC-06, MC-07, MC-10.
 SRS acceptance: AC-09, AC-12, AC-16, AC-17.
-Open decisions to resolve or implement: OD-08, OD-13, OD-17, OD-18.
+Open decisions: OD-08, OD-13, OD-17, OD-18.
 
 Acceptance criteria:
 
@@ -1078,12 +1141,14 @@ Required closure evidence:
 **Approve the first issuer jurisdiction and complete provider capability matrix**
 
 Owner role: Issuer authority, privacy and platform architecture.
-Gate: G0; proposed priority: p0; state: needs-triage.
+Gate: G0; proposed priority: p0; triage: needs-triage.
+Progress: deferred_production (reviewed 2026-10-29).
+Remaining/evidence scope: No actual real-data issuer/jurisdiction/provider capability approval recorded; demo hosting is a separate zero-charge qualification.
 Dependencies: SOV-002, SOV-004.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/41).
 Requirements: DR-01, DR-04, DR-11, SR-25, SR-33, INV-11, NFR-12, NFR-14.
 Validation: SEC-40, SEC-41, SEC-44, MC-05, MC-06.
-Open decisions to resolve or implement: OD-07, OD-08, OD-10, OD-13, OD-17.
+Open decisions: OD-07, OD-08, OD-10, OD-13, OD-17.
 
 Acceptance criteria:
 
@@ -1102,13 +1167,16 @@ Required closure evidence:
 **Harden issuer bindings, immutable approval identity and sealed trust snapshots**
 
 Owner role: Authority backend and database security.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Trust sealing, stable subject/quorum checks and production startup guards exist; BFF human trust changes, source provenance and actual issuer authority remain.
 Dependencies: SOV-004, SOV-005, SOV-008, SOV-009.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/43).
 Requirements: FR-23, FR-25, DR-05, DR-06, SR-01, SR-27, SR-34, SR-35, INV-03, INV-05, INV-06.
 Validation: SEC-01, SEC-02, SEC-03, SEC-26, SEC-31, MC-01, MC-06, MC-09.
 SRS acceptance: AC-02, AC-11, AC-14, AC-16.
-Open decisions to resolve or implement: OD-10, OD-11, OD-14, OD-17.
+Open decisions: OD-10, OD-11, OD-14, OD-17.
+Evidence reference: `docs/engineering/sov-040-hardening-assessment.md`.
 
 Acceptance criteria:
 
@@ -1128,13 +1196,17 @@ Required closure evidence:
 **Add packaged two-instance consent-to-verification end-to-end suite**
 
 Owner role: Integration and security E2E engineering.
-Gate: G1; proposed priority: p0; state: needs-triage.
+Gate: G1; proposed priority: p0; triage: needs-triage.
+Progress: partial (reviewed 2026-10-29).
+Remaining/evidence scope: Both artifact-profile HTTP E2E suites exist; no real DOM/JS holder/browser automation or full external selected-profile flow evidence. Keep issue 45 open.
 Dependencies: SOV-010, SOV-011, SOV-012, SOV-015, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/45).
 Requirements: FR-08, FR-19, FR-20, FR-21, FR-22, SR-03, SR-04, SR-05, SR-06, INV-01, INV-02, INV-07, INV-08, NFR-01, NFR-07.
 Validation: SEC-04, SEC-05, SEC-07, SEC-08, SEC-09, SEC-10, SEC-11, SEC-12, SEC-13, SEC-20, SEC-30.
 SRS acceptance: AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08.
-Open decisions to resolve or implement: OD-01, OD-03, OD-06.
+Open decisions: OD-01, OD-03, OD-06.
+Evidence reference: `docs/engineering/sov-041-holder-browser-assessment.md`.
+Evidence reference: `scripts/e2e-verification.py`.
 
 Acceptance criteria:
 

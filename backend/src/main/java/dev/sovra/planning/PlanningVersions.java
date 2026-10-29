@@ -16,7 +16,7 @@ import org.springframework.ai.tool.ToolCallback;
 public final class PlanningVersions {
 
   /** System/user prompt template version; text lives in PlanningPrompts. */
-  public static final String PROMPT_VERSION = "sovra-planner-prompts/1";
+  public static final String PROMPT_VERSION = "sovra-planner-prompts/2";
 
   /** Tool name/description/schema contract version. */
   public static final String TOOL_CONTRACT_VERSION = "sovra-planner-tools/1";

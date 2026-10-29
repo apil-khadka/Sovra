@@ -112,6 +112,13 @@ services:
       SOVRA_BFF_REQUIRE_HTTPS_ISSUER: 'false'
       SOVRA_BFF_REDIRECT_URI: http://localhost:8080/login/oauth2/code/sovra
       SOVRA_BFF_POST_LOGOUT_URI: http://localhost:8080/
+      # Live planning (SOV-013, OD-02): values come from the root
+      # .env (never committed; see .env.example). Empty defaults keep
+      # default boot keyless and fixture-only.
+      SOVRA_AI_LIVE_ENABLED: ${SOVRA_AI_LIVE_ENABLED:-false}
+      SOVRA_AI_BASE_URL: ${SOVRA_AI_BASE_URL:-}
+      SOVRA_AI_MODEL: ${SOVRA_AI_MODEL:-}
+      SOVRA_AI_API_KEY: ${SOVRA_AI_API_KEY:-}
     extra_hosts:
       - "sovra-keycloak:host-gateway"
     depends_on:
@@ -181,6 +188,13 @@ services:
       SOVRA_BFF_REQUIRE_HTTPS_ISSUER: 'false'
       SOVRA_BFF_REDIRECT_URI: http://localhost:8081/login/oauth2/code/sovra
       SOVRA_BFF_POST_LOGOUT_URI: http://localhost:8081/
+      # Live planning (SOV-013, OD-02): values come from the root
+      # .env (never committed; see .env.example). Empty defaults keep
+      # default boot keyless and fixture-only.
+      SOVRA_AI_LIVE_ENABLED: ${SOVRA_AI_LIVE_ENABLED:-false}
+      SOVRA_AI_BASE_URL: ${SOVRA_AI_BASE_URL:-}
+      SOVRA_AI_MODEL: ${SOVRA_AI_MODEL:-}
+      SOVRA_AI_API_KEY: ${SOVRA_AI_API_KEY:-}
     extra_hosts:
       - "sovra-keycloak:host-gateway"
     depends_on:

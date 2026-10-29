@@ -11,7 +11,8 @@ Version 0.5 makes the mission-critical research controls explicit requirements a
 Version 0.6 selects an issuer-local identity and attested key-provider reference, makes human/machine and governance boundaries explicit, and separates synthetic development from independent real-data release approval.
 It describes required behavior, not implemented features or completed security assurance.
 The repository contains a Java/Spring backend, a React bootstrap and synthetic control-plane implementations; the earlier TypeScript backend was removed.
-Human SSO, real KMS integration, the full consent/presentation-verification flow and production assurance remain pending.
+Synthetic BFF/SSO, consent/verification, software vault/quarantine and artifact-profile paths now exist.
+Full protocol/browser acceptance, real KMS/attestation and production assurance remain pending; see the [current continuation guide](../engineering/continuation-guide.md) for the dated evidence boundary.
 
 ## Contents
 

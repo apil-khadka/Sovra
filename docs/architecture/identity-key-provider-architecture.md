@@ -5,6 +5,12 @@
 **Scope:** architecture and source inspection, provider research, and implementation requirements.
 No runtime code, cloud account, identity tenant or live key was created by this review.
 
+## Progress after this assessment
+
+The source findings below describe the 2026-10-28 assessment input, not the current implementation inventory.
+Subsequent BFF, authority-hardening, vault, quarantine and SD-JWT artifact work is reconciled in the [2026-10-29 continuation guide](../engineering/continuation-guide.md).
+Preserve these historical findings and use the task assessments/current guide to decide which gaps remain.
+
 ## Recommendation
 
 Keep Java 25/Spring, PostgreSQL and the React client, with issuer-local authority and a small number of deliberately separated runtime identities.

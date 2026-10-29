@@ -1,14 +1,19 @@
 # Live planning integration (SOV-013)
 
-**Status:** fixture mode implemented and tested; live acceptance is NOT
-claimed. OD-02 stays open until the smoke procedure below passes against
-verified no-charge Meta capacity.
+**Status:** fixture mode implemented and tested. The smoke procedure
+below PASSED against the Baseten hackathon grant on 2026-10-29 (see
+evidence); OD-02 remains partially resolved pending verified no-charge limits, processing/retention terms and complete frozen live-evaluation evidence.
+Owner acknowledgement records evidence; it does not substitute for those checks.
 
 ## Adapter
 
+The [2026-10-29 continuation guide](../engineering/continuation-guide.md) records remaining spend/retention/evaluation work and the uncommitted implementation baseline.
+The documented smoke is prior technical evidence; it is not a provider billing-cap verification or permission for additional automatic live runs.
+
 Live planning uses Spring AI's OpenAI-compatible chat adapter
 (`spring-ai-starter-model-openai`) pointed at the operator-configured
-chat endpoint. The Meta Llama API speaks that contract; no vendor SDK
+chat endpoint. The recorded Baseten candidate was exercised through that adapter; this does not establish compatibility with every Meta/model endpoint.
+No vendor SDK
 is embedded, and no endpoint, model id, or key has a default anywhere
 in the repo — every one arrives from the environment (see
 [PlanningProperties](../../backend/src/main/java/dev/sovra/planning/PlanningProperties.java)):
@@ -27,8 +32,36 @@ explicitly-labeled fixture candidates (`mode: FIXTURE`,
 
 Optional budgets (defaults in parentheses): `SOVRA_AI_MAX_TOOL_CALLS`
 (8), `SOVRA_AI_TIMEOUT` (10s), `SOVRA_AI_MAX_RETRIES` (1),
-`SOVRA_AI_MAX_TOKENS` (2000), `SOVRA_AI_MAX_PROMPT_CHARS` (8000),
+`SOVRA_AI_MAX_TOKENS` (8000: reasoning consumes the output budget), `SOVRA_AI_MAX_PROMPT_CHARS` (8000),
 `SOVRA_AI_TEMPERATURE` (0.0), `SOVRA_AI_SEED` (7).
+
+## Hackathon endpoint (Baseten, OD-02 candidate)
+
+Meta Global AI Developer Hackathon grant: $100 in Baseten credits
+for Muse Spark Open at an OpenAI-compatible endpoint. Provenance
+verified against the pinned client: Spring AI 2.0.2 delegates to
+the OpenAI Java SDK 4.80.0, whose base URL carries the `/v1` prefix
+(default `https://api.openai.com/v1`), so the Baseten base URL below
+is used verbatim.
+
+| Variable | Hackathon value |
+| --- | --- |
+| `SOVRA_AI_BASE_URL` | `https://inference.baseten.co/v1` |
+| `SOVRA_AI_MODEL` | `meta-models/muse-spark-open-1026` (exact; the key works only with this model) |
+| `SOVRA_AI_API_KEY` | One-time key from the Baseten invite link (single-view; copy immediately) |
+
+Local wiring:
+
+1. Values live in the root `.env` (gitignored, never committed;
+   shape documented in `.env.example`); `compose.yaml` passes the
+   four `SOVRA_AI_*` variables into both app instances with empty
+   defaults, so a missing `.env` still boots keyless.
+2. Paste the key into `.env`, `docker compose up -d` to recycle the
+   app containers, and confirm `GET /api/plans/status` still reports
+   fixture mode (`liveEnabled: false`).
+3. Arm live (`SOVRA_AI_LIVE_ENABLED=true` in `.env`, recycle) only
+   to run the OD-02 smoke procedure with synthetic inputs, then
+   disarm and rotate/disable the key per the checklist below.
 
 ## Fixture versus live
 
@@ -63,7 +96,7 @@ it becomes a candidate.
 
 ## Frozen versions
 
-Every proposal and evaluation run records `sovra-planner-prompts/1`,
+Every proposal and evaluation run records `sovra-planner-prompts/2`,
 `sovra-planner-tools/1` plus the SHA-256 tool-schema hash,
 `sovra-baseline-planner/1`, the model id, the seed, tool-call counts,
 and sanitized latency/token evidence (cost is `unreported` unless the
@@ -80,8 +113,9 @@ so any tool-contract drift fails loudly.
 4. Confirm `GET /api/plans/status` reports `LIVE` and the smoke run
    records the actual model id, prompt/tool versions, token usage,
    latency, and guard verdicts — including failures.
-5. Disable the key or set spend alerts immediately after; record the
-   sanitized run log as the OD-02 evidence.
+5. Disarm live mode in the persistent secret configuration, recycle affected instances and confirm sanitized fixture/unarmed status, or revoke the provider key.
+   Record the sanitized run log as OD-02 evidence.
+   Spend alerts are supplementary notifications, not hard caps or substitutes for disarming.
 
 ## Smoke procedure (OD-02)
 
@@ -103,3 +137,36 @@ With live armed against verified no-charge capacity:
 
 A failed or blocked model is never replaced by a pre-recorded
 response. Fixture runs stay labeled fixture runs.
+
+## Smoke evidence (2026-10-29, Baseten hackathon grant)
+
+Reproducible via `scripts/smoke-live-planning.py` (spends credits;
+exits 2 without spending when unarmed). Synthetic inputs only.
+
+- Status reported `LIVE` / `liveEnabled` / `modelConfigured` with
+  `sovra-planner-prompts/2`, `sovra-planner-tools/1`, baseline
+  `sovra-baseline-planner/1`, and the five discovery tools.
+- `POST /api/plans/propose` (age-over-18 intent, frozen policy
+  binding) returned a `LIVE` candidate: model
+  `meta-models/muse-spark-open-1026`, `CANDIDATE_ONLY`, 5 tool
+  calls, ~9 s latency, ~8-11k tokens, cost `unreported`, exact
+  versioned citations, no invented ids.
+- Unknown outcome plus invented claim returned 400 before any
+  model contact.
+- `POST /api/guard/validate` on the live candidate returned
+  `GUARD_ACCEPTED` under `sovra-guard/1` (the guard had earlier
+  explicitly rejected a candidate that cited a credential type as
+  evidence, proving the adjudication is real).
+- Unreachable provider host returned explicit 503
+  `planning_unavailable` with no candidate and no fixture
+  fallback (manual step; key never revoked).
+- Evaluator baseline arm stays green in the committed suite; the
+  live agent result satisfies `requireLive` (mode `LIVE`,
+  `liveAcceptance: true`).
+
+Live findings fixed during the recorded smoke (the handoff reported 384/384 green; the current tool-bound test changes remain uncommitted at this audit): tool args accept integral numbers exactly
+for the policy `version` member (models emit `"version": 1`;
+`PlanningToolBoundsTests.policyVersionAcceptsIntegralNumbersExactly`);
+default output budget raised 2000 -> 8000 because reasoning consumes
+it (one turn measured 2119 reasoning tokens); prompt v2 pins the
+evidence convention (policy documents only).

@@ -3,12 +3,14 @@
 Sovra is an identity-interoperability prototype.
 The prototype explores how a Meta-powered AI planner can propose verification evidence across simulated jurisdictions, while deterministic policy checks, holder consent, and issuer signatures control authorization.
 
-**Current status:** documentation, a Java 25/Spring Boot backend bootstrap, a React frontend bootstrap, and synthetic examples.
+**Current status:** Java 25/Spring synthetic authority, consent/verification, BFF login, planning, vault and quarantine code, with React demo/holder views.
 The earlier TypeScript prototype was removed; JSON fixtures in `tests/fixtures/` and `docs/engineering/fixtures/` are preserved as migration evidence.
-Java 25 LTS with Spring Boot is the [selected backend direction](docs/architecture/java-spring-baseline.md); the G1 vertical slice, deployed demo, and security evaluation are pending.
+Java 25 LTS with Spring Boot is the [selected backend direction](docs/architecture/java-spring-baseline.md); full protocol/browser acceptance, public deployment qualification and production security assessment remain pending.
 Architecture documents describe intended behavior rather than implemented guarantees.
 
 ## Start here
+
+- [Current status and continuation guide](docs/engineering/continuation-guide.md): what exists, remaining launch gates, next implementation steps and safe verification.
 
 - [Documentation index](docs/README.md): product scope, architecture, requirements, and implementation plan.
 - [Software Requirements Specification](docs/requirements/software-requirements-specification.md): business scope, testable requirements, security, and release acceptance.

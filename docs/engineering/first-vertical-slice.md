@@ -1,5 +1,8 @@
 # First Java synthetic vertical slice
 
+Current progress and the remaining public-demo work are recorded in the [2026-10-29 continuation guide](continuation-guide.md).
+The dated evidence below is historical and does not establish browser/profile completion.
+
 **Purpose:** reproduce the core identity-evidence flow on the selected Java backend with real HTTP/PostgreSQL and independent negative assertions.
 **Scope:** G1 in the [business implementation plan](implementation-plan.md), consolidated by SOV-035 in the [backlog](implementation-backlog.md).
 This is a build specification, not an implemented flow or permission to use real identity data.
@@ -49,8 +52,8 @@ is git-ignored, so the clone also proves its exclusion breaks nothing):
 git clone /path/to/Sovra /tmp/sovra-clean-<rand>
 cd /tmp/sovra-clean-<rand>
 export JAVA_HOME=$HOME/.jdk/temurin-25/Contents/Home
-cd backend && ./mvnw verify
-pnpm --dir frontend install && pnpm --dir frontend run build
+(cd backend && ./mvnw verify)
+pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend run build
 python3 scripts/e2e-issuance.py
 ```
 

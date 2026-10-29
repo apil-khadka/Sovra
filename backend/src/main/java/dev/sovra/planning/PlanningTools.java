@@ -209,6 +209,19 @@ public class PlanningTools {
 
   /** Strict argument object: allowlisted members, bounded strings, no authority. */
   private Map<String, String> args(String input, Set<String> allowed) {
+    return args(input, allowed, Set.of());
+  }
+
+  /**
+   * Strict argument object with narrow numeric tolerance: members in
+   * {@code numericExact} additionally accept integral JSON numbers
+   * (OD-02: models naturally emit {@code "version": 1}), normalized
+   * by exact canonical form under the same length bound. Nothing
+   * else changes: unknown members, non-integral numbers, booleans,
+   * arrays, objects, and authority-smuggling members still fail.
+   */
+  private Map<String, String> args(
+      String input, Set<String> allowed, Set<String> numericExact) {
     JsonNode root;
     try {
       root = mapper.readTree(input);
@@ -224,14 +237,22 @@ public class PlanningTools {
       if (FORBIDDEN_ARGS.contains(name)) {
         throw new InvalidPlanningException("tool arguments must not carry authority");
       }
-      if (!allowed.contains(name) || !field.getValue().isString()) {
+      if (!allowed.contains(name)) {
         throw new InvalidPlanningException("unsupported tool argument: " + name);
       }
-      String value = field.getValue().asText();
-      if (value.length() > MAX_ARG_CHARS) {
+      JsonNode value = field.getValue();
+      String text;
+      if (value.isString()) {
+        text = value.asText();
+      } else if (numericExact.contains(name) && value.isIntegralNumber()) {
+        text = value.asText();
+      } else {
+        throw new InvalidPlanningException("unsupported tool argument: " + name);
+      }
+      if (text.length() > MAX_ARG_CHARS) {
         throw new InvalidPlanningException("tool argument exceeds its bound: " + name);
       }
-      parsed.put(name, value);
+      parsed.put(name, text);
     }
     return parsed;
   }
@@ -319,7 +340,8 @@ public class PlanningTools {
   private String getPolicyDocument(
       String input, ToolContext context) {
     authorizeToolCall();
-    Map<String, String> arguments = args(input, Set.of("policyId", "version"));
+    // Policy versions read numeric to models; accept 1 as "1" exactly.
+    Map<String, String> arguments = args(input, Set.of("policyId", "version"), Set.of("version"));
     String policyId = arguments.get("policyId");
     String version = arguments.get("version");
     if (policyId == null || version == null) {

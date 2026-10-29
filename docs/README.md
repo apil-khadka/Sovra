@@ -1,6 +1,6 @@
 # Sovra - Documentation Index
 
-**Snapshot:** 2026-10-28 · **Status:** synthetic Java control-plane code with a business SRS draft; not a production identity system.
+**Snapshot:** 2026-10-29 · **Status:** synthetic Java demo implementations with remaining browser/protocol/public-release gates; not a production identity system.
 
 Sovra explores whether a **Meta-powered, policy-grounded interoperability planner** can discover compatible verification evidence across independently governed identity systems, while keeping user identity source records in local jurisdiction-controlled domains.
 It is a research/demo prototype using **synthetic data** and **simulated jurisdictions**.
@@ -8,6 +8,9 @@ It is a research/demo prototype using **synthetic data** and **simulated jurisdi
 > **Design contract:** Meta AI proposes. Approved policies, consent and deterministic code authorize. Issuers sign evidence. Verifiers verify evidence. Relying parties decide legal KYC/CDD sufficiency themselves.
 
 ## Reading map
+
+Start implementation work with the [current continuation guide](engineering/continuation-guide.md), reviewed 2026-10-29.
+It reconciles implemented demo features, remaining browser/protocol/public-hosting gates and no-credit verification.
 
 | Question | Document |
 | --- | --- |

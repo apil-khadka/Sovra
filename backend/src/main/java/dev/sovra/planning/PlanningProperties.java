@@ -35,8 +35,13 @@ public class PlanningProperties {
   /** Bounded provider retries, not tool retries (SEC-19). */
   private int maxRetries = 1;
 
-  /** Provider-side output token cap (NFR-03). */
-  private int maxTokens = 2000;
+  /**
+   * Provider-side output token cap (NFR-03). Reasoning models spend
+   * this budget on reasoning before answering (OD-02 measured 2119
+   * reasoning tokens on one planning turn), so the default leaves
+   * headroom while staying finite and fail-closed.
+   */
+  private int maxTokens = 8000;
 
   /** Local bound on the prompt and on the raw model output (SEC-18). */
   private int maxPromptChars = 8000;

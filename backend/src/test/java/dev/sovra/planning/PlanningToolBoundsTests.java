@@ -180,6 +180,49 @@ class PlanningToolBoundsTests extends SovraAppRoleBase {
   }
 
   @Test
+  void policyVersionAcceptsIntegralNumbersExactly() {
+    TestAccount rp = TestAccounts.create(owner, "tool-numver", Set.of("RP_CLIENT"));
+    asCaller(
+        rp,
+        properties.maxToolCalls(),
+        () -> {
+          String byString = call(
+              "getPolicyDocument",
+              "{\"policyId\":\"" + dev.sovra.guard.GuardPolicies.POLICY_ID + "\","
+                  + "\"version\":\"1\"}");
+          String byNumber = call(
+              "getPolicyDocument",
+              "{\"policyId\":\"" + dev.sovra.guard.GuardPolicies.POLICY_ID + "\","
+                  + "\"version\":1}");
+          // Integral numbers normalize by exact canonical form.
+          assertThat(byNumber).isEqualTo(byString);
+          assertThat(byNumber).contains("\"version\":\"1\"");
+          // Non-integral numbers, booleans, and numbers on other
+          // members still fail; unknown numeric versions fail closed
+          // as tool results, not run-killing rejections.
+          assertThatThrownBy(() -> call(
+                  "getPolicyDocument",
+                  "{\"policyId\":\"" + dev.sovra.guard.GuardPolicies.POLICY_ID + "\","
+                      + "\"version\":1.5}"))
+              .isInstanceOf(InvalidPlanningException.class);
+          assertThatThrownBy(() -> call(
+                  "getPolicyDocument",
+                  "{\"policyId\":\"" + dev.sovra.guard.GuardPolicies.POLICY_ID + "\","
+                      + "\"version\":true}"))
+              .isInstanceOf(InvalidPlanningException.class);
+          assertThatThrownBy(
+                  () -> call("listTrustedIssuers", "{\"outcome\":1}"))
+              .isInstanceOf(InvalidPlanningException.class);
+          assertThat(call(
+                  "getPolicyDocument",
+                  "{\"policyId\":\"" + dev.sovra.guard.GuardPolicies.POLICY_ID + "\","
+                      + "\"version\":7}"))
+              .contains("unknown_policy");
+          return null;
+        });
+  }
+
+  @Test
   void budgetExhaustionEndsTheRunAsUnavailable() {
     TestAccount rp = TestAccounts.create(owner, "tool-budget", Set.of("RP_CLIENT"));
     asCaller(

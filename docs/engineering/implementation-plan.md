@@ -1,6 +1,6 @@
 # Business implementation plan
 
-**Baseline:** SRS v0.6, 2026-10-28.
+**Baseline:** SRS v0.6; implementation progress reviewed 2026-10-29.
 **Status:** synthetic Java control-plane code exists; full flow, provider qualification and production assurance are pending.
 
 Build the business application on Java 25 LTS, Spring Boot, Spring Security, Spring AI and PostgreSQL, preserving issuer authority and data locality across every operation.
@@ -36,17 +36,20 @@ A customer pilot is a production release for these gates when it handles real id
 
 ## Next implementation sequence
 
-1. Read the [provider architecture assessment](../architecture/identity-key-provider-architecture.md) and revised SOV-001/002/004 contracts; keep synthetic data and all production approval boxes open.
-2. Start SOV-006 against local Keycloak: OIDC/BFF, hardware-authenticator policy, current entitlements/elevation and separate machine credentials.
-3. Address SOV-040 issuer bindings, immutable approval identity, sealed trust snapshots and production rejection of synthetic genesis; remove serving-process migration authority under SOV-027.
-4. Qualify the mandatory profile/library adapters in SOV-036, then complete SOV-010/011/012 consent, verification, durable replay and status behavior.
-5. Complete SOV-041 packaged two-instance consent-to-verification E2E evidence and SOV-029 semantic readiness ([operations surfaces](semantic-health.md), contract 0.5.0); SOV-035 consolidates the synthetic flow with actual bounded AI and guard evidence ([clean-checkout proof](first-vertical-slice.md#clean-checkout-reproduction-sov-035)). Live-model acceptance stays open under OD-02; interop claims stay blocked on SOV-036.
-6. In parallel with synthetic work, obtain actual issuer/location capability approval in SOV-039 and independent design/privacy assessment in SOV-037; neither is asserted completed by this plan.
-7. Implement and validate the real provider under SOV-027/028/038, then complete all applicable product/SEC/MC/ASVS and release evidence before real data.
+The [continuation guide](continuation-guide.md) is the current execution reference and supersedes earlier bootstrap-only next steps.
+Keycloak/BFF, authority hardening, consent/verification, semantic readiness, SD-JWT artifact adapters, vault and quarantine already exist in synthetic scope.
+Do not restart those modules or ask for the provider choice again; close their recorded gaps.
 
-The Google Cloud Single-tenant HSM/Confidential Space reference applies only where the complete issuer-approved location/capability combination is available.
-Keycloak locality includes account, factor, sign-in/session, recovery, backup and support metadata; a global IdP or broker does not automatically satisfy it.
-Zero cross-request DEK caching, current privileged-operation checks, attested input channels and independent key-policy administration are part of the reference.
+1. Preserve/review the uncommitted live-planner changes and establish a fresh fixture-only baseline without spending provider credits.
+2. Package the React SPA on the Spring application origin with exact OIDC callback/logout configuration and tested multi-instance session behavior.
+3. Add repository-owned real-browser login/consent/verification/logout E2E and CI alongside the existing HTTP race/restart suites.
+4. Finish SOV-036 kb+jwt, VCI/VP/DCQL/encrypted transports, artifact pinning and independent interoperability/conformance; rerun SOV-041 before closing either issue.
+5. Verify Baseten grant limits/retention and cumulative usage controls; finish the frozen live evaluation only within proven no-charge authorization.
+6. Qualify a separate zero-charge public deployment, deny arbitrary vault/quarantine uploads through all public paths, protect administration, rotate secrets and retain public-release evidence.
+7. Continue synthetic extraction/enrollment, custody, SDK/portal and role-dashboard work after these demo foundations; preserve the separate real-data release gates.
+
+SOV-037/038/039 and production key-provider work remain unsatisfied future real-data gates, not reasons to stop the synthetic demo.
+Public hosting capacity, billing limits and complete conformance must not be invented or marked approved by implementation code.
 
 ## Workstream boundaries
 

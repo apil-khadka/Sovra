@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "baseline": "SRS v0.6",
-  "updated": "2026-10-28",
-  "status": "Synthetic implementations exist for part of G1; all acceptance/release claims require evidence and triage.",
+  "updated": "2026-10-29",
+  "status": "Source/evidence audit: demo implementations and remaining acceptance gaps recorded separately from unchanged maintainer triage; no task closure or production approval implied.",
   "tasks": [
     {
       "id": "SOV-001",
@@ -57,7 +57,13 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/5",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "partial",
+      "implementation_observation": "SOV-001 v0.4 records artifact-layer qualification; VCI/VP, kb+jwt, independent interoperability and strong digest pinning remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/architecture/decisions/SOV-001-proof-profile.md"
+      ]
     },
     {
       "id": "SOV-002",
@@ -109,7 +115,11 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/6",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "partial",
+      "implementation_observation": "Locality/custody reference recorded; actual issuer locations, legal retention and independent custody approval remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-003",
@@ -142,7 +152,10 @@
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/7",
       "acceptance_cases": [],
-      "implementation_observation": "Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review."
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Java/React build, real PostgreSQL harness, container and CI foundations exist; no production acceptance inferred.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-004",
@@ -200,7 +213,11 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/8",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "partial",
+      "implementation_observation": "Keycloak and deferred cloud reference chosen; synthetic continuation does not require a provider re-pick. Production qualification remains.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-005",
@@ -253,7 +270,10 @@
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/9",
       "acceptance_cases": [],
-      "implementation_observation": "Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review."
+      "implementation_progress": "partial",
+      "implementation_observation": "Role/resource authorization and tenant guards exist; deployment-specific issuer/legal authority and production assessment remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-006",
@@ -308,6 +328,13 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/10",
       "acceptance_cases": [
         "AC-16"
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Keycloak OIDC/BFF and service-account lifecycle exist; browser-origin packaging, hardware/recovery/elevation and full privileged acceptance remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "backend/src/main/java/dev/sovra/bff",
+        "scripts/e2e-bff-login.py"
       ]
     },
     {
@@ -353,7 +380,10 @@
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/11",
       "acceptance_cases": [],
-      "implementation_observation": "Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review."
+      "implementation_progress": "partial",
+      "implementation_observation": "Transactional audit and integrity/denial tests exist for demo; independent production integrity authority and lifecycle evidence remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-008",
@@ -403,7 +433,10 @@
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/12",
       "acceptance_cases": [],
-      "implementation_observation": "Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review."
+      "implementation_progress": "partial",
+      "implementation_observation": "Versioned/sealed trust and policy workflows exist; person-verified human quorum and actual accreditation remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-009",
@@ -456,7 +489,10 @@
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/13",
       "acceptance_cases": [],
-      "implementation_observation": "Synthetic/bootstrap source exists as of the architecture inspection; full acceptance and current runtime results were not established by this review."
+      "implementation_progress": "partial",
+      "implementation_observation": "Constrained synthetic and SD-JWT artifact issuance exists; VCI flows, approved enrollment provenance and real KMS remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-010",
@@ -504,7 +540,11 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/14",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "partial",
+      "implementation_observation": "Consent APIs, BFF holder paths and React consent view exist; packaged browser and external wallet/profile evidence remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-011",
@@ -568,7 +608,11 @@
         "AC-02",
         "AC-03",
         "AC-06"
-      ]
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Durable verification, atomic replay and HTTP race/restart evidence exist; complete selected protocol/browser acceptance remains.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-012",
@@ -619,7 +663,11 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/16",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "partial",
+      "implementation_observation": "Synthetic revocation/freshness and filtered serving JWKS exist; production status privacy, lifecycle and compromise drills remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-013",
@@ -678,6 +726,13 @@
         "AC-05",
         "AC-06",
         "AC-07"
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Fixture/live adapters and a dated successful Baseten smoke exist; latest changes are uncommitted. Hard no-charge limit, retention and full live evaluation remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/ai/live-integration.md",
+        "scripts/smoke-live-planning.py"
       ]
     },
     {
@@ -730,7 +785,11 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/19",
       "acceptance_cases": [
         "AC-05"
-      ]
+      ],
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Deterministic guard, policy/citation validation and planner baseline/evaluation code exist; retain exact corpus evidence at release.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-015",
@@ -779,7 +838,11 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/17",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "partial",
+      "implementation_observation": "Implemented API 0.6.0 and contract tests cover current routes; remaining product APIs, compatibility and profile contracts remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-016",
@@ -839,6 +902,12 @@
         "AC-09",
         "AC-12",
         "AC-16"
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Software-key vault/grants and HTTP evidence exist; KMS/attestation, key retirement/rewrap, purge and BFF viewing remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/engineering/sov-016-vault-assessment.md"
       ]
     },
     {
@@ -895,6 +964,12 @@
       "acceptance_cases": [
         "AC-10",
         "AC-12"
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Isolated PNG/JPEG quarantine worker and HTTP evidence exist; deeper scanning/review, production custody and worker operations remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/engineering/sov-017-quarantine-assessment.md"
       ]
     },
     {
@@ -949,7 +1024,11 @@
         "AC-10",
         "AC-11",
         "AC-12"
-      ]
+      ],
+      "implementation_progress": "not_started",
+      "implementation_observation": "No OCR/extraction/normalization/provenance revision module found; start synthetic implementation after demo launch foundations.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-019",
@@ -1005,7 +1084,11 @@
       "acceptance_cases": [
         "AC-10",
         "AC-11"
-      ]
+      ],
+      "implementation_progress": "not_started",
+      "implementation_observation": "No enrollment/source-review/correction/claim-eligibility workflow found; build on extraction and vault with explicit maker/checker rules.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-020",
@@ -1062,7 +1145,11 @@
       "acceptance_cases": [
         "AC-14",
         "AC-16"
-      ]
+      ],
+      "implementation_progress": "not_started",
+      "implementation_observation": "Demo holder proof helpers do not implement device custody, encrypted backup recovery or loss/theft/reissuance.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-021",
@@ -1107,7 +1194,11 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/26",
       "acceptance_cases": [
         "AC-13"
-      ]
+      ],
+      "implementation_progress": "not_started",
+      "implementation_observation": "No released Java/TypeScript SDK or SDK consumer tests found; frontend fetch helpers are not SDK releases.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-022",
@@ -1150,7 +1241,11 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/27",
       "acceptance_cases": [
         "AC-13"
-      ]
+      ],
+      "implementation_progress": "not_started",
+      "implementation_observation": "No complete developer portal/sandbox/onboarding implementation found.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-023",
@@ -1198,7 +1293,11 @@
       "acceptance_cases": [
         "AC-11",
         "AC-14"
-      ]
+      ],
+      "implementation_progress": "not_started",
+      "implementation_observation": "No issuer enrollment/source-review/issuance dashboard found.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-024",
@@ -1250,7 +1349,11 @@
       "acceptance_cases": [
         "AC-04",
         "AC-14"
-      ]
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Holder consent/verification views exist; full enrollment/documents/history/recovery dashboard and accessibility evidence remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-025",
@@ -1295,7 +1398,11 @@
       "acceptance_cases": [
         "AC-13",
         "AC-14"
-      ]
+      ],
+      "implementation_progress": "not_started",
+      "implementation_observation": "No complete RP/organization application-management dashboard found.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-026",
@@ -1341,7 +1448,11 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/32",
       "acceptance_cases": [
         "AC-14"
-      ]
+      ],
+      "implementation_progress": "not_started",
+      "implementation_observation": "Operational APIs exist, but no governed federation/security operations dashboard found.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-027",
@@ -1408,7 +1519,11 @@
       "acceptance_cases": [
         "AC-12",
         "AC-14"
-      ]
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Local Compose includes migrations and worker isolation; same-origin public profile, TLS, private admin, runtime privilege and actual host qualification remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-028",
@@ -1448,7 +1563,11 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/33",
       "acceptance_cases": [
         "AC-17"
-      ]
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Build/CI and dependency artifacts exist; strong digest/provenance pinning, scanning and enforced deployment admission remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-029",
@@ -1496,6 +1615,12 @@
       "acceptance_cases": [
         "AC-07",
         "AC-17"
+      ],
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Semantic readiness, safe telemetry/alerts and outage checks exist; retain deployment-specific evidence and approved operational objectives.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/engineering/semantic-health.md"
       ]
     },
     {
@@ -1549,7 +1674,11 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/34",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "partial",
+      "implementation_observation": "Finite request/tool/token/worker budgets exist; aggregate grant enforcement, measured capacity and approved recovery/service targets remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-031",
@@ -1619,7 +1748,11 @@
         "AC-15",
         "AC-16",
         "AC-17"
-      ]
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "HTTP instance/database-restart replay evidence exists; stale-backup fencing, independent key copies, deletion and full rollback/restore drills remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-032",
@@ -1747,7 +1880,11 @@
         "AC-15",
         "AC-16",
         "AC-17"
-      ]
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Layered tests and assessment notes exist; no complete applicable ASVS/SEC evidence mapping or independent assessment established.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-033",
@@ -1813,7 +1950,11 @@
         "AC-15",
         "AC-16",
         "AC-17"
-      ]
+      ],
+      "implementation_progress": "deferred_production",
+      "implementation_observation": "Representative deployed MC attack/load/failover exercises have not been established; not a paid-infrastructure blocker for local synthetic work.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-034",
@@ -1901,7 +2042,11 @@
         "AC-15",
         "AC-16",
         "AC-17"
-      ]
+      ],
+      "implementation_progress": "deferred_production",
+      "implementation_observation": "Independent production release approval is not complete; do not infer it from passing demo tests.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-035",
@@ -1976,6 +2121,12 @@
         "AC-06",
         "AC-07",
         "AC-08"
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Demo UI, prior clean-checkout proof and live smoke exist; reproducible packaged browser journey, protocol qualification and zero-charge public release evidence remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/engineering/first-vertical-slice.md"
       ]
     },
     {
@@ -2022,7 +2173,13 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/40",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "partial",
+      "implementation_observation": "SD-JWT artifact adapters and both-profile HTTP tests exist; kb+jwt, VCI/VP/DCQL/encrypted response flows, independent conformance and digest pinning remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/architecture/decisions/SOV-001-proof-profile.md"
+      ]
     },
     {
       "id": "SOV-037",
@@ -2076,7 +2233,11 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/42",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "deferred_production",
+      "implementation_observation": "No named independent assessor/date or accepted independent design/privacy report is recorded.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-038",
@@ -2146,7 +2307,11 @@
         "AC-12",
         "AC-16",
         "AC-17"
-      ]
+      ],
+      "implementation_progress": "deferred_production",
+      "implementation_observation": "KMS sign/unwrap paths remain fail-closed placeholders; no deployed attestation/key/input-channel qualification established.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-039",
@@ -2195,7 +2360,11 @@
       ],
       "condition": null,
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/41",
-      "acceptance_cases": []
+      "acceptance_cases": [],
+      "implementation_progress": "deferred_production",
+      "implementation_observation": "No actual real-data issuer/jurisdiction/provider capability approval recorded; demo hosting is a separate zero-charge qualification.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": []
     },
     {
       "id": "SOV-040",
@@ -2257,6 +2426,12 @@
         "AC-11",
         "AC-14",
         "AC-16"
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Trust sealing, stable subject/quorum checks and production startup guards exist; BFF human trust changes, source provenance and actual issuer authority remain.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/engineering/sov-040-hardening-assessment.md"
       ]
     },
     {
@@ -2330,6 +2505,13 @@
         "AC-06",
         "AC-07",
         "AC-08"
+      ],
+      "implementation_progress": "partial",
+      "implementation_observation": "Both artifact-profile HTTP E2E suites exist; no real DOM/JS holder/browser automation or full external selected-profile flow evidence. Keep issue 45 open.",
+      "progress_reviewed_on": "2026-10-29",
+      "progress_evidence": [
+        "docs/engineering/sov-041-holder-browser-assessment.md",
+        "scripts/e2e-verification.py"
       ]
     }
   ],
