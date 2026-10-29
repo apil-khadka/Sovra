@@ -1198,7 +1198,7 @@ Required closure evidence:
 Owner role: Integration and security E2E engineering.
 Gate: G1; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Both artifact-profile HTTP E2E suites exist; no real DOM/JS holder/browser automation or full external selected-profile flow evidence. Keep issue 45 open.
+Remaining/evidence scope: Both artifact-profile HTTP E2E suites exist, and the packaged same-origin SPA/BFF delivery is implemented with HTTP evidence; no real DOM/JS holder/browser automation or full external selected-profile flow evidence. Keep issue 45 open.
 Dependencies: SOV-010, SOV-011, SOV-012, SOV-015, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/45).
 Requirements: FR-08, FR-19, FR-20, FR-21, FR-22, SR-03, SR-04, SR-05, SR-06, INV-01, INV-02, INV-07, INV-08, NFR-01, NFR-07.
@@ -1206,7 +1206,9 @@ Validation: SEC-04, SEC-05, SEC-07, SEC-08, SEC-09, SEC-10, SEC-11, SEC-12, SEC-
 SRS acceptance: AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08.
 Open decisions: OD-01, OD-03, OD-06.
 Evidence reference: `docs/engineering/sov-041-holder-browser-assessment.md`.
+Evidence reference: `docs/engineering/sov-041-same-origin-packaging.md`.
 Evidence reference: `scripts/e2e-verification.py`.
+Evidence reference: `scripts/e2e-bff-login.py`.
 
 Acceptance criteria:
 

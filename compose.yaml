@@ -77,7 +77,9 @@ services:
       - sovra-net
 
   app-a:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -133,7 +135,9 @@ services:
   # entrypoint, own database role, no published ports, no Spring, no
   # HTTP. Heap-capped so a hostile decode cannot take the host.
   quarantine-worker:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     entrypoint:
       ["java", "-Xmx512m", "-cp", "BOOT-INF/classes:BOOT-INF/lib/*",
         "dev.sovra.worker.QuarantineWorkerMain"]
@@ -153,7 +157,9 @@ services:
       - sovra-net
 
   app-b:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8081:8080"
     environment:

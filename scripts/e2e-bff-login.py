@@ -140,6 +140,23 @@ def main():
     status, body, _ = request(probe, "GET", f"{KC}/realms/{REALM}/.well-known/openid-configuration")
     if status != 200 or b'"issuer":"http://sovra-keycloak:18080/realms/sovra"' not in body:
         fail("Keycloak discovery unreachable (is the compose stack up?)")
+    check("packaged origin serves the SPA entry at / (SOV-041)", True)
+    status, body, headers = request(probe, "GET", f"{APP}/")
+    if status != 200 or b'id="root"' not in body or b"/assets/" not in body:
+        fail(f"SPA entry missing at / (status={status})")
+    if "text/html" not in headers.get("Content-Type", ""):
+        fail("SPA entry is not HTML")
+    check("history fallback serves the entry for SPA routes", True)
+    status, body, _ = request(probe, "GET", f"{APP}/consent")
+    if status != 200 or b'id="root"' not in body:
+        fail(f"history fallback missing (status={status})")
+    check("API surface is not swallowed by the SPA fallback", True)
+    status, body, _ = request(probe, "GET", f"{APP}/api/health")
+    if status != 200 or b'"UP"' not in body:
+        fail(f"/api/health not intact (status={status})")
+    status, _, _ = request(probe, "GET", f"{APP}/api/does-not-exist")
+    if status != 401:
+        fail(f"anonymous unknown API returned {status}, want 401")
     op, jar = opener()
     check("member login lands with TENANT_MEMBER session (seed may lag boot)", True)
     landing, headers = login(op, "demo-member", "sovra-demo-member-01")

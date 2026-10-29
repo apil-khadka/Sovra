@@ -6,10 +6,16 @@ tasks (SOV-010, SOV-021 and later).
 
 ```sh
 pnpm install
-pnpm run dev      # :5173, proxies /api to the backend on :8080
-pnpm run build    # typecheck + production bundle
+pnpm run build    # typecheck + production bundle (packaged into the backend image)
+pnpm run dev      # :5173, proxies /api /oauth2 /login to :8080 for local iteration
 pnpm run lint
 ```
+
+The packaged demo serves this bundle from the backend origin
+itself (`http://localhost:8080` via `docker compose up --build`):
+SPA, BFF session, authorization callback, and logout share one
+origin, and the `:5173` dev server is never part of the login
+loop. See `docs/engineering/sov-041-same-origin-packaging.md`.
 
 Keep `pnpm-lock.yaml` pinned; it is the reproducible dependency record.
 

@@ -1,0 +1,16 @@
+# Backend image build context is the repository root (SOV-041 needs
+# frontend/ for the SPA build stage). Secrets, local research, and
+# regenerable outputs never enter the context.
+.git/
+.intel/
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+**/node_modules/
+**/target/
+**/dist/
+**/__pycache__/
+.venv/

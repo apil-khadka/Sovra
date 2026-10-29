@@ -32,6 +32,16 @@ forwarded headers (IF-02). Trusted routing rejects arbitrary redirects
 and wrong audiences: consent binds the exact audience, and verification
 refuses any submission whose audience differs from the consented one.
 
+Browser origin (SOV-041): the packaged demo serves the React SPA
+from the backend origin itself, so the SPA, BFF session cookies,
+authorization callback, and logout share one origin with the API
+(`http://localhost:8080` for compose `app-a`). No CORS
+configuration exists because no cross-origin browser caller is
+supported; session cookies are host-scoped with no `Domain`
+attribute. BFF sessions are per-instance and not portable across
+backend instances. See
+`sov-041-same-origin-packaging.md` for the serving decision.
+
 Per-operation authorizing roles are recorded in the OpenAPI
 `x-sovra-scopes` extension and enforced by the central authorization
 service; the matrix below summarizes them.

@@ -7,6 +7,8 @@ import dev.sovra.bff.BffLoginHandlers;
 import dev.sovra.bff.BffLoginService;
 import dev.sovra.bff.BffSessionFilter;
 import dev.sovra.bff.PkceAuthorizationRequestResolver;
+import dev.sovra.web.SpaRoutes;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,6 +40,11 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
  * (stateless, never reads a session) and Bearer [REDACTED] never
  * authenticate the BFF (the session filter clears non-session auth
  * first).
+ *
+ * <p>Packaged SPA (SOV-041): GET/HEAD outside the reserved
+ * API/auth/operations prefixes is public static content served
+ * from this same origin; the matcher below shares its boundary
+ * with the resource fallback ({@link SpaRoutes}).
  */
 @Configuration
 @EnableWebSecurity
@@ -141,6 +148,12 @@ public class SecurityConfig {
                     // without this, framework 400s surface as 401s.
                     .requestMatchers("/error")
                     .permitAll()
+                    // Packaged SPA (SOV-041): same-origin static
+                    // assets and history routes. Reserved prefixes
+                    // stay authenticated; nothing else here is a
+                    // controller, so there is nothing to bypass.
+                    .requestMatchers(new SpaStaticRequestMatcher())
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .httpBasic(Customizer.withDefaults())
@@ -149,5 +162,22 @@ public class SecurityConfig {
                 exceptions.authenticationEntryPoint(
                     (request, response, authException) -> response.setStatus(401)));
     return http.build();
+  }
+
+  /**
+   * GET/HEAD over public static paths (SOV-041). Safe methods only:
+   * mutations outside the reserved prefixes still require
+   * authentication and 401 anonymously.
+   */
+  static final class SpaStaticRequestMatcher
+      implements org.springframework.security.web.util.matcher.RequestMatcher {
+    @Override
+    public boolean matches(HttpServletRequest request) {
+      String method = request.getMethod();
+      if (!"GET".equals(method) && !"HEAD".equals(method)) {
+        return false;
+      }
+      return SpaRoutes.isPublicStaticPath(request.getRequestURI());
+    }
   }
 }
