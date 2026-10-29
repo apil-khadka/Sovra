@@ -9,8 +9,9 @@ import dev.sovra.authz.ResourceRef;
 import dev.sovra.guard.GuardClaims;
 import dev.sovra.guard.GuardPolicies;
 import dev.sovra.guard.PolicyDocument;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.issuance.TrustUnavailableException;
+import dev.sovra.trust.IssuerKeys;
 import dev.sovra.trust.TrustService;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -281,7 +282,7 @@ public class PlanningTools {
     List<Map<String, Object>> issuers = new ArrayList<>();
     for (TrustService.IssuerView issuer : snapshot.issuers()) {
       // First row wins per issuer, matching the guard and verifier.
-      if (!PlanningIssuers.usable(issuer, now.value())
+      if (!IssuerKeys.usable(issuer, now.value())
           || issuers.stream().anyMatch(row -> issuer.issuerId().equals(row.get("issuerId")))) {
         continue;
       }
@@ -381,7 +382,7 @@ public class PlanningTools {
     result.put("credentialTypes", issuer.credentialTypes());
     result.put("scope", issuer.scope());
     result.put("status", issuer.status());
-    result.put("usable", PlanningIssuers.usable(issuer, clock.instant()));
+    result.put("usable", IssuerKeys.usable(issuer, clock.instant()));
     result.put("validThrough", issuer.validThrough().toString());
     result.put("snapshotVersion", snapshot.version());
     return toJson(result);
@@ -458,7 +459,7 @@ public class PlanningTools {
     } else if (!PlanningIntents.OUTCOME.equals(outcome)) {
       verdict = "unsupported";
       detail = "outcome is outside the G1 allowlist";
-    } else if (!PlanningIssuers.usable(issuer, now)) {
+    } else if (!IssuerKeys.usable(issuer, now)) {
       verdict = "unusable";
       detail = "issuer is not currently usable";
     } else if (!issuer.credentialTypes().contains(credentialType)

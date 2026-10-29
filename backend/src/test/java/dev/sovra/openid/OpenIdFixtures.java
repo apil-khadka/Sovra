@@ -179,11 +179,6 @@ public final class OpenIdFixtures {
     return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
   }
 
-  /** Consent fixtures audience, re-exported for protocol tests. */
-  public static String audience() {
-    return ConsentFixtures.AUDIENCE;
-  }
-
   /** Fresh nonce, same shape as the verification challenge. */
   public static String nonce() {
     return VerificationFixtures.nonce();

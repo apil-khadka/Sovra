@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Base64;
 
 /** Opaque API-token hashing and generation. Tokens are shown once at creation. */
@@ -13,13 +12,14 @@ public final class TokenHasher {
   public static final String PREFIX = "sovra_test_";
   private static final int PREFIX_LEN = 8;
   private static final int SECRET_BYTES = 32;
+  private static final SecureRandom RANDOM = new SecureRandom();
 
   private TokenHasher() {}
 
   /** Generates a new token; only the hash is stored. */
   public static String generate() {
     byte[] secret = new byte[SECRET_BYTES];
-    new SecureRandom().nextBytes(secret);
+    RANDOM.nextBytes(secret);
     return PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
   }
 
@@ -45,26 +45,10 @@ public final class TokenHasher {
     return MessageDigest.isEqual(hash(token), expectedHash);
   }
 
-  /** Constant-time prefix comparison for defense in depth (DB also filters). */
-  public static boolean prefixMatches(String token, String expectedPrefix) {
-    if (token == null || !token.startsWith(PREFIX)) {
-      return false;
-    }
-    byte[] a = prefix(token).getBytes(StandardCharsets.UTF_8);
-    byte[] b = expectedPrefix.getBytes(StandardCharsets.UTF_8);
-    return a.length == b.length && MessageDigest.isEqual(a, b);
-  }
-
   private static String body(String token) {
     if (token == null || !token.startsWith(PREFIX)) {
       return "";
     }
     return token.substring(PREFIX.length());
-  }
-
-  public static void wipe(byte[] sensitive) {
-    if (sensitive != null) {
-      Arrays.fill(sensitive, (byte) 0);
-    }
   }
 }

@@ -299,7 +299,7 @@ class VerificationNegativeTests extends SovraAppRoleBase {
     Map<String, Object> followup = VerificationFixtures.verifyBody(
         stage.holder(), stage.requestId(), nonce, foreign, mapper);
     assertThatThrownBy(() -> VerificationFixtures.verify(client, stage.rp(), followup))
-        .isInstanceOf(HttpClientErrorException.UnprocessableContent.class);
+        .isInstanceOf(HttpClientErrorException.Conflict.class);
 
     Integer count = owner.queryForObject(
         "SELECT COUNT(*) FROM verification_decision WHERE request_id = ?",

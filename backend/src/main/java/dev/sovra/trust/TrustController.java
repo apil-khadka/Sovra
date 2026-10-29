@@ -1,9 +1,7 @@
 package dev.sovra.trust;
 
 import tools.jackson.databind.JsonNode;
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -44,7 +42,7 @@ public class TrustController {
   @PostMapping("/proposals")
   public ResponseEntity<Map<String, String>> propose(@Valid @RequestBody ProposalRequest request) {
     var maker =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     TrustService.ProposalResult result =
         trust.propose(
             maker,
@@ -62,15 +60,18 @@ public class TrustController {
   @PostMapping("/proposals/{id}/approve")
   public ResponseEntity<Map<String, String>> approve(@PathVariable("id") UUID proposalId) {
     var checker =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
-    trust.approve(checker, proposalId);
-    return ResponseEntity.ok(Map.of("proposalId", proposalId.toString()));
+        CurrentPrincipal.require();
+    boolean personVerified = trust.approve(checker, proposalId);
+    return ResponseEntity.ok(
+        Map.of(
+            "proposalId", proposalId.toString(),
+            "personVerified", String.valueOf(personVerified)));
   }
 
   @PostMapping("/snapshots/{version}/activate")
   public ResponseEntity<Map<String, String>> activate(@PathVariable("version") long version) {
     var activator =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     trust.activate(activator, version);
     return ResponseEntity.ok(Map.of("version", String.valueOf(version)));
   }
@@ -79,7 +80,7 @@ public class TrustController {
   public ResponseEntity<IssuerKeyService.KeyView> registerKey(
       @Valid @RequestBody RegisterKeyRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     IssuerKeyService.KeyView view =
         keys.register(
             caller,
@@ -93,7 +94,7 @@ public class TrustController {
   public ResponseEntity<IssuerKeyService.KeyView> revokeKey(
       @Valid @RequestBody RevokeKeyRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     IssuerKeyService.KeyView view =
         keys.revoke(
             caller,

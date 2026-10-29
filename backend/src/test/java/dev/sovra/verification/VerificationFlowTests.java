@@ -10,7 +10,7 @@ import dev.sovra.config.SovraMode;
 import dev.sovra.consent.ConsentFixtures;
 import dev.sovra.issuance.IssuanceFixtures;
 import dev.sovra.issuance.StatusEvidenceFetcher;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.tenancy.TenantContext;
 import dev.sovra.tenancy.TenantDataSource;

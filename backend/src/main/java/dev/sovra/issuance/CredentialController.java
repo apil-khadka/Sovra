@@ -1,8 +1,6 @@
 package dev.sovra.issuance;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
@@ -40,7 +38,7 @@ public class CredentialController {
       @RequestHeader("Idempotency-Key") String idempotencyKey,
       @Valid @RequestBody IssueRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     String response =
         issuance.issue(
             caller,
@@ -57,21 +55,21 @@ public class CredentialController {
   @GetMapping("/credentials/{id}")
   public ResponseEntity<IssuanceService.CredentialView> get(@PathVariable("id") UUID credentialId) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(issuance.get(caller, credentialId));
   }
 
   @GetMapping("/credentials/{id}/status")
   public ResponseEntity<IssuanceService.StatusView> status(@PathVariable("id") UUID credentialId) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(issuance.status(caller, credentialId));
   }
 
   @PostMapping("/credentials/{id}/revoke")
   public ResponseEntity<Map<String, String>> revoke(@PathVariable("id") UUID credentialId) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     IssuanceService.StatusView status = issuance.revoke(caller, credentialId);
     return ResponseEntity.ok(
         Map.of("credentialId", credentialId.toString(), "status", status.status()));

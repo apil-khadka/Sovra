@@ -140,6 +140,17 @@ class VpConformanceTests extends SovraAppRoleBase {
   }
 
   @Test
+  void completedSessionReplaysIdentically() throws Exception {
+    Stage stage = VerificationFixtures.approvedStage(client, owner, mapper, "vpc-replay");
+    SessionView session = openSession(stage);
+    String artifact = OpenIdFixtures.storedArtifact(owner, stage.credentialId());
+    String token = artifact + "~" + kb(stage, session.nonce(), ConsentFixtures.AUDIENCE);
+    String first = respond(session, token, Dcql.submission(), session.sessionId());
+    assertThat(first).startsWith("ACCEPTED");
+    assertThat(respond(session, token, Dcql.submission(), session.sessionId())).isEqualTo(first);
+  }
+
+  @Test
   void presentationWithoutBindingRejects() throws Exception {
     Stage stage = VerificationFixtures.approvedStage(client, owner, mapper, "vpc-nokb");
     SessionView session = openSession(stage);

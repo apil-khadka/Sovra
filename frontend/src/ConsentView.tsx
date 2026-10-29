@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import {
-  ConsentApiError,
-  exportPrivateKey,
-  fetchPresentation,
-  fetchReview,
-  generateHolder,
-  postDecision,
-} from './consent'
-import type { ConsentPresentation, ConsentReview, HolderKey } from './consent'
-import type { Caller, SessionInfo } from './auth'
+import { ApiError } from './api'
+import { EMPTY_CONNECTION, resolveCaller } from './auth'
+import type { Connection, SessionInfo } from './auth'
+import { exportPrivateKey, generateHolder } from './crypto'
+import type { HolderKey } from './crypto'
+import { fetchPresentation, fetchReview, postDecision } from './consent'
+import type { ConsentPresentation, ConsentReview } from './consent'
+import ConnectionFields from './components/ConnectionFields'
+import Field from './components/Field'
+import HolderKeyControls from './components/HolderKeyControls'
+import StateCard from './components/StateCard'
 
-// Minimal holder consent flow (SOV-010). Five visibly distinct states:
+// Holder consent flow (SOV-010). Five visibly distinct states:
 // pending, review, denied, unavailable, verified. Every server value
 // renders as plain text (React escapes by default); nothing here uses
 // innerHTML or renders links, so hostile RP strings cannot execute.
@@ -26,20 +27,8 @@ type Stage =
   | { kind: 'verified'; review: ConsentReview; presentation: ConsentPresentation }
   | { kind: 'error'; message: string }
 
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="consent-field">
-      <dt>{label}</dt>
-      <dd className={mono === true ? 'mono' : undefined}>{value}</dd>
-    </div>
-  )
-}
-
 export default function ConsentView({ session }: { session: SessionInfo | null }) {
-  const [base, setBase] = useState('')
-  const [token, setToken] = useState('')
-  const [useSession, setUseSession] = useState(true)
-  const [requestId, setRequestId] = useState('')
+  const [connection, setConnection] = useState<Connection>(EMPTY_CONNECTION)
   const [holder, setHolder] = useState<HolderKey | null>(null)
   const [keyStatus, setKeyStatus] = useState('')
   const [stage, setStage] = useState<Stage>({ kind: 'idle' })
@@ -54,55 +43,6 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
     }
   }
 
-  function caller(): Caller {
-    return session !== null && useSession ? { kind: 'session' } : { kind: 'token', token: token.trim() }
-  }
-
-  async function onLoad() {
-    setStage({ kind: 'loading' })
-    try {
-      const review = await fetchReview(base.trim(), caller(), requestId.trim())
-      if (review.state === 'PENDING') setStage({ kind: 'pending', review })
-      else if (review.state === 'DENIED') setStage({ kind: 'denied', review })
-      else if (review.state === 'UNAVAILABLE') setStage({ kind: 'unavailable', review })
-      else {
-        const presentation = await fetchPresentation(base.trim(), caller(), review.requestId)
-        setStage({ kind: 'verified', review, presentation })
-      }
-    } catch (err: unknown) {
-      setStage({
-        kind: 'error',
-        message: err instanceof ConsentApiError ? err.message : 'unreachable',
-      })
-    }
-  }
-
-  async function onDecide(decision: 'approve' | 'deny') {
-    if (stage.kind !== 'review' || holder === null) return
-    if (holder.thumbprint !== stage.review.holderThumbprint) return
-    setStage({ kind: 'deciding', review: stage.review })
-    try {
-      const review = await postDecision(base.trim(), caller(), holder, stage.review, decision)
-      if (review.state === 'VERIFIED') {
-        const presentation = await fetchPresentation(base.trim(), caller(), review.requestId)
-        setStage({ kind: 'verified', review, presentation })
-      } else if (review.state === 'DENIED') {
-        setStage({ kind: 'denied', review })
-      } else {
-        setStage({ kind: 'unavailable', review })
-      }
-    } catch (err: unknown) {
-      setStage({
-        kind: 'error',
-        message: err instanceof ConsentApiError ? err.message : 'unreachable',
-      })
-    }
-  }
-
-  function onReset() {
-    setStage({ kind: 'idle' })
-  }
-
   async function onCopyKey() {
     if (holder === null) return
     try {
@@ -113,6 +53,55 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
     }
   }
 
+  async function onLoad() {
+    setStage({ kind: 'loading' })
+    try {
+      const caller = resolveCaller(session, connection)
+      const base = connection.base.trim()
+      const review = await fetchReview(base, caller, connection.requestId.trim())
+      if (review.state === 'PENDING') setStage({ kind: 'pending', review })
+      else if (review.state === 'DENIED') setStage({ kind: 'denied', review })
+      else if (review.state === 'UNAVAILABLE') setStage({ kind: 'unavailable', review })
+      else {
+        const presentation = await fetchPresentation(base, caller, review.requestId)
+        setStage({ kind: 'verified', review, presentation })
+      }
+    } catch (err: unknown) {
+      setStage({
+        kind: 'error',
+        message: err instanceof ApiError ? err.message : 'unreachable',
+      })
+    }
+  }
+
+  async function onDecide(decision: 'approve' | 'deny') {
+    if (stage.kind !== 'review' || holder === null) return
+    if (holder.thumbprint !== stage.review.holderThumbprint) return
+    setStage({ kind: 'deciding', review: stage.review })
+    try {
+      const caller = resolveCaller(session, connection)
+      const base = connection.base.trim()
+      const review = await postDecision(base, caller, holder, stage.review, decision)
+      if (review.state === 'VERIFIED') {
+        const presentation = await fetchPresentation(base, caller, review.requestId)
+        setStage({ kind: 'verified', review, presentation })
+      } else if (review.state === 'DENIED') {
+        setStage({ kind: 'denied', review })
+      } else {
+        setStage({ kind: 'unavailable', review })
+      }
+    } catch (err: unknown) {
+      setStage({
+        kind: 'error',
+        message: err instanceof ApiError ? err.message : 'unreachable',
+      })
+    }
+  }
+
+  function onReset() {
+    setStage({ kind: 'idle' })
+  }
+
   const holderMatches =
     stage.kind === 'review' && holder !== null
       ? holder.thumbprint === stage.review.holderThumbprint
@@ -120,7 +109,8 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
 
   return (
     <section className="consent" aria-label="Holder consent">
-      <h2>Holder consent (synthetic demo)</h2>
+      <h1 className="view-title">Holder consent</h1>
+      <p className="view-lede">Review the exact request, then approve or deny it with your key.</p>
 
       {(stage.kind === 'idle' || stage.kind === 'loading' || stage.kind === 'error') && (
         <form
@@ -130,58 +120,19 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
             void onLoad()
           }}
         >
-          <label>
-            API base (blank for same origin)
-            <input
-              value={base}
-              onChange={(event) => setBase(event.target.value)}
-              placeholder=""
-              autoComplete="off"
-            />
-          </label>
-          {session !== null && (
-            <label className="consent-session">
-              <input
-                type="checkbox"
-                checked={useSession}
-                onChange={(event) => setUseSession(event.target.checked)}
-              />
-              Act as {session.displayName} (browser session)
-            </label>
-          )}
-          <label>
-            Bearer [REDACTED]
-            <input
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              autoComplete="off"
-              disabled={session !== null && useSession}
-            />
-          </label>
-          <label>
-            Proof request id
-            <input
-              value={requestId}
-              onChange={(event) => setRequestId(event.target.value)}
-              placeholder="request UUID from the relying party"
-              autoComplete="off"
-            />
-          </label>
-          <div className="consent-keyrow">
-            <button type="button" onClick={() => void onGenerateKey()}>
-              Generate holder key
-            </button>
-            {holder !== null && (
-              <code className="mono wrap">holder: {holder.thumbprint}</code>
-            )}
+          <ConnectionFields
+            session={session}
+            connection={connection}
+            onChange={setConnection}
+            tokenLabel="Bearer [REDACTED]"
+          />
+          <HolderKeyControls holder={holder} status={keyStatus} onGenerate={() => void onGenerateKey()}>
             {holder !== null && (
               <button type="button" onClick={() => void onCopyKey()}>
                 Copy private JWK
               </button>
             )}
-            {keyStatus !== '' && <p>{keyStatus}</p>}
-          </div>
+          </HolderKeyControls>
           <button type="submit" disabled={stage.kind === 'loading'}>
             {stage.kind === 'loading' ? 'Loading…' : 'Load request'}
           </button>
@@ -190,8 +141,7 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
       )}
 
       {stage.kind === 'pending' && (
-        <article className="consent-card state-pending">
-          <p className="consent-badge">Pending — awaiting your decision</p>
+        <StateCard tone="pending" badge="Pending — awaiting your decision">
           <dl>
             <Field label="Relying party" value={stage.review.rpId} />
             <Field label="Purpose" value={stage.review.purpose} />
@@ -209,22 +159,26 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
               Back
             </button>
           </div>
-        </article>
+        </StateCard>
       )}
 
       {stage.kind === 'review' && (
-        <article className="consent-card state-review">
-          <p className="consent-badge">Review — check every bound value</p>
+        <StateCard tone="review" badge="Review — check every bound value">
           <dl>
             <Field label="Relying party" value={stage.review.rpId} />
             <Field label="Audience" value={stage.review.audience} />
             <Field label="Purpose" value={stage.review.purpose} />
             <Field label="Exact claims" value={JSON.stringify(stage.review.claims)} mono />
-            <Field label="Plan hash" value={stage.review.planHash} mono />
-            <Field label="Challenge" value={stage.review.challenge} mono />
             <Field label="Expires" value={stage.review.expiresAt} mono />
             <Field label="Expected holder" value={stage.review.holderThumbprint} mono />
           </dl>
+          <details className="consent-details">
+            <summary>Machine-bound values</summary>
+            <dl>
+              <Field label="Plan hash" value={stage.review.planHash} mono />
+              <Field label="Challenge" value={stage.review.challenge} mono />
+            </dl>
+          </details>
           {holder === null && (
             <p role="alert">Generate your holder key first: only its signature can decide.</p>
           )}
@@ -236,6 +190,7 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
           <div className="consent-actions">
             <button
               type="button"
+              className="primary"
               disabled={holder === null || holderMatches === false}
               onClick={() => void onDecide('approve')}
             >
@@ -252,18 +207,15 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
               Cancel (shares nothing)
             </button>
           </div>
-        </article>
+        </StateCard>
       )}
 
       {stage.kind === 'deciding' && (
-        <article className="consent-card state-review">
-          <p className="consent-badge">Signing your decision…</p>
-        </article>
+        <StateCard tone="review" badge="Signing your decision…" />
       )}
 
       {stage.kind === 'denied' && (
-        <article className="consent-card state-denied">
-          <p className="consent-badge">Denied — nothing was shared</p>
+        <StateCard tone="denied" badge="Denied — nothing was shared">
           <dl>
             <Field label="Relying party" value={stage.review.rpId} />
             <Field label="Purpose" value={stage.review.purpose} />
@@ -272,37 +224,42 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
           <button type="button" onClick={onReset}>
             Done
           </button>
-        </article>
+        </StateCard>
       )}
 
       {stage.kind === 'unavailable' && (
-        <article className="consent-card state-unavailable">
-          <p className="consent-badge">Unavailable — no decision possible</p>
+        <StateCard tone="unavailable" badge="Unavailable — no decision possible">
           <p>{stage.review.stateReason}</p>
           <p>An expired request, or one whose credential was revoked, cannot be approved.</p>
           <button type="button" onClick={onReset}>
             Done
           </button>
-        </article>
+        </StateCard>
       )}
 
       {stage.kind === 'verified' && (
-        <article className="consent-card state-verified">
-          <p className="consent-badge">Verified — synthetic consent proof</p>
+        <StateCard tone="verified" badge="Verified — synthetic consent proof">
           <dl>
             <Field label="Relying party" value={stage.review.rpId} />
             <Field label="Purpose" value={stage.review.purpose} />
-            <Field label="Exact claims" value={JSON.stringify(stage.presentation.claims)} mono />
+            <Field
+              label="Exact claims"
+              value={JSON.stringify(stage.presentation.claims)}
+              mono
+            />
             <Field label="Profile" value={stage.presentation.profile} mono />
-            <Field label="Presentation" value={stage.presentation.presentation} mono />
           </dl>
-          <p>
-            Synthetic G1 evidence only. A technical proof, never a legal or KYC determination.
-          </p>
+          <details className="consent-details">
+            <summary>Signed presentation</summary>
+            <dl>
+              <Field label="Presentation" value={stage.presentation.presentation} mono />
+            </dl>
+          </details>
+          <p>Synthetic evidence only. A technical proof, never a legal or KYC determination.</p>
           <button type="button" onClick={onReset}>
             Done
           </button>
-        </article>
+        </StateCard>
       )}
     </section>
   )

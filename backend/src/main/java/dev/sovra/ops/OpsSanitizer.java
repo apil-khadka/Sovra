@@ -1,42 +1,24 @@
 package dev.sovra.ops;
 
+import dev.sovra.audit.AuditSanitizer;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Final output gate for operations surfaces. Check details, canary
  * payloads, and any future free-text ops field pass through here: secret-like
  * keys are dropped, values are truncated, and non-scalar values are replaced
  * with a type tag so raw driver or framework objects never reach Jackson.
- * Mirrors the {@code AuditService} minimization rules for ops-owned output.
+ * Key and truncation rules come from {@code AuditSanitizer}; only the
+ * heterogeneous-object shape is ops-owned.
  */
 public final class OpsSanitizer {
-
-  static final int MAX_VALUE_CHARS = 500;
-
-  private static final Pattern SENSITIVE_KEY =
-      Pattern.compile(
-          ".*(password|passwd|secret|token|api[_-]?key|private[_-]?key|ssn|social[_-]?security"
-              + "|dob|birth|passport|credential_|proof_|jwk|seed|mnemonic).*",
-          Pattern.CASE_INSENSITIVE);
 
   private OpsSanitizer() {}
 
   public static Map<String, String> sanitizeDetail(Map<String, String> detail) {
-    Map<String, String> clean = new LinkedHashMap<>();
-    if (detail == null) {
-      return clean;
-    }
-    for (Map.Entry<String, String> entry : detail.entrySet()) {
-      String key = entry.getKey();
-      if (key == null || SENSITIVE_KEY.matcher(key).matches()) {
-        continue;
-      }
-      clean.put(key, truncate(entry.getValue()));
-    }
-    return clean;
+    return AuditSanitizer.sanitize(detail);
   }
 
   /**
@@ -51,14 +33,14 @@ public final class OpsSanitizer {
     }
     for (Map.Entry<String, Object> entry : detail.entrySet()) {
       String key = entry.getKey();
-      if (key == null || SENSITIVE_KEY.matcher(key).matches()) {
+      if (AuditSanitizer.sensitiveKey(key)) {
         continue;
       }
       Object value = entry.getValue();
       if (value == null) {
         clean.put(key, "");
       } else if (value instanceof String text) {
-        clean.put(key, truncate(text));
+        clean.put(key, AuditSanitizer.truncate(text));
       } else if (value instanceof Number
           || value instanceof Boolean
           || value instanceof Instant
@@ -69,12 +51,5 @@ public final class OpsSanitizer {
       }
     }
     return clean;
-  }
-
-  private static String truncate(String value) {
-    if (value == null) {
-      return "";
-    }
-    return value.length() > MAX_VALUE_CHARS ? value.substring(0, MAX_VALUE_CHARS) : value;
   }
 }

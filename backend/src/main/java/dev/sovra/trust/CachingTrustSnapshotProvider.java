@@ -1,7 +1,6 @@
-package dev.sovra.issuance;
+package dev.sovra.trust;
 
 import dev.sovra.authz.EmergencyFlagService;
-import dev.sovra.trust.TrustService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;

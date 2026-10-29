@@ -32,7 +32,16 @@ public class MigrationCheck implements ReadinessCheck {
           "issuance_idempotency",
           "proof_request",
           "verification_decision",
-          "issuer_key_revocation");
+          "issuer_key_revocation",
+          "human_membership",
+          "vault_object",
+          "vault_object_version",
+          "vault_grant",
+          "vault_kek",
+          "quarantine_admission",
+          "vci_grant",
+          "vci_token",
+          "vp_session");
 
   private final JdbcTemplate global;
 

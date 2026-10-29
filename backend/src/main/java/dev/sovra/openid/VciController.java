@@ -1,8 +1,6 @@
 package dev.sovra.openid;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
@@ -38,14 +36,14 @@ public class VciController {
   @PostMapping("/offers")
   public ResponseEntity<String> offer(@Valid @RequestBody OfferRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return json(vci.createOffer(caller, request.issuerId(), request.vct()));
   }
 
   @PostMapping("/authorize")
   public ResponseEntity<String> authorize(@Valid @RequestBody AuthorizeRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return json(
         vci.authorize(caller, request.issuerId(), request.vct(), request.codeChallenge()));
   }

@@ -118,8 +118,15 @@ public class TrustService {
    */
   public record ApprovalIdentity(
       UUID accountId, String displayName, String subject, List<String> amr) {
-    public static ApprovalIdentity machine(ServiceAccountPrincipal caller) {
-      return new ApprovalIdentity(caller.id(), caller.name(), null, List.of());
+    /**
+     * Identity the quorum rules see. Humans bind their OIDC subject;
+     * machines bind only their account. AMR stays empty until a BFF
+     * trust endpoint can pass the session's authentication methods
+     * through (SOV-040 gap); the subject alone already separates two
+     * people from one person with two accounts.
+     */
+    public static ApprovalIdentity of(ServiceAccountPrincipal caller) {
+      return new ApprovalIdentity(caller.id(), caller.name(), caller.subject(), List.of());
     }
   }
 
@@ -140,7 +147,7 @@ public class TrustService {
       throw new ForbiddenException(decision.reasonCode());
     }
     TrustProposalValidator.validate(input, clock.instant());
-    ApprovalIdentity identity = ApprovalIdentity.machine(maker);
+    ApprovalIdentity identity = ApprovalIdentity.of(maker);
     try {
       Map<String, Object> row =
           global.queryForMap(
@@ -205,12 +212,12 @@ public class TrustService {
     }
     // Same-person (distinct accounts, one OIDC subject) is enforced
     // inside trust_approve, which sees both sides' human binding.
-    // Machine callers carry no subject; BFF-session callers will.
+    // Machine callers carry no subject; BFF-session humans do.
     // The production quorum verdict is pre-computed with the same rule
     // so the refusal lands before any business write.
     boolean quorum =
-        maker.subject() != null && checkerSubject() != null
-            && !maker.subject().equals(checkerSubject());
+        maker.subject() != null && checkerSubject(checker) != null
+            && !maker.subject().equals(checkerSubject(checker));
     if (mode.isProduction() && !quorum) {
       audit.recordDenial(
           checker, Action.APPROVE_TRUST_CHANGE, resource,
@@ -226,7 +233,7 @@ public class TrustService {
               proposalId,
               checker.id(),
               checker.name(),
-              checkerSubject(),
+              checkerSubject(checker),
               null);
       verified = Boolean.TRUE.equals(result);
     } catch (DataAccessException e) {
@@ -282,9 +289,9 @@ public class TrustService {
         activator, Action.ACTIVATE_TRUST_SNAPSHOT, resource, decision, "", Map.of());
   }
 
-  /** OIDC subject binding; machine callers carry none, BFF sessions will. */
-  private static String checkerSubject() {
-    return null;
+  /** OIDC subject binding the principal carried in; null for machines. */
+  private static String checkerSubject(ServiceAccountPrincipal checker) {
+    return checker.subject();
   }
 
   private Maker makerOf(UUID proposalId) {

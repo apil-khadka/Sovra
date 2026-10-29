@@ -1,6 +1,7 @@
 package dev.sovra.issuance;
 
 import com.nimbusds.jose.crypto.impl.ECDSA;
+import dev.sovra.trust.TrustSnapshotProvider;
 import java.math.BigInteger;
 import java.time.Clock;
 import java.time.Instant;
@@ -52,7 +53,6 @@ public class LocalDevSigner implements IssuerSigner {
   private final KeyRef keyRef = new KeyRef(ISSUER_ID, KEY_ID, KEY_VERSION);
   private final ECPrivateKey privateKey;
   private final ECPoint publicPoint;
-  private final ECParameterSpec params;
   private final JdbcTemplate global;
   private final TrustSnapshotProvider snapshots;
   private final ObjectMapper mapper;
@@ -77,7 +77,7 @@ public class LocalDevSigner implements IssuerSigner {
     this.mapper = mapper;
     this.clock = clock;
     KeyFactory factory = KeyFactory.getInstance("EC");
-    this.params = dev.sovra.crypto.P256.params();
+    ECParameterSpec params = dev.sovra.crypto.P256.params();
     // Scalar 1: public key is the generator point. Anyone can recompute
     // this key, which is exactly why it must never leave synthetic use.
     this.privateKey =
@@ -119,16 +119,8 @@ public class LocalDevSigner implements IssuerSigner {
     return mapper.readTree(a).equals(mapper.readTree(b));
   }
 
-  KeyRef keyRef() {
-    return keyRef;
-  }
-
-  String issuerId() {
-    return ISSUER_ID;
-  }
-
   /** Public JWK (no private material; there is no private-key accessor). */
-  String publicJwk() {
+  private String publicJwk() {
     Map<String, String> jwk =
         Map.of(
             "kty", "EC",

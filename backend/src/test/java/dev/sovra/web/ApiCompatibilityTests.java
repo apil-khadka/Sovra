@@ -24,11 +24,45 @@ import org.yaml.snakeyaml.Yaml;
  * and no documented path may be stale. A behavior change without a
  * contract bump fails here.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {
+      "sovra.bff.enabled=true",
+      "sovra.bff.require-https-issuer=false",
+      "sovra.bff.redirect-uri=http://localhost:18085/login/oauth2/code/sovra",
+      "sovra.bff.post-logout-redirect-uri=http://localhost:18085/",
+      "spring.security.oauth2.client.registration.sovra.client-id=sovra-bff",
+      "spring.security.oauth2.client.registration.sovra.client-secret=stub-secret",
+      "spring.security.oauth2.client.registration.sovra.scope=openid,profile,groups,tenant",
+      "spring.security.oauth2.client.registration.sovra.redirect-uri=http://localhost:18085/login/oauth2/code/sovra"
+    })
 class ApiCompatibilityTests extends SovraAppRoleBase {
 
+  static final dev.sovra.bff.StubOpenIdProvider STUB;
+
+  static {
+    try {
+      STUB = new dev.sovra.bff.StubOpenIdProvider("sovra-bff", "stub-secret");
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  @org.springframework.test.context.DynamicPropertySource
+  static void stubProvider(org.springframework.test.context.DynamicPropertyRegistry registry) {
+    registry.add(
+        "spring.security.oauth2.client.provider.sovra.issuer-uri", STUB::issuer);
+    registry.add("sovra.bff.issuer", STUB::issuer);
+    registry.add("sovra.bff.end-session-endpoint", () -> STUB.baseUrl() + "/stub-logout");
+  }
+
+  @org.junit.jupiter.api.AfterAll
+  static void closeStub() {
+    STUB.close();
+  }
+
   /** Contract version this build implements; bump with any behavior change. */
-  static final String EXPECTED_CONTRACT_VERSION = "0.8.0";
+  static final String EXPECTED_CONTRACT_VERSION = "0.9.0";
 
   @Autowired
   @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")

@@ -209,13 +209,13 @@ class IssuanceNegativeTests extends SovraAppRoleBase {
 
   @Test
   void sameKeyDifferentRequestConflicts() throws Exception {
-    TestAccount issuer = TestAccounts.create(owner, "neg-422", Set.of("ISSUER_OPS"));
+    TestAccount issuer = TestAccounts.create(owner, "neg-409", Set.of("ISSUER_OPS"));
     IssuanceFixtures.HolderKeys first = IssuanceFixtures.generateHolder(mapper);
     IssuanceFixtures.HolderKeys second = IssuanceFixtures.generateHolder(mapper);
-    String key = "neg-422-" + UUID.randomUUID();
+    String key = "neg-409-" + UUID.randomUUID();
     issueRaw(issuer, key, issueBody(first, key));
     assertThatThrownBy(() -> issueRaw(issuer, key, issueBody(second, key)))
-        .isInstanceOf(HttpClientErrorException.UnprocessableContent.class);
+        .isInstanceOf(HttpClientErrorException.Conflict.class);
   }
 
   @Test

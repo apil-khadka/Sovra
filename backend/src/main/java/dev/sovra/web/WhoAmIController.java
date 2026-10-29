@@ -1,8 +1,7 @@
 package dev.sovra.web;
 
+import dev.sovra.auth.CurrentPrincipal;
 import dev.sovra.auth.ServiceAccountPrincipal;
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +17,7 @@ public class WhoAmIController {
   @GetMapping
   public ResponseEntity<Map<String, Object>> whoami() {
     ServiceAccountPrincipal principal =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(
         Map.of(
             "accountId", principal.id().toString(),

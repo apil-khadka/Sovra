@@ -21,12 +21,14 @@ public final class VaultCrypto {
   static final int GCM_TAG_BITS = 128;
   static final int DEK_BYTES = 32;
 
+  private static final SecureRandom RANDOM = new SecureRandom();
+
   private VaultCrypto() {}
 
-  /** Fresh random bytes from a new SecureRandom per call. */
+  /** Fresh random bytes. */
   public static byte[] randomBytes(int length) {
     byte[] raw = new byte[length];
-    new SecureRandom().nextBytes(raw);
+    RANDOM.nextBytes(raw);
     return raw;
   }
 

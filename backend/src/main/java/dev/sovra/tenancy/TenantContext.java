@@ -33,4 +33,30 @@ public final class TenantContext {
   public static void clear() {
     CURRENT.remove();
   }
+
+  /**
+   * Runs work as the given principal, restoring the empty context
+   * after. For service code that acts outside a request (wallet
+   * callbacks resolving their creator); request filters own their
+   * lifecycle directly instead.
+   */
+  public static void with(ServiceAccountPrincipal principal, Runnable work) {
+    set(principal);
+    try {
+      work.run();
+    } finally {
+      clear();
+    }
+  }
+
+  /** Result-bearing variant of {@link #with}. */
+  public static <T> T withResult(
+      ServiceAccountPrincipal principal, java.util.function.Supplier<T> work) {
+    set(principal);
+    try {
+      return work.get();
+    } finally {
+      clear();
+    }
+  }
 }

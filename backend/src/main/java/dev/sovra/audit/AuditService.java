@@ -7,9 +7,8 @@ import dev.sovra.authz.Action;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ResourceRef;
 import dev.sovra.authz.ReasonCode;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,14 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class AuditService {
-
-  static final int MAX_VALUE_CHARS = 500;
-
-  private static final Pattern SENSITIVE_KEY =
-      Pattern.compile(
-          ".*(password|passwd|secret|token|api[_-]?key|private[_-]?key|ssn|social[_-]?security"
-              + "|dob|birth|passport|credential_|proof_|jwk|seed|mnemonic).*",
-          Pattern.CASE_INSENSITIVE);
 
   private final AuditEventRepository events;
   private final ObjectMapper mapper;
@@ -47,8 +38,14 @@ public class AuditService {
       String correlationId,
       Map<String, String> detail) {
     String decisionText = decision.permitted() ? "PERMIT" : "DENY";
+    // Scope follows the resource, not the actor: global-resource
+    // actions (trust registry) are platform evidence visible to every
+    // tenant reader, so the chain of custody for a global change is
+    // never fragmented across caller tenants. Tenant-scoped actions
+    // keep actor attribution; their isolation is unchanged.
+    UUID scope = resource.tenantId().isPresent() ? actor.tenantId() : null;
     events.insert(
-        actor.tenantId(),
+        scope,
         "service_account",
         actor.id().toString(),
         action.name(),
@@ -63,22 +60,7 @@ public class AuditService {
 
   /** Drops secret-like keys and truncates values; never throws on content. */
   Map<String, String> sanitize(Map<String, String> detail) {
-    Map<String, String> clean = new LinkedHashMap<>();
-    if (detail == null) {
-      return clean;
-    }
-    for (Map.Entry<String, String> entry : detail.entrySet()) {
-      String key = entry.getKey();
-      if (key == null || SENSITIVE_KEY.matcher(key).matches()) {
-        continue;
-      }
-      String value = entry.getValue();
-      if (value != null && value.length() > MAX_VALUE_CHARS) {
-        value = value.substring(0, MAX_VALUE_CHARS);
-      }
-      clean.put(key, value == null ? "" : value);
-    }
-    return clean;
+    return AuditSanitizer.sanitize(detail);
   }
 
   private String toJson(Map<String, String> detail) {

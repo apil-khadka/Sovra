@@ -70,7 +70,8 @@ class AuditDurabilityTests extends SovraPostgresBase {
     Map<String, Object> row = TestAccounts.auditRow(owner, "PROPOSE_TRUST_CHANGE");
     assertThat(row.get("decision")).isEqualTo("PERMIT");
     assertThat(row.get("reason_code")).isEqualTo("PERMIT");
-    assertThat(row.get("tenant_id")).isEqualTo(account.tenantId());
+    // Global resource: platform evidence, owned by no tenant.
+    assertThat(row.get("tenant_id")).isNull();
     assertThat(row.get("correlation_id")).isEqualTo("corr-1");
     assertThat(row.get("detail").toString()).contains("p1");
   }

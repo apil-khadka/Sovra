@@ -94,13 +94,4 @@ public final class TrustProposalValidator {
       throw new InvalidProposalException(field + " is required");
     }
   }
-
-  /** Visible for controller tests. */
-  static void validateTypes(List<String> types) {
-    for (String vct : types) {
-      if (vct == null || !vct.startsWith(VCT_PREFIX)) {
-        throw new InvalidProposalException("unapproved credential type: " + vct);
-      }
-    }
-  }
 }

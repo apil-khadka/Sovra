@@ -1,8 +1,5 @@
 package dev.sovra.auth;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -46,7 +43,7 @@ public class ServiceAccountController {
   @PostMapping
   public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ServiceAccountService.CreatedAccount created =
         accounts.create(caller, request.name(), request.roles(), request.expiresAt());
     Map<String, Object> body = new LinkedHashMap<>(view(created.account()));
@@ -57,14 +54,14 @@ public class ServiceAccountController {
   @GetMapping
   public ResponseEntity<List<Map<String, Object>>> list() {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(accounts.list(caller).stream().map(ServiceAccountController::view).toList());
   }
 
   @GetMapping("/{id}")
   public ResponseEntity<Map<String, Object>> get(@PathVariable("id") UUID id) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(view(accounts.get(caller, id)));
   }
 
@@ -72,7 +69,7 @@ public class ServiceAccountController {
   public ResponseEntity<Map<String, Object>> rotate(
       @PathVariable("id") UUID id, @RequestBody(required = false) RotateRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ServiceAccountService.CreatedAccount rotated =
         accounts.rotate(caller, id, request == null ? null : request.expiresAt());
     Map<String, Object> body = new LinkedHashMap<>(view(rotated.account()));
@@ -83,7 +80,7 @@ public class ServiceAccountController {
   @PostMapping("/{id}/revoke")
   public ResponseEntity<Map<String, Object>> revoke(@PathVariable("id") UUID id) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(view(accounts.revoke(caller, id)));
   }
 

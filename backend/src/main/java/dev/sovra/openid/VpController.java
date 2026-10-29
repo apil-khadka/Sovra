@@ -1,8 +1,6 @@
 package dev.sovra.openid;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -39,7 +37,7 @@ public class VpController {
   @PostMapping("/requests")
   public ResponseEntity<String> create(@Valid @RequestBody CreateRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return json(vp.createRequest(caller, request.proofRequestId()));
   }
 

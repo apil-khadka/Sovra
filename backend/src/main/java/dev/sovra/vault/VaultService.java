@@ -13,13 +13,13 @@ import dev.sovra.authz.ResourceRef;
 import dev.sovra.config.DemoProperties;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.HexFormat;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,14 +40,6 @@ public class VaultService {
   static final int MAX_CONTENT_BYTES = 16777216 - 16;
   static final long MIN_GRANT_TTL_SECONDS = 60;
   static final long MAX_GRANT_TTL_SECONDS = 86400;
-
-  /**
-   * Quarantine marker purpose (SOV-017). Objects carrying it are
-   * unscanned hostile input: the content endpoint refuses them even
-   * under a live grant, and only {@link #readForQuarantine} opens
-   * them, server-side, during promotion of a CLEAN verdict.
-   */
-  public static final String QUARANTINE_PURPOSE = "quarantine-scan";
 
   /**
    * Byte provenance for {@link #store}. The public-demo boundary
@@ -227,10 +219,10 @@ public class VaultService {
             + " FROM vault_object_version WHERE object_id = ? ORDER BY version",
         (rs, row) -> new VersionMetadata(
             rs.getInt("version"),
-            sorted(rs.getArray("authorized_purposes")),
+            VaultEnvelope.sortedPurposes(rs.getArray("authorized_purposes")),
             rs.getInt("kek_version"),
             rs.getString("status"),
-            hex(rs.getBytes("content_sha256")),
+            HexFormat.of().formatHex(rs.getBytes("content_sha256")),
             rs.getTimestamp("created_at").toInstant()),
         objectId);
     audit.record(
@@ -322,7 +314,7 @@ public class VaultService {
     if (!"VALID".equals(row.status())) {
       throw new VaultNotFoundException();
     }
-    if (row.purposes().contains(QUARANTINE_PURPOSE)) {
+    if (row.purposes().contains(VaultEnvelope.QUARANTINE_PURPOSE)) {
       // Unscanned input never leaves through the content endpoint,
       // grant or no grant; promotion re-seals it server-side.
       deny(caller, Action.VAULT_READ_OBJECT, objectId.toString(), decision,
@@ -338,7 +330,7 @@ public class VaultService {
         decision, "",
         Map.of("version", String.valueOf(version), "purpose", purpose, "grant",
             grantId.toString()));
-    return new ReadResult(content, version, hex(row.contentSha256()));
+    return new ReadResult(content, version, HexFormat.of().formatHex(row.contentSha256()));
   }
 
   /**
@@ -361,7 +353,7 @@ public class VaultService {
     if (!"VALID".equals(row.status())) {
       throw new VaultNotFoundException();
     }
-    if (!row.purposes().contains(QUARANTINE_PURPOSE)) {
+    if (!row.purposes().contains(VaultEnvelope.QUARANTINE_PURPOSE)) {
       throw new VaultInvalidException("not a quarantine object");
     }
     GrantRow grant = grantRow(grantId);
@@ -577,7 +569,7 @@ public class VaultService {
             rs.getObject("object_id", UUID.class),
             rs.getInt("version"),
             rs.getString("issuer_id"),
-            sorted(rs.getArray("authorized_purposes")),
+            VaultEnvelope.sortedPurposes(rs.getArray("authorized_purposes")),
             rs.getBytes("content_sha256"),
             rs.getInt("kek_version"),
             rs.getBytes("wrapped_dek"),
@@ -646,7 +638,7 @@ public class VaultService {
       throw new VaultInvalidException("content must be 1..16777200 bytes");
     }
     if (expectedSha256Hex != null
-        && !hex(VaultCrypto.sha256(content)).equals(expectedSha256Hex.toLowerCase())) {
+        && !HexFormat.of().formatHex(VaultCrypto.sha256(content)).equals(expectedSha256Hex.toLowerCase())) {
       throw new VaultInvalidException("content does not match the pinned digest");
     }
     return content;
@@ -664,21 +656,4 @@ public class VaultService {
     }
   }
 
-  private static List<String> sorted(java.sql.Array array) throws java.sql.SQLException {
-    if (array == null) {
-      return List.of();
-    }
-    String[] values = (String[]) array.getArray();
-    Arrays.sort(values);
-    return List.of(values);
-  }
-
-  private static String hex(byte[] bytes) {
-    StringBuilder hex = new StringBuilder(bytes.length * 2);
-    for (byte b : bytes) {
-      hex.append(Character.forDigit((b >> 4) & 0xF, 16));
-      hex.append(Character.forDigit(b & 0xF, 16));
-    }
-    return hex.toString();
-  }
 }

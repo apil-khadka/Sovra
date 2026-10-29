@@ -1,19 +1,18 @@
 package dev.sovra.bff;
 
 import dev.sovra.audit.AuditService;
-import dev.sovra.auth.ServiceAccountAuthentication;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.authz.Role;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -55,7 +54,7 @@ public class BffController {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("displayName", principal.name());
     body.put("tenantId", principal.tenantId().toString());
-    body.put("roles", new java.util.ArrayList<>(principal.roles()));
+    body.put("roles", principal.roles().stream().sorted().map(Role::name).toList());
     body.put("amr", session == null ? List.of() : session.getAttribute(BffLoginService.SESSION_AMR));
     body.put("authTime", session == null ? null : session.getAttribute(BffLoginService.SESSION_AUTH_TIME));
     return ResponseEntity.ok(body);
@@ -92,10 +91,7 @@ public class BffController {
   }
 
   private ServiceAccountPrincipal current() {
-    return Optional.ofNullable(SecurityContextHolder.getContext().getAuthentication())
-        .filter(ServiceAccountAuthentication.class::isInstance)
-        .map(authentication -> ((ServiceAccountAuthentication) authentication).principal())
-        .orElse(null);
+    return CurrentPrincipal.get().orElse(null);
   }
 
   private static String urlEncode(String value) {

@@ -1,5 +1,6 @@
 package dev.sovra.web;
 
+import dev.sovra.audit.AuditCursorException;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.TenantMismatchException;
 import dev.sovra.consent.ConsentNotFoundException;
@@ -137,9 +138,9 @@ public class ApiExceptionHandler {
   @ExceptionHandler(IdempotencyConflictException.class)
   public ResponseEntity<Object> idempotencyConflict(HttpServletRequest request) {
     if (wantsProblem(request)) {
-      return problem(HttpStatus.UNPROCESSABLE_ENTITY, "idempotency_conflict", false);
+      return problem(HttpStatus.CONFLICT, "idempotency_conflict", false);
     }
-    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+    return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "idempotency_conflict"));
   }
 
@@ -147,18 +148,18 @@ public class ApiExceptionHandler {
       dev.sovra.auth.ServiceAccountService.ServiceAccountConflictException.class)
   public ResponseEntity<Object> serviceAccountConflict(HttpServletRequest request) {
     if (wantsProblem(request)) {
-      return problem(HttpStatus.UNPROCESSABLE_ENTITY, "service_account_conflict", false);
+      return problem(HttpStatus.CONFLICT, "service_account_conflict", false);
     }
-    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+    return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "service_account_conflict"));
   }
 
   @ExceptionHandler(VerificationConflictException.class)
   public ResponseEntity<Object> verificationConflict(HttpServletRequest request) {
     if (wantsProblem(request)) {
-      return problem(HttpStatus.UNPROCESSABLE_ENTITY, "verification_conflict", false);
+      return problem(HttpStatus.CONFLICT, "verification_conflict", false);
     }
-    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+    return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "verification_conflict"));
   }
 

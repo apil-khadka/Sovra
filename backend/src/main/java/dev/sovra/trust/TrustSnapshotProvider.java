@@ -1,6 +1,5 @@
-package dev.sovra.issuance;
+package dev.sovra.trust;
 
-import dev.sovra.trust.TrustService;
 import java.util.Optional;
 
 /**

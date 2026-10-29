@@ -18,7 +18,7 @@ async function submitVerification(
   privateJwk: EcJwk,
   thumb: string,
 ): Promise<void> {
-  await page.getByRole('button', { name: 'Verify presentation' }).click()
+  await page.getByRole('link', { name: 'Verify presentation' }).click()
   await page.getByLabel('Proof request id').fill(requestId)
   await page.getByLabel('Session audience').fill(audience)
   await page.getByRole('button', { name: 'New nonce' }).click()

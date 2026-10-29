@@ -5,6 +5,7 @@ import dev.sovra.guard.EvidenceCitation;
 import dev.sovra.guard.GuardPolicies;
 import dev.sovra.guard.Recommendation;
 import dev.sovra.issuance.SyntheticJwtEncoder;
+import dev.sovra.trust.IssuerKeys;
 import dev.sovra.trust.TrustService;
 import java.time.Instant;
 import java.util.List;
@@ -29,7 +30,7 @@ public final class FixturePlanner {
       PlanningIntent intent, TrustService.SnapshotView snapshot, Instant now, String toolHash) {
     TrustService.IssuerView issuer =
         snapshot.issuers().stream()
-            .filter(i -> PlanningIssuers.usable(i, now))
+            .filter(i -> IssuerKeys.usable(i, now))
             .filter(i -> i.credentialTypes().contains(SyntheticJwtEncoder.ADULT_VCT))
             .findFirst()
             .orElse(null);

@@ -6,10 +6,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.sovra.SovraPostgresBase;
 import dev.sovra.TestAccounts;
 import dev.sovra.TestAccounts.TestAccount;
+import dev.sovra.auth.HumanMembershipRepository;
+import dev.sovra.auth.ServiceAccountPrincipal;
+import dev.sovra.authz.Role;
+import dev.sovra.tenancy.TenantContext;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +24,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class TrustFlowTests extends SovraPostgresBase {
@@ -28,6 +34,12 @@ class TrustFlowTests extends SovraPostgresBase {
   @LocalServerPort int port;
 
   @Autowired DataSource dataSource;
+
+  @Autowired TrustService trust;
+
+  @Autowired HumanMembershipRepository memberships;
+
+  @Autowired ObjectMapper mapper;
 
   RestClient client;
   JdbcTemplate owner;
@@ -70,6 +82,41 @@ class TrustFlowTests extends SovraPostgresBase {
 
   static Map<String, Object> proposal() {
     return Map.of("issuers", List.of(issuer("key-1")), "policies", List.of(policy()), "note", "v1");
+  }
+
+  @Test
+  void humanQuorumIsPersonVerified() {
+    TestAccount anchor = TestAccounts.create(owner, "hq-anchor", Set.of("TENANT_MEMBER"));
+    UUID tenant = anchor.tenantId();
+    ServiceAccountPrincipal maker =
+        memberships
+            .upsert(
+                tenant, "https://op.example/hq", "hq-maker", "HQ Maker",
+                Set.of(Role.TRUST_ADMIN))
+            .principal();
+    ServiceAccountPrincipal checker =
+        memberships
+            .upsert(
+                tenant, "https://op.example/hq", "hq-checker", "HQ Checker",
+                Set.of(Role.TRUST_ADMIN))
+            .principal();
+    TrustService.ProposalInput input =
+        new TrustService.ProposalInput(
+            List.of(
+                new TrustService.IssuerInput(
+                    "np-mock-issuer", "Mock NP issuer", "adult-status", List.of(VCT),
+                    "hq-1", 1, mapper.valueToTree(p256Jwk("hq-1")),
+                    Instant.now().minusSeconds(60), Instant.now().plusSeconds(3600),
+                    "ACTIVE")),
+            List.of(
+                new TrustService.PolicyInput("demo-rp", "age-gate", List.of(VCT), "MEDIUM")));
+    TenantContext.set(maker);
+    try {
+      TrustService.ProposalResult result = trust.propose(maker, input, "human quorum");
+      assertThat(trust.approve(checker, result.proposalId())).isTrue();
+    } finally {
+      TenantContext.clear();
+    }
   }
 
   @Test

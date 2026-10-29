@@ -1,4 +1,4 @@
-package dev.sovra.issuance;
+package dev.sovra.trust;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import dev.sovra.SovraPostgresBase;
 import dev.sovra.authz.EmergencyFlagService;
-import dev.sovra.trust.TrustService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;

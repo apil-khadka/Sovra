@@ -209,7 +209,7 @@ class ServiceAccountLifecycleTests extends SovraAppRoleBase {
             .body(Map.of())
             .retrieve()
             .body(String.class))
-        .isInstanceOf(HttpClientErrorException.UnprocessableContent.class);
+        .isInstanceOf(HttpClientErrorException.Conflict.class);
     Map<String, Object> again = client
         .post()
         .uri("/api/auth/service-accounts/" + id + "/revoke")

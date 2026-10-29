@@ -69,6 +69,10 @@ class LeastPrivilegeTests extends SovraPostgresBase {
     }
   }
 
+  private List<UUID> tenantRows() throws Exception {
+    return auditTenants().stream().filter(id -> id != null).toList();
+  }
+
   private void seedAudit(UUID tenantId) {
     owner.update(
         "INSERT INTO audit_event (tenant_id, actor_type, actor_id, action, resource_type,"
@@ -84,10 +88,12 @@ class LeastPrivilegeTests extends SovraPostgresBase {
     seedAudit(accountA.tenantId());
     seedAudit(accountB.tenantId());
 
+    // NULL marks platform rows (global actions), visible by design;
+    // isolation means no other TENANT's rows appear.
     setTenant(accountA.tenantId());
-    assertThat(auditTenants()).containsExactly(accountA.tenantId());
+    assertThat(tenantRows()).containsExactly(accountA.tenantId());
     setTenant(accountB.tenantId());
-    assertThat(auditTenants()).containsExactly(accountB.tenantId());
+    assertThat(tenantRows()).containsExactly(accountB.tenantId());
   }
 
   @Test

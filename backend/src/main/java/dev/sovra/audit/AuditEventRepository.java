@@ -61,15 +61,17 @@ public class AuditEventRepository {
   /**
    * Keyset page over the stable {@code (occurred_at, id)} ordering (SOV-015,
    * IF-11). The cursor is opaque; callers treat it as an untrusted string.
-   * Tenant filtering applies before the cursor, so a foreign cursor can
-   * only narrow the caller's own page, never widen it.
+   * The page holds the caller's tenant rows plus platform rows (global
+   * actions, {@code tenant_id IS NULL}); other tenants' rows never
+   * appear. Tenant filtering applies before the cursor, so a foreign
+   * cursor can only narrow the caller's own page, never widen it.
    */
   public List<Map<String, Object>> listRecent(UUID tenantId, int limit, AuditCursor cursor) {
     // Typed mapping: raw PG types (jsonb, arrays) must never reach Jackson.
     String sql =
         "SELECT id, occurred_at, actor_type, actor_id, action, resource_type,"
             + " resource_id, decision, reason_code, policy_version, correlation_id, detail"
-            + " FROM audit_event WHERE tenant_id = ?";
+            + " FROM audit_event WHERE (tenant_id = ? OR tenant_id IS NULL)";
     Object[] args;
     if (cursor == null) {
       args = new Object[] {tenantId, bounded(limit)};

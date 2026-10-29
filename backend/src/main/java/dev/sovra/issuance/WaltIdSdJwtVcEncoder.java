@@ -79,7 +79,7 @@ public class WaltIdSdJwtVcEncoder implements CredentialEncoder {
             evidence.keyRef().keyId(),
             TYP,
             Collections.emptyMap());
-    return new EncodedCredential(sdJwt.toString(), payload.toString());
+    return new EncodedCredential(sdJwt.toString());
   }
 
   private static JsonObject holderJwk(JsonNode jwk) {

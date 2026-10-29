@@ -1,6 +1,5 @@
 package dev.sovra.audit;
 
-import dev.sovra.web.AuditCursorException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;

@@ -211,7 +211,7 @@ class ProblemJsonTests extends SovraAppRoleBase {
   }
 
   @Test
-  void idempotencyConflictMapsToUnprocessableProblem() throws Exception {
+  void idempotencyConflictMapsToConflictProblem() throws Exception {
     TestAccount issuer = TestAccounts.create(owner, "problem-issuer", Set.of("ISSUER_OPS"));
     HolderKeys holder = IssuanceFixtures.generateHolder(mapper);
     String key = "problem-" + UUID.randomUUID();
@@ -246,9 +246,9 @@ class ProblemJsonTests extends SovraAppRoleBase {
                     .retrieve()
                     .toBodilessEntity())
         .isInstanceOfSatisfying(
-            HttpClientErrorException.UnprocessableContent.class,
+            HttpClientErrorException.Conflict.class,
             e -> {
-              assertThat(e.getStatusCode()).isEqualTo(HttpStatusCode.valueOf(422));
+              assertThat(e.getStatusCode()).isEqualTo(HttpStatusCode.valueOf(409));
               assertThat(problem(e).get("code")).isEqualTo("idempotency_conflict");
               assertThat(problem(e).get("retryable")).isEqualTo(Boolean.FALSE);
             });

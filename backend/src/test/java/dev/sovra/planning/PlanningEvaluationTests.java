@@ -9,7 +9,7 @@ import dev.sovra.guard.EvidenceCitation;
 import dev.sovra.guard.GuardPolicies;
 import dev.sovra.guard.Recommendation;
 import dev.sovra.issuance.IssuanceFixtures;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.trust.TrustService;
 import java.nio.file.Files;
 import java.nio.file.Path;

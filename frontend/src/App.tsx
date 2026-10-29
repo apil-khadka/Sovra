@@ -1,70 +1,62 @@
 import { useEffect, useState } from 'react'
 import ConsentView from './ConsentView'
-import DemoView, { ReadinessPanel } from './DemoView'
+import DemoView from './DemoView'
 import VerifyView from './VerifyView'
+import ReadinessPanel from './components/ReadinessPanel'
+import Field from './components/Field'
+import { useAsync } from './hooks/useAsync'
 import { fetchSession, login, logout } from './auth'
-import type { SessionInfo } from './auth'
-import { fetchReadiness } from './ops'
-import type { ReadinessReport } from './ops'
+import { fetchHealth, fetchReadiness } from './ops'
 
-interface Health {
-  status: string
-  service: string
-  version: string
+type ViewName = 'status' | 'demo' | 'consent' | 'verify'
+
+const VIEW_TITLES: Record<ViewName, string> = {
+  status: 'Sovra — Status',
+  demo: 'Sovra — Public demo',
+  consent: 'Sovra — Holder consent',
+  verify: 'Sovra — Verify presentation',
 }
 
-type State =
-  | { kind: 'loading' }
-  | { kind: 'ready'; health: Health }
-  | { kind: 'error'; message: string }
+const NAV: Array<{ view: ViewName; label: string }> = [
+  { view: 'status', label: 'Status' },
+  { view: 'demo', label: 'Demo' },
+  { view: 'consent', label: 'Holder consent' },
+  { view: 'verify', label: 'Verify presentation' },
+]
+
+function viewFromHash(): ViewName {
+  const match = window.location.hash.match(/^#\/(\w+)/)
+  const found = NAV.find((item) => item.view === match?.[1])
+  return found === undefined ? 'status' : found.view
+}
+
+/** Reads ?auth_error= once and scrubs it from the URL. */
+function consumeAuthError(): string | null {
+  const params = new URLSearchParams(window.location.search)
+  const denied = params.get('auth_error')
+  if (denied === null) return null
+  params.delete('auth_error')
+  const rest = params.toString()
+  window.history.replaceState(null, '', window.location.pathname + (rest === '' ? '' : `?${rest}`))
+  return denied
+}
 
 export default function App() {
-  const [state, setState] = useState<State>({ kind: 'loading' })
-  const [readiness, setReadiness] = useState<ReadinessReport | null>(null)
-  const [view, setView] = useState<'status' | 'demo' | 'consent' | 'verify'>('status')
-  const [session, setSession] = useState<SessionInfo | null>(null)
-  const [authError] = useState<string | null>(() => {
-    const denied = new URLSearchParams(window.location.search).get('auth_error')
-    if (denied === null) return null
-    const params = new URLSearchParams(window.location.search)
-    params.delete('auth_error')
-    const rest = params.toString()
-    window.history.replaceState(null, '', window.location.pathname + (rest === '' ? '' : `?${rest}`))
-    return denied
-  })
+  const [view, setView] = useState<ViewName>(viewFromHash)
+  const [authError] = useState<string | null>(consumeAuthError)
   const [loggingOut, setLoggingOut] = useState(false)
+  const health = useAsync(fetchHealth)
+  const readiness = useAsync(fetchReadiness)
+  const session = useAsync(fetchSession)
 
   useEffect(() => {
-    const controller = new AbortController()
-    fetch('/api/health', { signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`backend responded ${res.status}`)
-        const body = (await res.json()) as Health
-        if (body.status !== 'UP') throw new Error('backend is not UP')
-        setState({ kind: 'ready', health: body })
-      })
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-        setState({
-          kind: 'error',
-          message: err instanceof Error ? err.message : 'unreachable',
-        })
-      })
-    fetchReadiness()
-      .then((report) => {
-        if (!controller.signal.aborted) setReadiness(report)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setReadiness(null)
-      })
-    fetchSession()
-      .then((info) => {
-        if (!controller.signal.aborted) setSession(info)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setSession(null)
-      })
-    return () => controller.abort()
+    document.title = VIEW_TITLES[view]
+  }, [view])
+
+  useEffect(() => {
+    const onHashChange = () => setView(viewFromHash())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
   async function onLogout() {
@@ -76,66 +68,73 @@ export default function App() {
     }
   }
 
+  const sessionInfo = session.kind === 'ready' ? session.value : null
+
   return (
-    <main>
-      <h1>Sovra</h1>
-      <div className="auth-bar">
-        {session === null ? (
-          <button type="button" onClick={login}>
-            Log in with Keycloak
-          </button>
-        ) : (
-          <>
-            <span>
-              {session.displayName} · {session.roles.join(', ')}
-            </span>
-            <button type="button" onClick={() => void onLogout()} disabled={loggingOut}>
-              {loggingOut ? 'Logging out…' : 'Log out'}
+    <>
+      <a className="skip-link" href="#view">
+        Skip to content
+      </a>
+      <header className="app-header">
+        <p className="wordmark" translate="no">
+          Sovra
+        </p>
+        <div className="auth-bar">
+          {sessionInfo === null ? (
+            <button type="button" onClick={login}>
+              Log in with Keycloak
             </button>
-          </>
-        )}
-      </div>
-      {authError !== null && (
-        <p role="alert">Login denied: {authError}. No session was created.</p>
-      )}
-      <nav className="app-nav" aria-label="Views">
-        <button type="button" onClick={() => setView('status')} aria-pressed={view === 'status'}>
-          Status
-        </button>
-        <button type="button" onClick={() => setView('demo')} aria-pressed={view === 'demo'}>
-          Demo
-        </button>
-        <button type="button" onClick={() => setView('consent')} aria-pressed={view === 'consent'}>
-          Holder consent
-        </button>
-        <button type="button" onClick={() => setView('verify')} aria-pressed={view === 'verify'}>
-          Verify presentation
-        </button>
-      </nav>
-      {view === 'status' && (
-        <>
-          {state.kind === 'loading' && <p>Checking backend…</p>}
-          {state.kind === 'ready' && (
+          ) : (
             <>
-              <dl>
-                <dt>Status</dt>
-                <dd>{state.health.status}</dd>
-                <dt>Service</dt>
-                <dd>{state.health.service}</dd>
-                <dt>Version</dt>
-                <dd>{state.health.version}</dd>
-              </dl>
-              {readiness !== null && <ReadinessPanel report={readiness} />}
+              <span className="session-id" translate="no">
+                {sessionInfo.displayName} · {sessionInfo.roles.join(', ')}
+              </span>
+              <button type="button" onClick={() => void onLogout()} disabled={loggingOut}>
+                {loggingOut ? 'Logging out…' : 'Log out'}
+              </button>
             </>
           )}
-          {state.kind === 'error' && (
-            <p role="alert">Backend unreachable: {state.message}</p>
-          )}
-        </>
-      )}
-      {view === 'demo' && <DemoView />}
-      {view === 'consent' && <ConsentView session={session} />}
-      {view === 'verify' && <VerifyView session={session} />}
-    </main>
+        </div>
+      </header>
+      <main id="view">
+        {authError !== null && (
+          <p role="alert">Login denied: {authError}. No session was created.</p>
+        )}
+        <nav className="app-nav" aria-label="Views">
+          {NAV.map((item) => (
+            <a
+              key={item.view}
+              href={`#/${item.view}`}
+              aria-current={view === item.view ? 'page' : undefined}
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+        {view === 'status' && (
+          <section className="consent" aria-label="Backend status">
+            <h1 className="view-title">Status</h1>
+            {health.kind === 'loading' && <p>Checking backend…</p>}
+            {health.kind === 'ready' && (
+              <>
+                <dl className="health-list">
+                  <Field label="Status" value={health.value.status} />
+                  <Field label="Service" value={health.value.service} />
+                  <Field label="Version" value={health.value.version} mono />
+                </dl>
+                {readiness.kind === 'ready' && <ReadinessPanel report={readiness.value} />}
+                {readiness.kind === 'error' && (
+                  <p role="alert">Readiness unreachable: {readiness.message}</p>
+                )}
+              </>
+            )}
+            {health.kind === 'error' && <p role="alert">Backend unreachable: {health.message}</p>}
+          </section>
+        )}
+        {view === 'demo' && <DemoView />}
+        {view === 'consent' && <ConsentView session={sessionInfo} />}
+        {view === 'verify' && <VerifyView session={sessionInfo} />}
+      </main>
+    </>
   )
 }

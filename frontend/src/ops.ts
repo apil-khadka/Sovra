@@ -52,6 +52,19 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T
 }
 
+export interface Health {
+  status: string
+  service: string
+  version: string
+}
+
+/** Liveness probe; throws unless the backend reports UP. */
+export async function fetchHealth(): Promise<Health> {
+  const body = await get<Health>('/api/health')
+  if (body.status !== 'UP') throw new Error('backend is not UP')
+  return body
+}
+
 /** Liveness says the process answers; readiness says the flow can proceed. */
 export function fetchReadiness(): Promise<ReadinessReport> {
   return get<ReadinessReport>('/api/health/ready')

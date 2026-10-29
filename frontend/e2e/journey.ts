@@ -42,7 +42,7 @@ export async function browserHolder(
   page: Page,
 ): Promise<{ thumbprint: string; privateJwk: EcJwk & { d: string } }> {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Holder consent' }).click()
+  await page.getByRole('link', { name: 'Holder consent' }).click()
   await expect(page.getByLabel(/browser session/)).toBeChecked()
   await page.getByRole('button', { name: 'Generate holder key' }).click()
   const line = page.locator('code.mono').first()

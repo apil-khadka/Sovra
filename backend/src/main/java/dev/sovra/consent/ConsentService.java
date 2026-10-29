@@ -16,7 +16,7 @@ import dev.sovra.guard.PlanGuard;
 import dev.sovra.guard.PlanParser;
 import dev.sovra.guard.SelectedPolicy;
 import dev.sovra.crypto.P256;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.issuance.TrustUnavailableException;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.trust.AlreadyDecidedException;
@@ -65,7 +65,6 @@ public class ConsentService {
   static final Duration MAX_LIFETIME = Duration.ofHours(24);
   static final String CONSENT_LABEL = "sovra-consent/v1";
   static final String PROFILE = "sovra-g1-synthetic/0.2";
-  static final String ADULT_VCT = "https://sovra.example/vct/adult-status/1";
   static final String CLAIMS_CANONICAL = "adultOver18=true";
   static final String DECIDE_APPROVE = "approve";
   static final String DECIDE_DENY = "deny";
@@ -501,7 +500,7 @@ public class ConsentService {
     }
   }
 
-  private static Object scalar(JsonNode node) {
+  static Object scalar(JsonNode node) {
     if (node.isBoolean()) {
       return node.asBoolean();
     }
@@ -509,6 +508,10 @@ public class ConsentService {
       return node.asString();
     }
     if (node.isNumber()) {
+      // Separate returns: a long:double ternary would widen to double.
+      if (node.isIntegralNumber()) {
+        return node.asLong();
+      }
       return node.asDouble();
     }
     return node.toString();

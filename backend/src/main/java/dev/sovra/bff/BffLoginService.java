@@ -3,6 +3,7 @@ package dev.sovra.bff;
 import dev.sovra.audit.AuditService;
 import dev.sovra.auth.HumanMembershipRepository;
 import dev.sovra.auth.HumanMembershipRepository.MembershipRow;
+import dev.sovra.auth.HumanTenantConflictException;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -146,7 +147,17 @@ public class BffLoginService {
     String displayName = user.getClaimAsString("preferred_username");
     displayName = displayName == null || displayName.isBlank() ? subject : displayName;
     MembershipRow before = memberships.findBySubject(issuer, subject).orElse(null);
-    MembershipRow stored = memberships.upsert(tenantId, issuer, subject, displayName, conferred);
+    if (before != null && !before.tenantId().equals(tenantId)) {
+      throw tenantConflict(tenantId, issuer, subject);
+    }
+    final MembershipRow stored;
+    try {
+      stored = memberships.upsert(tenantId, issuer, subject, displayName, conferred);
+    } catch (HumanTenantConflictException e) {
+      // Concurrent first logins from two tenants: the loser's
+      // conditional update matched zero rows.
+      throw tenantConflict(tenantId, issuer, subject);
+    }
     if (stored.revoked()) {
       denyAttributed(tenantId, issuer, subject, ReasonCode.CREDENTIAL_REVOKED,
           "membership revoked", Map.of());
@@ -177,6 +188,13 @@ public class BffLoginService {
 
   private static String joinNames(Set<Role> roles) {
     return String.join(",", roles.stream().map(Role::name).toList());
+  }
+
+  private BffLoginDeniedException tenantConflict(UUID tenantId, String issuer, String subject) {
+    denyAttributed(
+        tenantId, issuer, subject, ReasonCode.WRONG_TENANT,
+        "membership belongs to another tenant", Map.of());
+    return new BffLoginDeniedException(ReasonCode.WRONG_TENANT, "membership pinned elsewhere");
   }
 
   private void denyAttributed(UUID tenantId, String issuer, String subject, ReasonCode reason,

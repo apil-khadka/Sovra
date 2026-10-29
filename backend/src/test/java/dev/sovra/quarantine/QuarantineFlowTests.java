@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.HexFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
@@ -67,7 +68,7 @@ class QuarantineFlowTests extends SovraAppRoleBase {
   void admitScanPromoteReadRoundTrip() throws Exception {
     TestAccount ops = TestAccounts.create(owner, "quar-ops", Set.of("ISSUER_OPS"));
     byte[] content = fixture("tiny.png");
-    String pin = hex(MessageDigest.getInstance("SHA-256").digest(content));
+    String pin = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
 
     ResponseEntity<Map> admitted = client.post().uri("/api/quarantine/admissions")
         .headers(ops.headers())
@@ -346,12 +347,4 @@ class QuarantineFlowTests extends SovraAppRoleBase {
     }
   }
 
-  private static String hex(byte[] bytes) {
-    StringBuilder hex = new StringBuilder(bytes.length * 2);
-    for (byte b : bytes) {
-      hex.append(Character.forDigit((b >> 4) & 0xF, 16));
-      hex.append(Character.forDigit(b & 0xF, 16));
-    }
-    return hex.toString();
-  }
 }

@@ -92,3 +92,60 @@ rest is ordered backlog below.
   logs, no frontend trust of server-enforced decisions.
 - Vault/quarantine cryptographic layering and worker containment
   hold as previously assessed.
+
+## Batch 3 (same day): audit remediation fixes
+
+1. **Human-grant contract wired.** `MembershipRow.principal()`
+   dropped the `(issuer, subject)` binding, so
+   `TrustService.checkerSubject()` was a hardcoded `null` and no
+   quorum could ever be person-verified. `ServiceAccountPrincipal`
+   now carries the binding (machines: nulls, backward-compatible
+   constructor); `ApprovalIdentity.of` derives maker/checker
+   identity from it. Proven by
+   `TrustFlowTests#humanQuorumIsPersonVerified` (two humans, two
+   subjects, `approve` returns true).
+2. **Membership tenant pinned fail-closed.** `upsert` silently kept
+   the first tenant on cross-tenant re-login. Now: login-time
+   pre-check plus a conditional `ON CONFLICT ... WHERE
+   tenant_id` update; losers get `HumanTenantConflictException`,
+   mapped to an audited `WRONG_TENANT` login denial. Pinned by
+   `HumanMembershipTests`.
+3. **Audit platform scope.** Global-resource actions (trust
+   registry, issuer keys) were attributed to the actor's tenant,
+   fragmenting the evidence chain across tenants. `V19` makes
+   `tenant_id` nullable (NULL = platform row, visible to every
+   tenant reader) and scoping follows `ResourceRef`, not the actor.
+   The RLS guard leads with `app_tenant()` so missing-setting
+   connections still fail loudly (short-circuit trap documented
+   in the migration). Pinned by
+   `AuditPaginationTests#platformRowsAreVisibleAcrossTenants`;
+   contract bumped to 0.9.0.
+4. **VP idempotent replay.** First attempt wrongly rejected
+   completed-session resubmits; the suite's
+   `responseReplaysByteIdentically` defines the true contract:
+   COMPLETED sessions return the stored `response_body` verbatim
+   (no re-decision, no new rows), immune to expiry. `V20` exposes
+   `decision_id` through `resolve_vp_session`; the completion
+   UPDATE stays PENDING-conditional for race safety.
+5. **Approve quorum visible.** `POST .../approve` ignored the
+   returned boolean; the response now carries `personVerified`.
+6. **BFF contract documented.** All 12 session-chain operations
+   added to the OpenAPI file (session cookie + XSRF scheme);
+   served/documented parity holds both ways, enforced by
+   `ApiCompatibilityTests` (now BFF-enabled) at contract 0.9.0.
+   A redundant second parity test was written and removed in
+   favor of the established gate.
+7. **P1 merges.** `TenantContext.with/withResult` replace the two
+   private copies in the wallet services;
+   `IssuerKeys.usable` is the single issuer-usability predicate
+   (`PlanningIssuers` deleted, both artifact verifiers repointed).
+   Deliberately not merged: the six `text(JsonNode, String)`
+   readers (one site already carries a divergent throwing
+   contract, arguing for locality) and consent-local `scalar()`
+   (single use).
+8. **Conflict status unified.** Idempotency, service-account, and
+   verification conflicts all return 409 (was mixed 422/409).
+
+Full verification: backend 495/495, frontend build/lint/typecheck
+clean, Playwright 11/11 on the rebuilt compose stack,
+`check_repository.py` green.

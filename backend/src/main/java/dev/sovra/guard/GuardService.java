@@ -7,7 +7,7 @@ import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.issuance.TrustUnavailableException;
 import java.time.Clock;
 import java.util.ArrayList;

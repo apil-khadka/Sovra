@@ -26,7 +26,6 @@ public class CanaryService {
 
   static final String FIXTURE_LABEL = "FIXTURE";
   static final String CANARY_ISSUER = "https://sovra.example/issuers/canary";
-  static final String CANARY_VCT = "https://sovra.example/vct/adult-status/1";
 
   private final Clock clock;
   private final ObjectMapper mapper;
@@ -39,9 +38,9 @@ public class CanaryService {
 
   public CanaryReport run() {
     String sentinel = HexFormat.of().formatHex(randomBytes());
-    boolean logs = logsContain(sentinel);
-    boolean errors = errorsContain(sentinel);
-    boolean metrics = metricsContain(sentinel);
+    boolean logs = logsContained(sentinel);
+    boolean errors = errorsContained(sentinel);
+    boolean metrics = metricsContained(sentinel);
     ModelProbe model = modelFixture(sentinel);
     boolean contained = logs && errors && metrics && model.contained();
     return new CanaryReport(true, FIXTURE_LABEL, new Channels(logs, errors, metrics, model), contained);
@@ -58,7 +57,7 @@ public class CanaryService {
    * come back clean — secret-like keys dropped, and the sentinel absent
    * from every surviving value.
    */
-  boolean logsContain(String sentinel) {
+  boolean logsContained(String sentinel) {
     Map<String, String> probe =
         Map.of(
             "note", "canary-" + sentinel,
@@ -79,7 +78,7 @@ public class CanaryService {
    * Error path: an exception carrying the sentinel (a simulated worker
    * crash) must map to a fixed code with the message discarded.
    */
-  boolean errorsContain(String sentinel) {
+  boolean errorsContained(String sentinel) {
     try {
       throw new IllegalStateException("canary worker failed: " + sentinel);
     } catch (IllegalStateException e) {
@@ -91,7 +90,7 @@ public class CanaryService {
    * Metric path: telemetry labels are closed enums, so a sentinel can never
    * become a label. Proves the allowlist holds for every stage/outcome.
    */
-  boolean metricsContain(String sentinel) {
+  boolean metricsContained(String sentinel) {
     for (TelemetryService.Stage stage : TelemetryService.Stage.values()) {
       if (stage.name().contains(sentinel)) {
         return false;

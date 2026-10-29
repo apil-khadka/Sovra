@@ -1,5 +1,6 @@
 package dev.sovra.web;
 
+import dev.sovra.auth.CurrentPrincipal;
 import dev.sovra.audit.AuditCursor;
 import dev.sovra.audit.AuditEventRepository;
 import dev.sovra.authz.Action;
@@ -16,10 +17,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Own-tenant audit listing for evidence review (SOV-035). Newest first
- * over the stable {@code (occurred_at, id)} ordering; {@code limit} is
- * bounded to 1..100 (default 50) and {@code cursor} pages with an
- * opaque keyset position (SOV-015, IF-11).
+ * Audit listing for evidence review (SOV-035): the caller's tenant rows
+ * plus platform rows for global actions (trust registry), so a global
+ * change reads as one chain from any tenant. Newest first over the
+ * stable {@code (occurred_at, id)} ordering; {@code limit} is bounded
+ * to 1..100 (default 50) and {@code cursor} pages with an opaque
+ * keyset position (SOV-015, IF-11).
  */
 @RestController
 @RequestMapping("/api/audit/events")

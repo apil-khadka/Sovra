@@ -94,7 +94,11 @@ class AuditPaginationTests extends SovraAppRoleBase {
     }
     List<Map<String, Object>> rows = page(reader, "?limit=5000");
 
-    assertThat(rows).isNotNull().hasSize(5);
+    // Platform rows (global trust actions from any tenant) share the
+    // page; the bound applies to tenant rows touched here.
+    assertThat(rows).isNotNull();
+    assertThat(rows.stream().filter(r -> "VALIDATE_PLAN".equals(r.get("action"))).toList())
+        .hasSize(5);
   }
 
   @Test
@@ -150,9 +154,76 @@ class AuditPaginationTests extends SovraAppRoleBase {
     String foreign =
         AuditCursor.encode(other.get(0).get("occurredAt").toString(), other.get(0).get("id").toString());
     List<Map<String, Object>> rows = page(readerA, "?limit=50&cursor=" + foreign);
-    assertThat(rows).isNotNull().hasSize(2);
-    for (Map<String, Object> row : rows) {
+    assertThat(rows).isNotNull();
+    List<Map<String, Object>> own =
+        rows.stream().filter(r -> "VALIDATE_PLAN".equals(r.get("action"))).toList();
+    assertThat(own).hasSize(2);
+    for (Map<String, Object> row : own) {
       assertThat(row.get("id").toString()).isNotEqualTo(other.get(0).get("id").toString());
     }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void platformRowsAreVisibleAcrossTenants() {
+    TestAccount adminA = TestAccounts.create(owner, "audit-pa", Set.of("TRUST_ADMIN"));
+    TestAccount readerB = TestAccounts.create(owner, "audit-pb", Set.of("AUDIT_READER"));
+    Map<String, Object> created =
+        client
+            .post()
+            .uri("/api/trust/proposals")
+            .headers(adminA.headers())
+            .body(platformProposal())
+            .retrieve()
+            .body(Map.class);
+    assertThat(created).isNotNull();
+    String version = created.get("version").toString();
+    // Tenant-scoped evidence stays home: B must not see A's guard row.
+    touchAudit(writerFor(adminA, "audit-pa-writer"));
+
+    List<Map<String, Object>> rows = page(readerB, "?limit=100");
+    assertThat(rows).isNotNull();
+    assertThat(
+            rows.stream()
+                .filter(
+                    r ->
+                        "PROPOSE_TRUST_CHANGE".equals(r.get("action"))
+                            && version.equals(String.valueOf(r.get("resourceId"))))
+                .toList())
+        .hasSize(1);
+    assertThat(rows.stream().filter(r -> "VALIDATE_PLAN".equals(r.get("action"))).toList())
+        .isEmpty();
+  }
+
+  private static Map<String, Object> platformProposal() {
+    String keyId = "plat-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    String vct = "https://sovra.example/vct/adult-status/1";
+    return Map.of(
+        "issuers",
+        List.of(
+            Map.of(
+                "issuerId", "np-mock-issuer",
+                "displayName", "Mock NP issuer",
+                "scope", "adult-status",
+                "credentialTypes", List.of(vct),
+                "keyId", keyId,
+                "publicKeyJwk",
+                    Map.of(
+                        "kty", "EC",
+                        "crv", "P-256",
+                        "kid", keyId,
+                        "x", "MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4",
+                        "y", "4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM"),
+                "validFrom", java.time.Instant.now().minusSeconds(60).toString(),
+                "validThrough", java.time.Instant.now().plusSeconds(3600).toString(),
+                "status", "ACTIVE")),
+        "policies",
+        List.of(
+            Map.of(
+                "rpId", "demo-rp",
+                "purpose", "age-gate",
+                "allowedTypes", List.of(vct),
+                "maxAssurance", "MEDIUM")),
+        "note", "platform-scope");
   }
 }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.8.0
+  version: 0.9.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -16,6 +16,13 @@ info:
     Authentication is a Bearer service-account token except for the
     public probes, federation metadata, and OpenID4VCI/OpenID4VP
     wallet calls (bound to single-use grants, tokens, and sessions).
+    The /api/bff/* chain instead authenticates by BFF session cookie
+    (OIDC auth code with forced S256 PKCE; login entries are
+    /oauth2/authorization/sovra and /login/oauth2/code/sovra).
+    Authority checks are identical on both chains. BFF mutations
+    require an X-XSRF-TOKEN header matching the readable XSRF-TOKEN
+    cookie. Issuance and request creation stay machine-only: they are
+    back-office operations, not holder actions.
     Error bodies are minimal by design:
     404s carry empty bodies (never confirm or deny another tenant's
     objects), 403s carry only a machine-readable reason code.
@@ -200,7 +207,7 @@ paths:
         '401': { description: Anonymous }
         '403': { description: Lacks TRUST_ADMIN }
         '404': { description: Unknown or other-tenant account (empty body) }
-        '422': { description: Account is revoked (service_account_conflict) }
+        '409': { description: Account is revoked (service_account_conflict) }
   /api/auth/service-accounts/{id}/revoke:
     post:
       operationId: revokeServiceAccount
@@ -494,7 +501,7 @@ paths:
     get:
       operationId: listAuditEvents
       x-sovra-scopes: [AUDIT_READER, TRUST_ADMIN]
-      summary: Tenant-scoped decision evidence, newest first
+      summary: Own-tenant plus platform (global trust) decision evidence, newest first
       parameters:
         - name: limit
           in: query
@@ -557,7 +564,16 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses:
-        '200': { description: Approved }
+        '200':
+          description: Approved; personVerified reports the person-verified quorum verdict
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [proposalId, personVerified]
+                properties:
+                  proposalId: { type: string, format: uuid }
+                  personVerified: { type: string, enum: ['true', 'false'] }
         '400': { description: Malformed id }
         '401': { description: Anonymous }
         '403': { description: Lacks TRUST_ADMIN, or self-approval }
@@ -677,7 +693,7 @@ paths:
         '400': { description: Invalid request, scope, proof, or validity }
         '401': { description: Anonymous }
         '403': { description: Lacks ISSUER_OPS }
-        '422': { description: Same key, different request }
+        '409': { description: Same key, different request }
         '503': { description: No active trust snapshot governs issuance }
   /api/issuance/credentials/{id}:
     get:
@@ -918,7 +934,7 @@ paths:
         '401': { description: Anonymous }
         '403': { description: Lacks RP_CLIENT }
         '404': { description: Unknown or other-tenant request (empty body) }
-        '422': { description: Nonce already decided different content (original preserved) }
+        '409': { description: Nonce already decided different content (original preserved) }
   /api/verification/decisions/{id}:
     get:
       operationId: getVerificationDecision
@@ -1265,12 +1281,257 @@ paths:
         '200': { description: Verification decision body (ACCEPTED, REJECTED, or UNKNOWN) }
         '400': { description: '{error: invalid_request} or invalid envelope' }
         '404': { description: Empty; unknown session }
+  /api/bff/me:
+    get:
+      operationId: bffMe
+      x-sovra-scopes: []
+      summary: Current session identity, roles, and authentication context
+      security: [{ bffSession: [] }]
+      responses:
+        '200':
+          description: '{displayName, tenantId, roles (sorted), amr, authTime}'
+        '401': { description: No live session }
+  /api/bff/logout:
+    post:
+      operationId: bffLogout
+      x-sovra-scopes: []
+      summary: Local session logout plus RP-initiated provider logout URL
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{loggedOut: true, endSessionUrl}; the client then navigates to endSessionUrl' }
+  /api/bff/consent/requests/{id}:
+    get:
+      operationId: bffReviewProofRequest
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
+      summary: Holder review of one proof request; same view and ETag behavior as reviewProofRequest
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        '200': { description: Request view with ETag }
+        '304': { description: ETag matches; no body }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '404': { description: Unknown or other-tenant request (empty body) }
+  /api/bff/consent/requests/{id}/decision:
+    post:
+      operationId: bffDecideProofRequest
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
+      summary: Holder signed approve/deny; same body and rules as decideProofRequest
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, holderJwk, consentProof]
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, deny]
+                holderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+                consentProof:
+                  type: string
+                  description: ES256 JWS by the holder key over the canonical consent message
+      responses:
+        '200': { description: Request with the post-decision state }
+        '400': { description: Expired, unusable credential, wrong holder, or proof mismatch }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT, or missing/invalid CSRF token }
+        '404': { description: Unknown or other-tenant request (empty body) }
+        '409': { description: Already decided }
+  /api/bff/consent/requests/{id}/presentation:
+    get:
+      operationId: bffGetConsentPresentation
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
+      summary: Presentation material for an approved request; same view as getConsentPresentation
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Presentation view }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '404': { description: Unknown or other-tenant request (empty body) }
+  /api/bff/verification/presentations:
+    post:
+      operationId: bffVerifyPresentation
+      x-sovra-scopes: [RP_CLIENT]
+      summary: Evaluate one presentation; same body and decision rules as verifyPresentation
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, nonce, audience, holderJwk, bindingProof]
+              properties:
+                requestId:
+                  type: string
+                  format: uuid
+                nonce:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{16,128}$'
+                audience:
+                  type: string
+                  description: Session audience; must equal the consented audience
+                holderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+                bindingProof:
+                  type: string
+                  description: ES256 JWS by the holder key over the canonical presentation message
+      responses:
+        '200': { description: Same decision body as verifyPresentation }
+        '400': { description: Malformed submission envelope }
+        '401': { description: No live session }
+        '403': { description: Lacks RP_CLIENT, or missing/invalid CSRF token }
+        '404': { description: Unknown or other-tenant request (empty body) }
+        '409': { description: Nonce already decided different content (original preserved) }
+  /api/bff/verification/decisions/{id}:
+    get:
+      operationId: bffGetVerificationDecision
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
+      summary: Read one committed decision; same view and ETag behavior as getVerificationDecision
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        '200': { description: Decision view with ETag }
+        '304': { description: ETag matches; no body }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
+        '404': { description: Unknown or other-tenant decision (empty body) }
+  /api/bff/service-accounts:
+    post:
+      operationId: bffCreateServiceAccount
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Create a service account; same body as createServiceAccount, view plus one-time token
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, roles]
+              properties:
+                name: { type: string }
+                roles:
+                  type: array
+                  items: { type: string }
+                expiresAt: { type: string, format: date-time }
+      responses:
+        '201': { description: Account view plus one-time token (shown once) }
+        '400': { description: Invalid name, roles, or expiry }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN, or missing/invalid CSRF token }
+        '409': { description: Name already exists }
+    get:
+      operationId: bffListServiceAccounts
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: List service accounts; same views as listServiceAccounts
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: Account views (tokens never listed) }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN }
+  /api/bff/service-accounts/{id}:
+    get:
+      operationId: bffGetServiceAccount
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Read one service account; same view as getServiceAccount
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Account view }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown or other-tenant account (empty body) }
+  /api/bff/service-accounts/{id}/rotate:
+    post:
+      operationId: bffRotateServiceAccount
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Replace the credential; same rules as rotateServiceAccount
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresAt: { type: string, format: date-time }
+      responses:
+        '200': { description: Account view plus fresh one-time token }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN, or missing/invalid CSRF token }
+        '404': { description: Unknown or other-tenant account (empty body) }
+  /api/bff/service-accounts/{id}/revoke:
+    post:
+      operationId: bffRevokeServiceAccount
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Terminally revoke the credential; idempotent, same rules as revokeServiceAccount
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Revoked account view }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN, or missing/invalid CSRF token }
+        '404': { description: Unknown or other-tenant account (empty body) }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       description: Service-account token; tenant and roles come from the token, never from headers
+    bffSession:
+      type: apiKey
+      in: cookie
+      name: SESSION
+      description: >-
+        BFF session cookie from the OIDC auth-code login. Mutations
+        additionally require an X-XSRF-TOKEN header matching the
+        readable XSRF-TOKEN cookie.
   schemas:
     Problem:
       type: object

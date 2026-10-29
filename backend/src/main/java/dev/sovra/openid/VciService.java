@@ -13,7 +13,7 @@ import dev.sovra.authz.ResourceRef;
 import dev.sovra.issuance.InvalidIssuanceException;
 import dev.sovra.issuance.IssuanceService;
 import dev.sovra.issuance.LocalDevSigner;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.tenancy.TenantContext;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -241,7 +241,7 @@ public class VciService {
     String accessToken = random();
     String cNonce = random();
     UUID tokenId = UUID.randomUUID();
-    withTenant(creator, () -> {
+    TenantContext.with(creator, () -> {
       int consumed =
           tenant.update(
               "UPDATE vci_grant SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
@@ -257,7 +257,7 @@ public class VciService {
           java.sql.Timestamp.from(now.plus(NONCE_TTL)),
           java.sql.Timestamp.from(now.plus(TOKEN_TTL)));
     });
-    withTenant(creator, () -> audit.recordExternal(
+    TenantContext.with(creator, () -> audit.recordExternal(
         "openid-wallet", creator.tenantId(), grant.id().toString(),
         "PRE_AUTH".equals(grant.kind()) ? Action.VCI_CREATE_OFFER : Action.VCI_AUTHORIZE,
         ResourceRef.tenantScoped("vci-token", tokenId.toString(), creator.tenantId()),
@@ -278,7 +278,7 @@ public class VciService {
     Instant now = clock.instant();
     Token token = requireToken(authorization, now);
     String cNonce = random();
-    withTenant(token.creator(), () -> {
+    TenantContext.with(token.creator(), () -> {
       int rotated =
           tenant.update(
               "UPDATE vci_token SET c_nonce = ?, c_nonce_expires_at = ?"
@@ -325,7 +325,7 @@ public class VciService {
     Action authority =
         "PRE_AUTH".equals(token.grantKind()) ? Action.ISSUE_CREDENTIAL : Action.VCI_AUTHORIZE;
     String response =
-        withTenantResult(token.creator(), () -> {
+        TenantContext.withResult(token.creator(), () -> {
           int consumed =
               tenant.update(
                   "UPDATE vci_token SET c_nonce = NULL, c_nonce_expires_at = NULL"
@@ -509,25 +509,6 @@ public class VciService {
       return token.isEmpty() ? null : token;
     }
     return null;
-  }
-
-  private void withTenant(ServiceAccountPrincipal principal, Runnable work) {
-    TenantContext.set(principal);
-    try {
-      work.run();
-    } finally {
-      TenantContext.clear();
-    }
-  }
-
-  private <T> T withTenantResult(
-      ServiceAccountPrincipal principal, java.util.function.Supplier<T> work) {
-    TenantContext.set(principal);
-    try {
-      return work.get();
-    } finally {
-      TenantContext.clear();
-    }
   }
 
   private static String text(JsonNode node, String field) {

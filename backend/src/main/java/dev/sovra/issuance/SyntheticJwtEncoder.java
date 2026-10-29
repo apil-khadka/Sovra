@@ -63,7 +63,7 @@ public class SyntheticJwtEncoder implements CredentialEncoder {
       byte[] signature =
           signer.sign(evidence.keyRef(), signingInput.getBytes(StandardCharsets.US_ASCII), aad);
       String artifact = signingInput + "." + Base64URL.encode(signature);
-      return new EncodedCredential(artifact, claimsJson);
+      return new EncodedCredential(artifact);
     } catch (JacksonException e) {
       throw new IllegalStateException("evidence is not JSON-encodable", e);
     }

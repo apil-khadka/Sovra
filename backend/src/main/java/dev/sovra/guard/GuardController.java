@@ -1,8 +1,6 @@
 package dev.sovra.guard;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +30,7 @@ public class GuardController {
   public ResponseEntity<GuardService.VerdictView> validate(
       @Valid @RequestBody ValidateRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     CandidatePlan plan = PlanParser.parsePlan(request.plan());
     SelectedPolicy selected = PlanParser.parseSelected(request.policyId(), request.policyVersion());
     return ResponseEntity.ok(guard.adjudicate(caller, plan, selected));

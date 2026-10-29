@@ -11,7 +11,7 @@ import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
 import dev.sovra.crypto.P256;
 import dev.sovra.issuance.StatusEvidenceFetcher;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.trust.TrustService;
 import java.nio.charset.StandardCharsets;
@@ -369,7 +369,7 @@ public class VerificationService {
             new WaltIdArtifactVerifier.Expected(
                 credential.issuerId(), credential.vct(), credential.holderThumbprint(),
                 credential.id(), credential.expiresAt()),
-            snapshot, tenant, mapper, now);
+            snapshot, tenant, now);
       } else {
         SyntheticArtifactVerifier.verify(
             credential.artifact(),

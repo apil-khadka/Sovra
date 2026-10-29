@@ -19,6 +19,7 @@ import java.net.http.HttpClient.Redirect;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -105,8 +106,6 @@ class BffLoginTests extends SovraAppRoleBase {
 
   private static final String BASE = "http://localhost:18082";
 
-  record Session(String jsessionid, String xsrf) {}
-
   private HttpResponse<String> get(String url, Map<String, String> headers) throws Exception {
     return BffTestSessions.get(http, url, headers);
   }
@@ -123,14 +122,12 @@ class BffLoginTests extends SovraAppRoleBase {
     return BffTestSessions.dance(http, BASE, jar);
   }
 
-  private Session login(StubOpenIdProvider.Script script) throws Exception {
-    BffTestSessions.Session shared = BffTestSessions.login(http, mapper, BASE, STUB, script);
-    return new Session(shared.jsessionid(), shared.xsrf());
+  private BffTestSessions.Session login(StubOpenIdProvider.Script script) throws Exception {
+    return BffTestSessions.login(http, mapper, BASE, STUB, script);
   }
 
-  private JsonNode me(Session session) throws Exception {
-    return BffTestSessions.me(http, mapper, BASE,
-        new BffTestSessions.Session(session.jsessionid(), session.xsrf()));
+  private JsonNode me(BffTestSessions.Session session) throws Exception {
+    return BffTestSessions.me(http, mapper, BASE, session);
   }
 
   private UUID demoTenant() {
@@ -141,12 +138,15 @@ class BffLoginTests extends SovraAppRoleBase {
   @Test
   void loginHappyPathProvisionsMembershipAndAudits() throws Exception {
     String subject = "member-" + UUID.randomUUID().toString().substring(0, 8);
-    Session session = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session session = login(new StubOpenIdProvider.Script(
         subject, List.of("sovra-members"), "sovra-demo", List.of("pwd")));
     JsonNode identity = me(session);
     assertThat(identity.get("displayName").asString()).isEqualTo(subject);
     assertThat(identity.get("tenantId").asString()).isEqualTo(demoTenant().toString());
     assertThat(identity.get("roles").toString()).contains("TENANT_MEMBER");
+    List<String> roles = new ArrayList<>();
+    identity.get("roles").forEach(role -> roles.add(role.asString()));
+    assertThat(roles).isSorted();
     assertThat(session.xsrf()).isNotNull();
 
     MembershipRow stored =
@@ -163,14 +163,14 @@ class BffLoginTests extends SovraAppRoleBase {
   @Test
   void privilegedRoleNeedsHardwareAmr() throws Exception {
     String subject = "priv-" + UUID.randomUUID().toString().substring(0, 8);
-    Session session = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session session = login(new StubOpenIdProvider.Script(
         subject, List.of("sovra-members", "sovra-trust-admins"), "sovra-demo", List.of("webauthn")));
     assertThat(me(session).get("roles").toString()).contains("TRUST_ADMIN");
 
     // Same groups without the hardware method: privileged roles are
     // withheld, the login still succeeds with the remainder.
     String partial = "part-" + UUID.randomUUID().toString().substring(0, 8);
-    Session reduced = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session reduced = login(new StubOpenIdProvider.Script(
         partial, List.of("sovra-members", "sovra-trust-admins"), "sovra-demo", List.of("pwd")));
     JsonNode identity = me(reduced);
     assertThat(identity.get("roles").toString()).contains("TENANT_MEMBER");
@@ -221,7 +221,7 @@ class BffLoginTests extends SovraAppRoleBase {
   @Test
   void revocationDeniesNextLoginAndKillsLiveSession() throws Exception {
     String subject = "rev-" + UUID.randomUUID().toString().substring(0, 8);
-    Session session = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session session = login(new StubOpenIdProvider.Script(
         subject, List.of("sovra-members"), "sovra-demo", List.of("pwd")));
     MembershipRow stored = memberships.findBySubject(STUB.issuer(), subject).orElseThrow();
     memberships.revoke(stored.id());
@@ -267,7 +267,7 @@ class BffLoginTests extends SovraAppRoleBase {
   @Test
   void machineAndSessionChainsStaySeparate() throws Exception {
     String subject = "sep-" + UUID.randomUUID().toString().substring(0, 8);
-    Session session = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session session = login(new StubOpenIdProvider.Script(
         subject, List.of("sovra-members"), "sovra-demo", List.of("pwd")));
     TestAccount machine = TestAccounts.create(owner, "sep-machine", Set.of("TENANT_MEMBER"));
 
@@ -289,7 +289,7 @@ class BffLoginTests extends SovraAppRoleBase {
   @Test
   void bearerNeverOverridesSessionOnBffPaths() throws Exception {
     String subject = "mix-" + UUID.randomUUID().toString().substring(0, 8);
-    Session session = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session session = login(new StubOpenIdProvider.Script(
         subject, List.of("sovra-members"), "sovra-demo", List.of("pwd")));
     TestAccount machine = TestAccounts.create(owner, "mix-machine", Set.of("TRUST_ADMIN"));
 
@@ -309,7 +309,7 @@ class BffLoginTests extends SovraAppRoleBase {
   @Test
   void trustAdminSessionManagesServiceAccounts() throws Exception {
     String subject = "ops-" + UUID.randomUUID().toString().substring(0, 8);
-    Session session = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session session = login(new StubOpenIdProvider.Script(
         subject, List.of("sovra-trust-admins"), "sovra-demo", List.of("webauthn")));
 
     // Same service as the machine chain, over a CSRF-armed session.
@@ -334,7 +334,7 @@ class BffLoginTests extends SovraAppRoleBase {
 
     // A member session is denied the admin surface on its own chain.
     String member = "ops-member-" + UUID.randomUUID().toString().substring(0, 8);
-    Session reduced = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session reduced = login(new StubOpenIdProvider.Script(
         member, List.of("sovra-members"), "sovra-demo", List.of("pwd")));
     HttpResponse<String> denied = get(BASE + "/api/bff/service-accounts",
         Map.of("Cookie", "JSESSIONID=" + reduced.jsessionid()));
@@ -344,7 +344,7 @@ class BffLoginTests extends SovraAppRoleBase {
   @Test
   void logoutNeedsCsrfThenKillsSessionWithOpUrl() throws Exception {
     String subject = "logout-" + UUID.randomUUID().toString().substring(0, 8);
-    Session session = login(new StubOpenIdProvider.Script(
+    BffTestSessions.Session session = login(new StubOpenIdProvider.Script(
         subject, List.of("sovra-members"), "sovra-demo", List.of("pwd")));
     assertThat(session.xsrf()).isNotNull();
 

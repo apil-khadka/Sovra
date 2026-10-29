@@ -1,15 +1,13 @@
 package dev.sovra.quarantine;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
 import dev.sovra.quarantine.QuarantineService.AdmissionView;
 import dev.sovra.quarantine.QuarantineService.Admitted;
 import dev.sovra.quarantine.QuarantineService.Promoted;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.web.Bodies;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,9 +49,9 @@ public class QuarantineController {
   @PostMapping("/admissions")
   public ResponseEntity<Map<String, Object>> admit(@Valid @RequestBody AdmitRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     Admitted admitted = quarantine.admit(
-        caller, decode(request.contentBase64()), request.claimedType(), request.issuerId());
+        caller, Bodies.base64(request.contentBase64(), QuarantineInvalidException::new), request.claimedType(), request.issuerId());
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
         "admissionId", admitted.admissionId().toString(),
         "objectId", admitted.objectId().toString(),
@@ -65,7 +63,7 @@ public class QuarantineController {
   @GetMapping("/admissions/{id}")
   public ResponseEntity<Map<String, Object>> get(@PathVariable("id") UUID id) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     AdmissionView view = quarantine.get(caller, id);
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("admissionId", view.admissionId().toString());
@@ -87,20 +85,12 @@ public class QuarantineController {
   public ResponseEntity<Map<String, Object>> promote(
       @PathVariable("id") UUID id, @Valid @RequestBody PromoteRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     Promoted promoted = quarantine.promote(caller, id, request.grantId(), request.purpose(),
         request.workload(), request.purposes(), request.displayName());
     return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
         "admissionId", promoted.admissionId().toString(),
         "objectId", promoted.objectId().toString(),
         "version", promoted.version()));
-  }
-
-  private static byte[] decode(String base64) {
-    try {
-      return Base64.getDecoder().decode(base64);
-    } catch (IllegalArgumentException e) {
-      throw new QuarantineInvalidException("content is not base64");
-    }
   }
 }

@@ -1,13 +1,12 @@
 package dev.sovra.vault;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
 import dev.sovra.vault.VaultService.GrantView;
 import dev.sovra.vault.VaultService.ObjectMetadata;
 import dev.sovra.vault.VaultService.ReadResult;
 import dev.sovra.vault.VaultService.StoredVersion;
 import dev.sovra.vault.VaultService.VersionMetadata;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.web.Bodies;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -69,13 +68,13 @@ public class VaultController {
   @PostMapping("/objects")
   public ResponseEntity<Map<String, Object>> store(@Valid @RequestBody StoreRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     StoredVersion stored = vault.store(
         caller,
         request.issuerId(),
         request.displayName(),
         request.purposes(),
-        decode(request.contentBase64()),
+        Bodies.base64(request.contentBase64(), VaultInvalidException::new),
         request.contentSha256Hex(),
         VaultService.IngestionSource.CALLER);
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -86,9 +85,9 @@ public class VaultController {
   public ResponseEntity<Map<String, Object>> storeVersion(
       @PathVariable("id") UUID id, @Valid @RequestBody VersionRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     StoredVersion stored = vault.storeVersion(
-        caller, id, request.purposes(), decode(request.contentBase64()),
+        caller, id, request.purposes(), Bodies.base64(request.contentBase64(), VaultInvalidException::new),
         request.contentSha256Hex());
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(Map.of(
@@ -98,7 +97,7 @@ public class VaultController {
   @GetMapping("/objects/{id}")
   public ResponseEntity<Map<String, Object>> metadata(@PathVariable("id") UUID id) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ObjectMetadata found = vault.metadata(caller, id);
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("objectId", found.objectId().toString());
@@ -111,7 +110,7 @@ public class VaultController {
   @PostMapping("/grants")
   public ResponseEntity<Map<String, Object>> grant(@Valid @RequestBody GrantRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     GrantView granted = vault.grant(
         caller,
         request.objectId(),
@@ -127,7 +126,7 @@ public class VaultController {
   @PostMapping("/grants/{id}/revoke")
   public ResponseEntity<Map<String, Object>> revoke(@PathVariable("id") UUID id) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(grantView(vault.revokeGrant(caller, id)));
   }
 
@@ -137,7 +136,7 @@ public class VaultController {
       @PathVariable("version") int version,
       @Valid @RequestBody ReadRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ReadResult result = vault.read(
         caller, id, version, request.grantId(), request.purpose(), request.workload());
     return ResponseEntity.ok(Map.of(
@@ -150,7 +149,7 @@ public class VaultController {
   @PostMapping("/keys/rotate")
   public ResponseEntity<Map<String, Object>> rotateKek() {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(Map.of("kekVersion", vault.rotateKek(caller)));
   }
 
@@ -158,7 +157,7 @@ public class VaultController {
   public ResponseEntity<Map<String, Object>> delete(
       @PathVariable("id") UUID id, @PathVariable("version") int version) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     vault.deleteVersion(caller, id, version);
     return ResponseEntity.ok(
         Map.of("objectId", id.toString(), "version", version, "status", "DELETED"));
@@ -188,13 +187,5 @@ public class VaultController {
     body.put("expiresAt", grant.expiresAt().toString());
     body.put("createdAt", grant.createdAt().toString());
     return body;
-  }
-
-  private static byte[] decode(String base64) {
-    try {
-      return Base64.getDecoder().decode(base64);
-    } catch (IllegalArgumentException e) {
-      throw new VaultInvalidException("content is not base64");
-    }
   }
 }

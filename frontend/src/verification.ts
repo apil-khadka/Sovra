@@ -3,10 +3,10 @@
 // audience, and a holder-signed binding proof. The canonical message
 // mirrors VerificationService.presentationMessage line for line.
 
-import { signMessage } from './consent'
-import type { HolderKey } from './consent'
-
-import { sessionPath, xsrfToken } from './auth'
+import { SESSION_ROLE_MESSAGE, SESSION_TOKEN_MESSAGE, requestJson } from './api'
+import type { StatusMessages } from './api'
+import { signMessage } from './crypto'
+import type { HolderKey } from './crypto'
 import type { Caller } from './auth'
 
 export interface VerificationDecision {
@@ -22,12 +22,11 @@ export interface VerificationDecision {
 
 export const PRESENTATION_LABEL = 'sovra-presentation/v1'
 
-export class VerifyApiError extends Error {
-  status: number
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-  }
+const MESSAGES: StatusMessages = {
+  404: () => 'unknown or other-tenant object',
+  401: SESSION_TOKEN_MESSAGE,
+  403: SESSION_ROLE_MESSAGE,
+  409: () => 'this nonce already decided different content',
 }
 
 export function presentationMessage(
@@ -51,31 +50,7 @@ export function signPresentation(
   )
 }
 
-async function request<T>(path: string, caller: Caller, init?: RequestInit): Promise<T> {
-  const session = caller.kind === 'session'
-  const xsrf = session && init?.method !== undefined ? xsrfToken() : null
-  const res = await fetch(session ? sessionPath(path) : path, {
-    ...init,
-    credentials: session ? 'include' : undefined,
-    headers: {
-      ...(session ? {} : { Authorization: `Bearer ${caller.token}` }),
-      'Content-Type': 'application/json',
-      ...(xsrf === null ? {} : { 'X-XSRF-TOKEN': xsrf }),
-      ...(init?.headers ?? {}),
-    },
-  })
-  if (res.status === 404) throw new VerifyApiError(404, 'unknown or other-tenant object')
-  if (res.status === 401)
-    throw new VerifyApiError(401, session ? 'session expired: log in again' : 'invalid or missing token')
-  if (res.status === 403)
-    throw new VerifyApiError(403, session ? 'session lacks the required role' : 'token lacks the required role')
-  if (res.status === 422)
-    throw new VerifyApiError(422, 'this nonce already decided different content')
-  if (!res.ok) throw new VerifyApiError(res.status, `backend responded ${res.status}`)
-  return (await res.json()) as T
-}
-
-export function submitVerification(
+export async function submitVerification(
   base: string,
   caller: Caller,
   holder: HolderKey,
@@ -83,17 +58,15 @@ export function submitVerification(
   nonce: string,
   audience: string,
 ): Promise<VerificationDecision> {
-  return signPresentation(holder, requestId, nonce, audience).then((bindingProof) =>
-    request<VerificationDecision>(`${base}/api/verification/presentations`, caller, {
+  const bindingProof = await signPresentation(holder, requestId, nonce, audience)
+  return requestJson<VerificationDecision>(
+    `${base}/api/verification/presentations`,
+    caller,
+    {
       method: 'POST',
-      body: JSON.stringify({
-        requestId,
-        nonce,
-        audience,
-        holderJwk: holder.jwk,
-        bindingProof,
-      }),
-    }),
+      body: JSON.stringify({ requestId, nonce, audience, holderJwk: holder.jwk, bindingProof }),
+    },
+    MESSAGES,
   )
 }
 
@@ -102,8 +75,10 @@ export function fetchDecision(
   caller: Caller,
   decisionId: string,
 ): Promise<VerificationDecision> {
-  return request<VerificationDecision>(
+  return requestJson<VerificationDecision>(
     `${base}/api/verification/decisions/${decisionId}`,
     caller,
+    undefined,
+    MESSAGES,
   )
 }

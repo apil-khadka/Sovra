@@ -137,10 +137,7 @@ public class QuarantineWorker {
         rowObject = rs.getObject(1, UUID.class);
         version = rs.getInt(2);
         issuerId = rs.getString(3);
-        Array array = rs.getArray(4);
-        String[] names = array == null ? new String[0] : (String[]) array.getArray();
-        java.util.Arrays.sort(names);
-        purposes = List.of(names);
+        purposes = VaultEnvelope.sortedPurposes(rs.getArray(4));
         sha = rs.getBytes(5);
         kekVersion = rs.getInt(6);
         wrapped = rs.getBytes(7);
@@ -156,7 +153,7 @@ public class QuarantineWorker {
     byte[] dek = kek.unwrapDek(tenantId, kekVersion, wrapped, dekNonce,
         VaultEnvelope.wrapAad(tenantId, issuerId, rowObject, version, kekVersion, purposes));
     List<String> authorized = new ArrayList<>(purposes);
-    if (!authorized.contains("quarantine-scan")) {
+    if (!authorized.contains(VaultEnvelope.QUARANTINE_PURPOSE)) {
       throw new IllegalStateException("not a quarantine object");
     }
     return VaultCrypto.open(dek, contentNonce, ciphertext,

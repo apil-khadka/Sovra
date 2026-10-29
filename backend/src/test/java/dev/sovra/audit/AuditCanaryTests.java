@@ -15,7 +15,6 @@ import dev.sovra.tenancy.TenantContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,8 +25,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /** Canary suite: secrets and PII-shaped values must never land in evidence. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class AuditCanaryTests extends SovraPostgresBase {
-
-  @Autowired DataSource dataSource;
 
   @Autowired AuditService audit;
 

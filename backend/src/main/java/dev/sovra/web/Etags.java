@@ -3,6 +3,8 @@ package dev.sovra.web;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 /**
  * Strong ETags over stable view bytes (SOV-015, IF-11). The tag changes
@@ -28,5 +30,17 @@ public final class Etags {
   /** Exact-match precondition only; {@code *} never matches (see compat doc). */
   public static boolean matches(String etag, String ifNoneMatch) {
     return ifNoneMatch != null && etag.equals(ifNoneMatch.trim());
+  }
+
+  /**
+   * 304 when the caller holds the current representation, else 200
+   * with the tag. Keeps every conditional-GET site identical.
+   */
+  public static <T> ResponseEntity<T> respond(T view, String ifNoneMatch) {
+    String etag = strong(view.toString());
+    if (matches(etag, ifNoneMatch)) {
+      return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+    }
+    return ResponseEntity.ok().eTag(etag).body(view);
   }
 }

@@ -4,6 +4,7 @@ import com.nimbusds.jose.crypto.ECDSAVerifier;
 import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
 import dev.sovra.issuance.WaltIdSdJwtVcEncoder;
+import dev.sovra.trust.IssuerKeys;
 import dev.sovra.trust.TrustService;
 import id.walt.sdjwt.JWTCryptoProvider;
 import id.walt.sdjwt.JwtVerificationResult;
@@ -59,7 +60,6 @@ public final class WaltIdArtifactVerifier {
       Expected expected,
       TrustService.SnapshotView snapshot,
       JdbcTemplate tenant,
-      ObjectMapper mapper,
       Instant now) {
     SDJwt parsed = parse(artifact);
     JsonObject header = header(parsed);
@@ -142,9 +142,7 @@ public final class WaltIdArtifactVerifier {
             .filter(i -> expected.issuerId().equals(i.issuerId()))
             .findFirst()
             .orElseThrow(() -> new ArtifactFailure("ISSUER_UNTRUSTED"));
-    if (!"ACTIVE".equals(issuer.status())
-        || issuer.validFrom().isAfter(now)
-        || issuer.validThrough().isBefore(now)) {
+    if (!IssuerKeys.usable(issuer, now)) {
       throw new ArtifactFailure("ISSUER_UNTRUSTED");
     }
     if (!issuer.credentialTypes().contains(expected.vct())

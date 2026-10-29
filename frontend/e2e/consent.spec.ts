@@ -114,7 +114,7 @@ test('anonymous consent read fails closed without a token', async ({ page }) => 
   const credentialId = await issueCredential(setup, other.holderJwk, other.privateJwk)
   const created = await createRequest(setup, credentialId)
   await page.goto('/')
-  await page.getByRole('button', { name: 'Holder consent' }).click()
+  await page.getByRole('link', { name: 'Holder consent' }).click()
   await page.getByLabel('Proof request id').fill(created.requestId)
   await page.getByRole('button', { name: 'Load request' }).click()
   await expect(page.getByText('Could not load: invalid or missing token')).toBeVisible()

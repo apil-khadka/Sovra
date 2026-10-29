@@ -1,7 +1,10 @@
 package dev.sovra.vault;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.Array;
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,7 +19,25 @@ public final class VaultEnvelope {
   static final String CONTENT_AAD_LABEL = "sovra-vault-content/v1";
   static final String WRAP_AAD_LABEL = "sovra-vault-wrap/v1";
 
+  /**
+   * Quarantine marker purpose (SOV-017). Objects carrying it are
+   * unscanned hostile input: the content endpoint refuses them even
+   * under a live grant, and only the quarantine read path opens
+   * them, server-side, during promotion of a CLEAN verdict.
+   */
+  public static final String QUARANTINE_PURPOSE = "quarantine-scan";
+
   private VaultEnvelope() {}
+
+  /** Sorted purpose names from a roles-style array column. */
+  public static List<String> sortedPurposes(Array array) throws SQLException {
+    if (array == null) {
+      return List.of();
+    }
+    String[] values = (String[]) array.getArray();
+    Arrays.sort(values);
+    return List.of(values);
+  }
 
   public static byte[] contentAad(
       UUID tenantId,

@@ -6,6 +6,7 @@ import dev.sovra.guard.GuardClaims;
 import dev.sovra.guard.GuardPolicies;
 import dev.sovra.guard.Recommendation;
 import dev.sovra.issuance.SyntheticJwtEncoder;
+import dev.sovra.trust.IssuerKeys;
 import dev.sovra.trust.TrustService;
 import java.time.Instant;
 import java.util.List;
@@ -54,7 +55,7 @@ public final class BaselinePlanner {
     if (issuer == null) {
       return noPath("issuer is not pinned registry metadata");
     }
-    if (!PlanningIssuers.usable(issuer, now)) {
+    if (!IssuerKeys.usable(issuer, now)) {
       return noPath("issuer is not currently usable");
     }
     if (!issuer.credentialTypes().contains(query.credentialType())

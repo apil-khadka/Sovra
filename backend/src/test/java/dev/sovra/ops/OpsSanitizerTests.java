@@ -2,6 +2,7 @@ package dev.sovra.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.sovra.audit.AuditSanitizer;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,7 +23,7 @@ class OpsSanitizerTests {
 
     assertThat(clean).containsOnlyKeys("note", "long");
     assertThat(clean.get("note")).isEqualTo("ok");
-    assertThat(clean.get("long")).hasSize(OpsSanitizer.MAX_VALUE_CHARS);
+    assertThat(clean.get("long")).hasSize(500);
   }
 
   @Test
@@ -52,9 +53,22 @@ class OpsSanitizerTests {
   }
 
   @Test
+  void detailMatchesAuditSanitizerOnHostileInput() {
+    Map<String, String> hostile = new LinkedHashMap<>();
+    hostile.put("note", "ok");
+    hostile.put("api_key", "should-vanish");
+    hostile.put("holder_proof_jws", "should-vanish");
+    hostile.put("long", "x".repeat(600));
+    hostile.put("empty", null);
+
+    assertThat(OpsSanitizer.sanitizeDetail(hostile))
+        .isEqualTo(AuditSanitizer.sanitize(hostile));
+  }
+
+  @Test
   void objectsTruncateLongStrings() {
     Map<String, Object> clean =
         OpsSanitizer.sanitizeObjects(Map.of("text", "y".repeat(1000)));
-    assertThat((String) clean.get("text")).hasSize(OpsSanitizer.MAX_VALUE_CHARS);
+    assertThat((String) clean.get("text")).hasSize(500);
   }
 }

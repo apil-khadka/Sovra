@@ -12,6 +12,23 @@ export interface SessionInfo {
 
 export type Caller = { kind: 'token'; token: string } | { kind: 'session' }
 
+/** Connection form state shared by the consent and verify views. */
+export interface Connection {
+  base: string
+  token: string
+  useSession: boolean
+  requestId: string
+}
+
+export const EMPTY_CONNECTION: Connection = { base: '', token: '', useSession: true, requestId: '' }
+
+/** Session wins when one exists and the caller chose it; else the token. */
+export function resolveCaller(session: SessionInfo | null, connection: Connection): Caller {
+  return session !== null && connection.useSession
+    ? { kind: 'session' }
+    : { kind: 'token', token: connection.token.trim() }
+}
+
 export function login(): void {
   window.location.href = '/oauth2/authorization/sovra'
 }

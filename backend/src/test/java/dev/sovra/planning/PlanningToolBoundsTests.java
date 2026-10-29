@@ -10,7 +10,6 @@ import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.guard.GuardPolicies;
 import dev.sovra.issuance.IssuanceFixtures;
-import dev.sovra.issuance.TrustSnapshotProvider;
 import dev.sovra.tenancy.TenantContext;
 import dev.sovra.trust.TrustService;
 import java.util.Map;
@@ -34,8 +33,6 @@ import tools.jackson.databind.ObjectMapper;
 class PlanningToolBoundsTests extends SovraAppRoleBase {
 
   @Autowired TrustService trust;
-
-  @Autowired TrustSnapshotProvider snapshots;
 
   @Autowired PlanningTools tools;
 

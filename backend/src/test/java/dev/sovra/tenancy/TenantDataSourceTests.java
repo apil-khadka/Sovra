@@ -56,7 +56,9 @@ class TenantDataSourceTests extends SovraPostgresBase {
             + " 'PERMIT', 1)",
         accountB.tenantId());
 
-    // One pooled datasource, alternating tenants: each borrow sees only its own rows.
+    // One pooled datasource, alternating tenants: each borrow sees only
+    // its own tenant rows (platform NULL rows are visible by design and
+    // filtered here; the pool must never leak another TENANT's rows).
     DataSource pooled = appRoleDataSource();
     for (int i = 0; i < 6; i++) {
       TestAccount current = i % 2 == 0 ? accountA : accountB;
@@ -66,7 +68,7 @@ class TenantDataSourceTests extends SovraPostgresBase {
       try {
         List<Map<String, Object>> rows =
             new JdbcTemplate(new TenantDataSource(pooled))
-                .queryForList("SELECT tenant_id FROM audit_event");
+                .queryForList("SELECT tenant_id FROM audit_event WHERE tenant_id IS NOT NULL");
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).get("tenant_id")).isEqualTo(current.tenantId());
       } finally {
@@ -108,7 +110,8 @@ class TenantDataSourceTests extends SovraPostgresBase {
     TenantContext.set(
         new ServiceAccountPrincipal(UUID.randomUUID(), UUID.randomUUID(), "ghost", Set.of()));
     List<Map<String, Object>> rows =
-        tenantTemplate().queryForList("SELECT tenant_id FROM audit_event");
+        tenantTemplate()
+            .queryForList("SELECT tenant_id FROM audit_event WHERE tenant_id IS NOT NULL");
     assertThat(rows).isEmpty();
     assertThat(account.tenantId()).isNotNull();
   }

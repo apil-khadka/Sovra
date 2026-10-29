@@ -1,13 +1,10 @@
 package dev.sovra.verification;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import dev.sovra.web.Etags;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,7 +36,7 @@ public class VerificationController {
   @PostMapping("/presentations")
   public ResponseEntity<String> verify(@Valid @RequestBody VerifyRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     String response =
         verification.verify(
             caller,
@@ -55,14 +52,10 @@ public class VerificationController {
       @PathVariable("id") UUID decisionId,
       @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     VerificationService.DecisionView view = verification.get(caller, decisionId);
     // Decisions are immutable, so the tag is stable for the row's life.
-    String etag = Etags.strong(view.toString());
-    if (Etags.matches(etag, ifNoneMatch)) {
-      return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
-    }
-    return ResponseEntity.ok().eTag(etag).body(view);
+    return Etags.respond(view, ifNoneMatch);
   }
 
   public record VerifyRequest(

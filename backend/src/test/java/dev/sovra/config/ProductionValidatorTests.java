@@ -14,7 +14,7 @@ import dev.sovra.consent.ConsentFixtures;
 import dev.sovra.issuance.IssuanceFixtures;
 import dev.sovra.issuance.KmsSigner;
 import dev.sovra.issuance.StatusEvidenceFetcher;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.tenancy.TenantContext;
 import dev.sovra.tenancy.TenantDataSource;
@@ -170,13 +170,14 @@ class ProductionValidatorTests extends SovraPostgresBase {
     } finally {
       TenantContext.clear();
     }
-    // The refusal is evidence, and the decision row was never written.
+    // The refusal is platform evidence (global resource), matched by
+    // proposal; the decision row was never written.
     Map<String, Object> denial =
         owner.queryForMap(
             "SELECT decision, reason_code FROM audit_event"
-                + " WHERE tenant_id = ? AND action = 'APPROVE_TRUST_CHANGE'"
-                + " ORDER BY occurred_at DESC LIMIT 1",
-            checker.tenantId());
+                + " WHERE tenant_id IS NULL AND action = 'APPROVE_TRUST_CHANGE'"
+                + " AND resource_id = ? ORDER BY occurred_at DESC LIMIT 1",
+            proposal.proposalId().toString());
     assertThat(denial.get("decision")).isEqualTo("DENY");
     assertThat(denial.get("reason_code")).isEqualTo("ASSURANCE_INSUFFICIENT");
     assertThat(

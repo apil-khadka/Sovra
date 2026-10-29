@@ -1,5 +1,6 @@
 package dev.sovra.trust;
 
+import java.time.Instant;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -32,5 +33,19 @@ public final class IssuerKeys {
             Integer.class,
             issuerId, keyId, keyVersion);
     return revoked == null || revoked == 0;
+  }
+
+  /**
+   * Registry usability (SOV-009, SOV-014): ACTIVE standing inside the
+   * validity window. Null bounds fail closed. The single predicate
+   * every verifier, issuer, guard, and planner shares, so discovery
+   * can never surface an issuer the verifier would refuse.
+   */
+  public static boolean usable(TrustService.IssuerView issuer, Instant now) {
+    return "ACTIVE".equals(issuer.status())
+        && issuer.validFrom() != null
+        && issuer.validThrough() != null
+        && !issuer.validFrom().isAfter(now)
+        && !issuer.validThrough().isBefore(now);
   }
 }

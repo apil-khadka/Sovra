@@ -55,7 +55,6 @@ class ReadinessProbeTests extends SovraAppRoleBase {
   @Test
   void everyCheckIsUpOnASeededDatabase() {
     FlowReadinessService.ReadinessReport report = readiness.report();
-
     assertThat(report.status()).isEqualTo("READY");
     assertThat(report.checks()).hasSize(7);
     assertThat(report.checks())

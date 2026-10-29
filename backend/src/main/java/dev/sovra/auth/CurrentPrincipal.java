@@ -1,7 +1,7 @@
-package dev.sovra.web;
+package dev.sovra.auth;
 
-import dev.sovra.auth.ServiceAccountAuthentication;
-import dev.sovra.auth.ServiceAccountPrincipal;
+import dev.sovra.authz.ForbiddenException;
+import dev.sovra.authz.ReasonCode;
 import java.util.Optional;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -16,5 +16,10 @@ public final class CurrentPrincipal {
       return Optional.of(serviceAuth.principal());
     }
     return Optional.empty();
+  }
+
+  /** The verified caller, or 403 ANONYMOUS for anonymous requests. */
+  public static ServiceAccountPrincipal require() {
+    return get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
   }
 }

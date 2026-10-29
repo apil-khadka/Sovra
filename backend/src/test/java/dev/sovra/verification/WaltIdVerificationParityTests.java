@@ -14,7 +14,7 @@ import dev.sovra.issuance.IssuanceFixtures;
 import dev.sovra.issuance.IssuerSigner;
 import dev.sovra.issuance.KeyRef;
 import dev.sovra.issuance.StatusEvidenceFetcher;
-import dev.sovra.issuance.TrustSnapshotProvider;
+import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.issuance.WaltIdSdJwtVcEncoder;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.tenancy.TenantContext;

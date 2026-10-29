@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.HexFormat;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +54,7 @@ class VaultFlowTests extends SovraAppRoleBase {
     TestAccount member = TestAccounts.createInTenant(
         owner, issuer.tenantId(), "vault-member", Set.of("TENANT_MEMBER"));
     byte[] content = "synthetic-id-image-bytes".getBytes(StandardCharsets.UTF_8);
-    String pin = hex(MessageDigest.getInstance("SHA-256").digest(content));
+    String pin = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
 
     Map<String, Object> stored = post("/api/vault/objects", issuer.headers(), Map.of(
         "issuerId", "https://issuer.example/vault-1",
@@ -243,12 +244,4 @@ class VaultFlowTests extends SovraAppRoleBase {
     return Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
   }
 
-  private static String hex(byte[] bytes) {
-    StringBuilder hex = new StringBuilder(bytes.length * 2);
-    for (byte b : bytes) {
-      hex.append(Character.forDigit((b >> 4) & 0xF, 16));
-      hex.append(Character.forDigit(b & 0xF, 16));
-    }
-    return hex.toString();
-  }
 }

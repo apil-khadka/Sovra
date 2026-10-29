@@ -157,7 +157,7 @@ public class VpService {
     }
     ServiceAccountPrincipal creator = liveCreator(session.createdAccount());
     StoredRequest stored =
-        withTenantResult(creator, () -> loadRequest(session.proofRequestId(), creator.tenantId())
+        TenantContext.withResult(creator, () -> loadRequest(session.proofRequestId(), creator.tenantId())
             .orElseThrow(OpenIdNotFoundException::new));
     Map<String, Object> metadata = new LinkedHashMap<>();
     metadata.put("jwks_uri", issuerBaseUrl + "/api/vp/jwks.json");
@@ -199,10 +199,21 @@ public class VpService {
     }
     Session session = findSession(sessionId).orElseThrow(OpenIdNotFoundException::new);
     ServiceAccountPrincipal creator = liveCreator(session.createdAccount());
+    if ("COMPLETED".equals(session.state())) {
+      // Idempotent replay: the stored decision returns verbatim,
+      // whenever it is asked for. No re-decision, no new decision
+      // row, no new audit rows — expiry cannot un-decide a session.
+      return replayStored(session, creator);
+    }
     if (!session.expiresAt().isAfter(clock.instant())) {
       // Commits in its own transaction: the rejection below rolls
       // back this call's transaction, not the expiry marking.
-      withTenantResult(creator, () -> expireNewTransaction(session.id()));
+      TenantContext.withResult(creator, () -> expireNewTransaction(session.id()));
+      throw new OpenIdProtocolException("invalid_request");
+    }
+    // The completion UPDATE below re-checks PENDING so concurrent
+    // submits cannot both win.
+    if (!"PENDING".equals(session.state())) {
       throw new OpenIdProtocolException("invalid_request");
     }
     if (response != null && !response.isBlank()) {
@@ -269,7 +280,7 @@ public class VpService {
     // portion ends exactly at the separator.
     String presented = vpToken.substring(0, split);
     String kbJwt = vpToken.substring(split + 1);
-    return withTenantResult(creator, () -> {
+    return TenantContext.withResult(creator, () -> {
       StoredRequest stored =
           loadRequest(session.proofRequestId(), creator.tenantId())
               .orElseThrow(OpenIdNotFoundException::new);
@@ -289,9 +300,14 @@ public class VpService {
               credential.holderJwk(), kbJwt);
       String decision = verification.verify(creator, delegated);
       UUID decisionId = decisionId(decision);
-      tenant.update(
-          "UPDATE vp_session SET state = 'COMPLETED', decision_id = ? WHERE id = ?",
-          decisionId, session.id());
+      int completed =
+          tenant.update(
+              "UPDATE vp_session SET state = 'COMPLETED', decision_id = ?"
+                  + " WHERE id = ? AND state = 'PENDING'",
+              decisionId, session.id());
+      if (completed != 1) {
+        throw new OpenIdProtocolException("invalid_request");
+      }
       return decision;
     });
   }
@@ -337,7 +353,28 @@ public class VpService {
   }
 
   private record Session(UUID id, UUID proofRequestId, String nonce, String state,
-      Instant expiresAt, UUID createdAccount) {}
+      Instant expiresAt, UUID createdAccount, UUID decisionId) {}
+
+  /**
+   * Returns the stored decision bytes verbatim. The decision id comes
+   * from our own session row, never from the caller, and the tenant
+   * predicate holds anyway.
+   */
+  private String replayStored(Session session, ServiceAccountPrincipal creator) {
+    return TenantContext.withResult(
+        creator,
+        () -> {
+          List<String> rows =
+              tenant.query(
+                  "SELECT response_body FROM verification_decision WHERE id = ? AND tenant_id = ?",
+                  (rs, row) -> rs.getString(1),
+                  session.decisionId(), creator.tenantId());
+          if (rows.isEmpty()) {
+            throw new IllegalStateException("decision record vanished");
+          }
+          return rows.get(0);
+        });
+  }
 
   private record StoredRequest(UUID credentialId, String audience, String vct) {}
 
@@ -346,7 +383,7 @@ public class VpService {
   private Optional<Session> findSession(UUID sessionId) {
     List<Session> rows =
         global.query(
-            "SELECT id, proof_request_id, nonce, state, expires_at, created_account"
+            "SELECT id, proof_request_id, nonce, state, expires_at, created_account, decision_id"
                 + " FROM resolve_vp_session(?)",
             (rs, row) ->
                 new Session(
@@ -355,7 +392,8 @@ public class VpService {
                     rs.getString("nonce"),
                     rs.getString("state"),
                     rs.getTimestamp("expires_at").toInstant(),
-                    rs.getObject("created_account", UUID.class)),
+                    rs.getObject("created_account", UUID.class),
+                    rs.getObject("decision_id", UUID.class)),
             sessionId);
     return rows.stream().findFirst();
   }
@@ -443,16 +481,6 @@ public class VpService {
     byte[] raw = new byte[24];
     RANDOM.nextBytes(raw);
     return Base64URL.encode(raw).toString();
-  }
-
-  private <T> T withTenantResult(
-      ServiceAccountPrincipal principal, java.util.function.Supplier<T> work) {
-    TenantContext.set(principal);
-    try {
-      return work.get();
-    } finally {
-      TenantContext.clear();
-    }
   }
 
   private static String text(JsonNode node, String field) {

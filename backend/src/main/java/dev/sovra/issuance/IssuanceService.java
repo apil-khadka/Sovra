@@ -13,6 +13,7 @@ import dev.sovra.crypto.HolderProofs;
 import dev.sovra.crypto.P256;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.trust.IssuerKeyService;
+import dev.sovra.trust.TrustSnapshotProvider;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.interfaces.ECPublicKey;

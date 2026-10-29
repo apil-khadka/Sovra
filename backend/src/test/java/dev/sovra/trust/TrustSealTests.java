@@ -84,12 +84,14 @@ class TrustSealTests extends SovraAppRoleBase {
     assertThat(created).isNotNull();
     String proposalId = created.get("proposalId").toString();
     long version = Long.parseLong(created.get("version").toString());
-    client
-        .post()
-        .uri("/api/trust/proposals/" + proposalId + "/approve")
-        .headers(checker.headers())
-        .retrieve()
-        .toBodilessEntity();
+    Map<?, ?> approval =
+        client
+            .post()
+            .uri("/api/trust/proposals/" + proposalId + "/approve")
+            .headers(checker.headers())
+            .retrieve()
+            .body(Map.class);
+    assertThat(approval.get("personVerified")).isEqualTo("false");
     client
         .post()
         .uri("/api/trust/snapshots/" + version + "/activate")
@@ -237,9 +239,9 @@ class TrustSealTests extends SovraAppRoleBase {
     Map<String, Object> denial =
         owner.queryForMap(
             "SELECT decision, reason_code FROM audit_event"
-                + " WHERE tenant_id = ? AND action = 'APPROVE_TRUST_CHANGE'"
-                + " ORDER BY occurred_at DESC LIMIT 1",
-            maker.tenantId());
+                + " WHERE tenant_id IS NULL AND action = 'APPROVE_TRUST_CHANGE'"
+                + " AND resource_id = ? ORDER BY occurred_at DESC LIMIT 1",
+            created.get("proposalId").toString());
     assertThat(denial.get("decision")).isEqualTo("DENY");
     assertThat(denial.get("reason_code")).isEqualTo("SELF_APPROVAL");
   }

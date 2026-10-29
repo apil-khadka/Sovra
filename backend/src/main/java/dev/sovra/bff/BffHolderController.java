@@ -1,17 +1,14 @@
 package dev.sovra.bff;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
 import dev.sovra.consent.ConsentController;
 import dev.sovra.consent.ConsentService;
 import dev.sovra.verification.VerificationController;
 import dev.sovra.verification.VerificationService;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import dev.sovra.web.Etags;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,13 +47,9 @@ public class BffHolderController {
       @PathVariable("id") UUID requestId,
       @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ConsentService.RequestView view = consent.get(caller, requestId);
-    String etag = Etags.strong(view.toString());
-    if (Etags.matches(etag, ifNoneMatch)) {
-      return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
-    }
-    return ResponseEntity.ok().eTag(etag).body(view);
+    return Etags.respond(view, ifNoneMatch);
   }
 
   @PostMapping("/consent/requests/{id}/decision")
@@ -64,7 +57,7 @@ public class BffHolderController {
       @PathVariable("id") UUID requestId,
       @Valid @RequestBody ConsentController.DecideRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ConsentService.RequestView view =
         consent.decide(
             caller,
@@ -78,7 +71,7 @@ public class BffHolderController {
   public ResponseEntity<ConsentService.PresentationView> presentation(
       @PathVariable("id") UUID requestId) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(consent.presentation(caller, requestId));
   }
 
@@ -86,7 +79,7 @@ public class BffHolderController {
   public ResponseEntity<String> verify(
       @Valid @RequestBody VerificationController.VerifyRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     String response =
         verification.verify(
             caller,
@@ -101,12 +94,8 @@ public class BffHolderController {
       @PathVariable("id") UUID decisionId,
       @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     VerificationService.DecisionView view = verification.get(caller, decisionId);
-    String etag = Etags.strong(view.toString());
-    if (Etags.matches(etag, ifNoneMatch)) {
-      return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
-    }
-    return ResponseEntity.ok().eTag(etag).body(view);
+    return Etags.respond(view, ifNoneMatch);
   }
 }

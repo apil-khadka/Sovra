@@ -10,12 +10,14 @@ import dev.sovra.authz.ReasonCode;
 import dev.sovra.authz.ResourceRef;
 import dev.sovra.config.DemoProperties;
 import dev.sovra.vault.VaultCrypto;
+import dev.sovra.vault.VaultEnvelope;
 import dev.sovra.vault.VaultService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.HexFormat;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,7 +92,7 @@ public class QuarantineService {
       throw new QuarantineInvalidException("issuer id is required");
     }
     VaultService.StoredVersion stored = vault.store(caller, issuerId.trim(),
-        "quarantine admission", List.of(VaultService.QUARANTINE_PURPOSE), content, null,
+        "quarantine admission", List.of(VaultEnvelope.QUARANTINE_PURPOSE), content, null,
         VaultService.IngestionSource.CALLER);
     UUID admissionId = UUID.randomUUID();
     tenant.update(
@@ -139,7 +141,7 @@ public class QuarantineService {
       throw new QuarantineConflictException(
           "admission is " + admission.status() + "; only CLEAN admissions promote");
     }
-    if (purposes != null && purposes.contains(VaultService.QUARANTINE_PURPOSE)) {
+    if (purposes != null && purposes.contains(VaultEnvelope.QUARANTINE_PURPOSE)) {
       throw new QuarantineInvalidException("promoted purposes must be real purposes");
     }
     // Bytes open server-side under the quarantine grant and re-seal
@@ -184,7 +186,7 @@ public class QuarantineService {
             rs.getString("claimed_type"),
             rs.getString("actual_type"),
             rs.getInt("size_bytes"),
-            hex(rs.getBytes("content_sha256")),
+            HexFormat.of().formatHex(rs.getBytes("content_sha256")),
             rs.getString("verdict"),
             rs.getObject("image_width", Integer.class),
             rs.getObject("image_height", Integer.class),
@@ -222,12 +224,4 @@ public class QuarantineService {
     }
   }
 
-  private static String hex(byte[] bytes) {
-    StringBuilder hex = new StringBuilder(bytes.length * 2);
-    for (byte b : bytes) {
-      hex.append(Character.forDigit((b >> 4) & 0xF, 16));
-      hex.append(Character.forDigit(b & 0xF, 16));
-    }
-    return hex.toString();
-  }
 }

@@ -1,8 +1,6 @@
 package dev.sovra.consent;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import dev.sovra.web.Etags;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -40,7 +38,7 @@ public class ConsentController {
   public ResponseEntity<ConsentService.RequestView> create(
       @Valid @RequestBody CreateRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ConsentService.RequestView view =
         consent.create(
             caller,
@@ -57,22 +55,18 @@ public class ConsentController {
       @PathVariable("id") UUID requestId,
       @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ConsentService.RequestView view = consent.get(caller, requestId);
     // The tag covers the derived state too, so a state change (expiry,
     // decision) invalidates a cached review. 404s stay tagless.
-    String etag = Etags.strong(view.toString());
-    if (Etags.matches(etag, ifNoneMatch)) {
-      return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
-    }
-    return ResponseEntity.ok().eTag(etag).body(view);
+    return Etags.respond(view, ifNoneMatch);
   }
 
   @PostMapping("/requests/{id}/decision")
   public ResponseEntity<ConsentService.RequestView> decide(
       @PathVariable("id") UUID requestId, @Valid @RequestBody DecideRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ConsentService.RequestView view =
         consent.decide(
             caller,
@@ -86,7 +80,7 @@ public class ConsentController {
   public ResponseEntity<ConsentService.PresentationView> presentation(
       @PathVariable("id") UUID requestId) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(consent.presentation(caller, requestId));
   }
 

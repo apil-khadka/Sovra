@@ -530,8 +530,8 @@ def main() -> int:
             fail(f"denied request returned {status}/{raw[:120]!r}")
         status, _ = verify(auth, BASE_A, request_id, nonce,
                            "https://evil.example/callback", jwk, binding)
-        if status != 422:
-            fail(f"conflicting content on stored nonce returned {status}, want 422")
+        if status != 409:
+            fail(f"conflicting content on stored nonce returned {status}, want 409")
         print("E2E verification: negative matrix holds (tamper, audience, "
               "nonce, unapproved, denied, conflict)", flush=True)
 

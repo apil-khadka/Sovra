@@ -1,8 +1,6 @@
 package dev.sovra.planning;
 
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -33,7 +31,7 @@ public class PlanningController {
   public ResponseEntity<PlanningService.ProposalView> propose(
       @Valid @RequestBody ProposeRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     PlanningIntent intent =
         PlanningIntents.validate(
             request.rpId(), request.audience(), request.purpose(), request.outcome(),
@@ -44,7 +42,7 @@ public class PlanningController {
   @GetMapping("/status")
   public ResponseEntity<PlanningService.StatusView> status() {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(planning.status(caller));
   }
 

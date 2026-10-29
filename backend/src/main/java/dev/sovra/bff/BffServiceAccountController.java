@@ -2,9 +2,7 @@ package dev.sovra.bff;
 
 import dev.sovra.auth.ServiceAccountController;
 import dev.sovra.auth.ServiceAccountService;
-import dev.sovra.authz.ForbiddenException;
-import dev.sovra.authz.ReasonCode;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import jakarta.validation.Valid;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,7 +40,7 @@ public class BffServiceAccountController {
   public ResponseEntity<Map<String, Object>> create(
       @Valid @RequestBody ServiceAccountController.CreateRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ServiceAccountService.CreatedAccount created =
         accounts.create(caller, request.name(), request.roles(), request.expiresAt());
     Map<String, Object> body = new LinkedHashMap<>(ServiceAccountController.view(created.account()));
@@ -53,7 +51,7 @@ public class BffServiceAccountController {
   @GetMapping
   public ResponseEntity<List<Map<String, Object>>> list() {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(
         accounts.list(caller).stream().map(ServiceAccountController::view).toList());
   }
@@ -61,7 +59,7 @@ public class BffServiceAccountController {
   @GetMapping("/{id}")
   public ResponseEntity<Map<String, Object>> get(@PathVariable("id") UUID id) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(ServiceAccountController.view(accounts.get(caller, id)));
   }
 
@@ -70,7 +68,7 @@ public class BffServiceAccountController {
       @PathVariable("id") UUID id,
       @RequestBody(required = false) ServiceAccountController.RotateRequest request) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     ServiceAccountService.CreatedAccount rotated =
         accounts.rotate(caller, id, request == null ? null : request.expiresAt());
     Map<String, Object> body =
@@ -82,7 +80,7 @@ public class BffServiceAccountController {
   @PostMapping("/{id}/revoke")
   public ResponseEntity<Map<String, Object>> revoke(@PathVariable("id") UUID id) {
     var caller =
-        CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+        CurrentPrincipal.require();
     return ResponseEntity.ok(ServiceAccountController.view(accounts.revoke(caller, id)));
   }
 }

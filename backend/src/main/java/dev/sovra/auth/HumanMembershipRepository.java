@@ -44,25 +44,36 @@ public class HumanMembershipRepository {
     }
 
     public ServiceAccountPrincipal principal() {
-      return new ServiceAccountPrincipal(id, tenantId, displayName, roles);
+      return new ServiceAccountPrincipal(id, tenantId, displayName, roles, issuer, subject);
     }
   }
 
-  /** First-login provision plus role sync; returns the stored row. */
+  /**
+   * First-login provision plus role sync; returns the stored row. The
+   * tenant pins on first login: a later login carrying another tenant
+   * fails closed instead of re-homing the membership. The conditional
+   * update closes the concurrent-first-login race the read-then-check
+   * in the login service cannot see.
+   */
   public MembershipRow upsert(
       UUID tenantId, String issuer, String subject, String displayName, Set<Role> roles) {
-    global.update(
-        "INSERT INTO human_membership"
-            + " (tenant_id, issuer, subject, display_name, roles, updated_at)"
-            + " VALUES (?, ?, ?, ?, ?::text[], now())"
-            + " ON CONFLICT (issuer, subject) DO UPDATE SET"
-            + " display_name = EXCLUDED.display_name,"
-            + " roles = EXCLUDED.roles, updated_at = now()",
-        tenantId,
-        issuer,
-        subject,
-        displayName,
-        roles.stream().map(Role::name).toArray(String[]::new));
+    int rows =
+        global.update(
+            "INSERT INTO human_membership"
+                + " (tenant_id, issuer, subject, display_name, roles, updated_at)"
+                + " VALUES (?, ?, ?, ?, ?::text[], now())"
+                + " ON CONFLICT (issuer, subject) DO UPDATE SET"
+                + " display_name = EXCLUDED.display_name,"
+                + " roles = EXCLUDED.roles, updated_at = now()"
+                + " WHERE human_membership.tenant_id = EXCLUDED.tenant_id",
+            tenantId,
+            issuer,
+            subject,
+            displayName,
+            roles.stream().map(Role::name).toArray(String[]::new));
+    if (rows == 0) {
+      throw new HumanTenantConflictException();
+    }
     return findBySubject(issuer, subject).orElseThrow();
   }
 

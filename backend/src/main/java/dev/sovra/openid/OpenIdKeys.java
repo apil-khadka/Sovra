@@ -40,7 +40,6 @@ import org.springframework.stereotype.Service;
 public class OpenIdKeys {
 
   public static final String KEY_ID = "sovra-vp-synth-1";
-  public static final String VERIFIER_ID = "https://sovra.example/verifiers/synth-1";
 
   private final ECPrivateKey privateKey;
   private final ECPublicKey publicKey;
@@ -134,10 +133,6 @@ public class OpenIdKeys {
                 "kid", KEY_ID,
                 "x", publicJwk.getX().toString(),
                 "y", publicJwk.getY().toString())));
-  }
-
-  ECPublicKey publicKey() {
-    return publicKey;
   }
 
   private com.nimbusds.jose.util.Base64URL publicJwkX() {

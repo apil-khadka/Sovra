@@ -5,7 +5,7 @@ import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ReasonCode;
 import dev.sovra.authz.ResourceRef;
-import dev.sovra.web.CurrentPrincipal;
+import dev.sovra.auth.CurrentPrincipal;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;

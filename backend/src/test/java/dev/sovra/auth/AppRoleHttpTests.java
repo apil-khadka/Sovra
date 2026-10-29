@@ -84,4 +84,15 @@ class AppRoleHttpTests extends SovraAppRoleBase {
       assertThat(e.getResponseBodyAsString()).isEmpty();
     }
   }
+
+  @Test
+  void anonymousCallHasNoBasicChallenge() {
+    assertThatThrownBy(() -> client.get().uri("/api/whoami").retrieve().toBodilessEntity())
+        .isInstanceOfSatisfying(
+            HttpClientErrorException.Unauthorized.class,
+            e -> {
+              var headers = e.getResponseHeaders();
+              assertThat(headers == null || !headers.containsHeader("WWW-Authenticate")).isTrue();
+            });
+  }
 }

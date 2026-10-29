@@ -4,6 +4,7 @@ import com.nimbusds.jose.util.Base64URL;
 import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
 import dev.sovra.issuance.SyntheticJwtEncoder;
+import dev.sovra.trust.IssuerKeys;
 import dev.sovra.trust.TrustService;
 import java.nio.charset.StandardCharsets;
 import java.security.interfaces.ECPublicKey;
@@ -104,9 +105,7 @@ public final class SyntheticArtifactVerifier {
             .filter(i -> expected.issuerId().equals(i.issuerId()))
             .findFirst()
             .orElseThrow(() -> new ArtifactFailure("ISSUER_UNTRUSTED"));
-    if (!"ACTIVE".equals(issuer.status())
-        || issuer.validFrom().isAfter(now)
-        || issuer.validThrough().isBefore(now)) {
+    if (!IssuerKeys.usable(issuer, now)) {
       throw new ArtifactFailure("ISSUER_UNTRUSTED");
     }
     if (!issuer.credentialTypes().contains(expected.vct())
