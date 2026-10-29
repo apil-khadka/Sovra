@@ -1,5 +1,6 @@
 package dev.sovra.bff;
 
+import dev.sovra.authz.Role;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -25,8 +26,8 @@ public record BffProperties(
     String tenantClaim,
     String groupsClaim,
     List<String> allowedTenantSlugs,
-    Map<String, String> groupRoleMap,
-    List<String> privilegedRoles,
+    Map<String, Role> groupRoleMap,
+    List<Role> privilegedRoles,
     List<String> hardwareAmr,
     @DefaultValue("sovra") String registrationId) {
 

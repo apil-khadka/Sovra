@@ -6,14 +6,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.sovra.SovraAppRoleBase;
 import dev.sovra.TestAccounts;
 import dev.sovra.TestAccounts.TestAccount;
+import dev.sovra.auth.ServiceAccountPrincipal;
+import dev.sovra.authz.ForbiddenException;
+import dev.sovra.config.DemoProperties;
+import dev.sovra.issuance.IssuanceFixtures;
+import dev.sovra.quarantine.QuarantineService;
+import dev.sovra.tenancy.TenantContext;
+import dev.sovra.vault.SoftwareVaultKekProvider;
+import dev.sovra.vault.VaultService;
+import dev.sovra.worker.QuarantineWorker;
+import java.io.InputStream;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,6 +53,13 @@ class DemoAdmissionTests extends SovraAppRoleBase {
   };
 
   @LocalServerPort int port;
+
+  @Value("${sovra.vault.seed}")
+  String vaultSeed;
+
+  @Autowired DemoProperties demo;
+  @Autowired VaultService vault;
+  @Autowired QuarantineService quarantine;
 
   RestClient client;
   JdbcTemplate owner;
@@ -138,5 +156,109 @@ class DemoAdmissionTests extends SovraAppRoleBase {
             .retrieve()
             .toBodilessEntity())
         .isInstanceOf(HttpClientErrorException.NotFound.class);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void promotionStillWorksUnderFlag() throws Exception {
+    TestAccount issuer = TestAccounts.create(owner, "demo-issuer-p", Set.of("ISSUER_OPS"));
+    byte[] content;
+    try (InputStream in = DemoAdmissionTests.class.getResourceAsStream("/quarantine/tiny.png")) {
+      assertThat(in).isNotNull();
+      content = in.readAllBytes();
+    }
+    // Admit and scan while disarmed (data admitted before the flag
+    // was armed); the flag is always restored, even on failure.
+    demo.setSyntheticOnly(false);
+    String admissionId;
+    String quarantineObject;
+    try {
+      Map<String, Object> admitted = client.post().uri("/api/quarantine/admissions")
+          .headers(issuer.headers())
+          .body(Map.of(
+              "contentBase64", Base64.getEncoder().encodeToString(content),
+              "claimedType", "png",
+              "issuerId", "https://issuer.example/demo-1"))
+          .retrieve()
+          .body(Map.class);
+      admissionId = admitted.get("admissionId").toString();
+      quarantineObject = admitted.get("objectId").toString();
+      QuarantineWorker worker = new QuarantineWorker(
+          quarantineRoleDataSource(), new SoftwareVaultKekProvider(vaultSeed, true));
+      while (worker.scanOne()) {
+      }
+      Map<String, Object> scanned = client.get()
+          .uri("/api/quarantine/admissions/" + admissionId)
+          .headers(issuer.headers())
+          .retrieve()
+          .body(Map.class);
+      assertThat(scanned.get("status")).isEqualTo("CLEAN");
+    } finally {
+      demo.setSyntheticOnly(true);
+    }
+    // Flag re-armed: the server-side promotion re-seal still works.
+    Map<String, Object> granted = client.post().uri("/api/vault/grants")
+        .headers(issuer.headers())
+        .body(Map.of(
+            "objectId", quarantineObject, "objectVersion", 1,
+            "purpose", "quarantine-scan", "workload", "scan-desk", "ttlSeconds", 3600))
+        .retrieve()
+        .body(Map.class);
+    org.springframework.http.ResponseEntity<Map> promoted = client.post()
+        .uri("/api/quarantine/admissions/" + admissionId + "/promote")
+        .headers(issuer.headers())
+        .body(Map.of(
+            "grantId", granted.get("grantId").toString(),
+            "purpose", "quarantine-scan",
+            "workload", "scan-desk",
+            "purposes", List.of("enrollment-review")))
+        .retrieve()
+        .toEntity(Map.class);
+    assertThat(promoted.getStatusCode().value()).isEqualTo(201);
+    // And the boundary is back in force afterwards.
+    assertThatThrownBy(() -> client.post().uri("/api/vault/objects")
+            .headers(issuer.headers())
+            .body(Map.of(
+                "issuerId", "https://issuer.example/demo-1",
+                "purposes", List.of("enrollment-review"),
+                "contentBase64",
+                    Base64.getEncoder().encodeToString(VALID_LOOKING_PNG)))
+            .retrieve()
+            .toBodilessEntity())
+        .isInstanceOf(HttpClientErrorException.Forbidden.class)
+        .hasMessageContaining("DEMO_SYNTHETIC_ONLY");
+  }
+
+  @Test
+  void storeEnforcedAtServiceLayer() {
+    TestAccount issuer = TestAccounts.create(owner, "demo-issuer-s", Set.of("ISSUER_OPS"));
+    ServiceAccountPrincipal caller = IssuanceFixtures.asPrincipal(issuer);
+    TenantContext.set(caller);
+    try {
+      // Direct service call, no controller involved: the boundary
+      // holds, so future caller paths are fail-closed by default.
+      assertThatThrownBy(() -> vault.store(
+              caller, "https://issuer.example/demo-1", "", List.of("enrollment-review"),
+              VALID_LOOKING_PNG, null, VaultService.IngestionSource.CALLER))
+          .isInstanceOf(ForbiddenException.class)
+          .hasMessageContaining("DEMO_SYNTHETIC_ONLY");
+    } finally {
+      TenantContext.clear();
+    }
+  }
+
+  @Test
+  void admitEnforcedAtServiceLayer() {
+    TestAccount issuer = TestAccounts.create(owner, "demo-issuer-a", Set.of("ISSUER_OPS"));
+    ServiceAccountPrincipal caller = IssuanceFixtures.asPrincipal(issuer);
+    TenantContext.set(caller);
+    try {
+      assertThatThrownBy(() -> quarantine.admit(
+              caller, VALID_LOOKING_PNG, "png", "https://issuer.example/demo-1"))
+          .isInstanceOf(ForbiddenException.class)
+          .hasMessageContaining("DEMO_SYNTHETIC_ONLY");
+    } finally {
+      TenantContext.clear();
+    }
   }
 }

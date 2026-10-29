@@ -6,7 +6,9 @@ import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
+import dev.sovra.authz.ReasonCode;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.config.DemoProperties;
 import dev.sovra.vault.VaultCrypto;
 import dev.sovra.vault.VaultService;
 import java.time.Instant;
@@ -35,16 +37,19 @@ public class QuarantineService {
   private final AuditService audit;
   private final VaultService vault;
   private final JdbcTemplate tenant;
+  private final DemoProperties demo;
 
   public QuarantineService(
       AuthorizationService authz,
       AuditService audit,
       VaultService vault,
-      JdbcTemplate tenantJdbcTemplate) {
+      JdbcTemplate tenantJdbcTemplate,
+      DemoProperties demo) {
     this.authz = authz;
     this.audit = audit;
     this.vault = vault;
     this.tenant = tenantJdbcTemplate;
+    this.demo = demo;
   }
 
   public record Admitted(
@@ -71,6 +76,9 @@ public class QuarantineService {
       ServiceAccountPrincipal caller, byte[] content, String claimedType, String issuerId) {
     Decision decision =
         require(caller, Action.QUARANTINE_ADMIT, "quarantine-admission", "admit");
+    // After authorization (anonymous keeps 401), before validation:
+    // an armed demo answers 403 even for malformed admissions.
+    requireCallerIngestion();
     if (content == null || content.length == 0 || content.length > MAX_ADMISSION_BYTES) {
       throw new QuarantineInvalidException("content must be 1..8388608 bytes");
     }
@@ -82,7 +90,8 @@ public class QuarantineService {
       throw new QuarantineInvalidException("issuer id is required");
     }
     VaultService.StoredVersion stored = vault.store(caller, issuerId.trim(),
-        "quarantine admission", List.of(VaultService.QUARANTINE_PURPOSE), content, null);
+        "quarantine admission", List.of(VaultService.QUARANTINE_PURPOSE), content, null,
+        VaultService.IngestionSource.CALLER);
     UUID admissionId = UUID.randomUUID();
     tenant.update(
         "INSERT INTO quarantine_admission (id, tenant_id, vault_object_id, claimed_type,"
@@ -141,7 +150,8 @@ public class QuarantineService {
     String issuerId = vault.metadata(caller, admission.objectId()).issuerId();
     VaultService.StoredVersion stored = vault.store(caller, issuerId,
         displayName == null ? "" : displayName,
-        purposes == null ? List.of("enrollment-review") : purposes, content, null);
+        purposes == null ? List.of("enrollment-review") : purposes, content, null,
+        VaultService.IngestionSource.SERVER);
     // Terminal transition guarded in the row, after the re-seal: a
     // bad grant fails above while the admission is still CLEAN (and
     // retryable), while a second promote of the same admission
@@ -199,6 +209,17 @@ public class QuarantineService {
       throw new ForbiddenException(decision.reasonCode());
     }
     return decision;
+  }
+
+  /**
+   * Public-demo ingestion boundary (SOV-027). Enforcement lives in
+   * the service — not the controller — so every present and future
+   * caller path is fail-closed when the demo is armed.
+   */
+  private void requireCallerIngestion() {
+    if (demo.syntheticOnly()) {
+      throw new ForbiddenException(ReasonCode.DEMO_SYNTHETIC_ONLY);
+    }
   }
 
   private static String hex(byte[] bytes) {

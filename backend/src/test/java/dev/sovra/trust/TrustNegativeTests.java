@@ -125,14 +125,14 @@ class TrustNegativeTests extends SovraPostgresBase {
   }
 
   @Test
-  void plannerCannotPropose() {
-    TestAccount planner = TestAccounts.create(owner, "neg-planner", Set.of("PLANNER"));
+  void memberCannotPropose() {
+    TestAccount member = TestAccounts.create(owner, "neg-member", Set.of("TENANT_MEMBER"));
     assertThatThrownBy(
             () ->
                 client
                     .post()
                     .uri("/api/trust/proposals")
-                    .headers(planner.headers())
+                    .headers(member.headers())
                     .body(Map.of("issuers", List.of(), "policies", List.of(TrustFlowTests.policy())))
                     .retrieve()
                     .toBodilessEntity())

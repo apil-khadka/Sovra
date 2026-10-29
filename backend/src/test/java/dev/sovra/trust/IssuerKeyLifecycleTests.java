@@ -578,7 +578,7 @@ class IssuerKeyLifecycleTests extends SovraAppRoleBase {
   @Test
   void wrongRolesAreDenied() {
     TestAccount ops = TestAccounts.create(owner, "key-ops", Set.of("ISSUER_OPS"));
-    TestAccount planner = TestAccounts.create(owner, "key-planner", Set.of("PLANNER"));
+    TestAccount member = TestAccounts.create(owner, "key-member", Set.of("TENANT_MEMBER"));
     String kid = keyId("role-k");
     Map<String, Object> reg = registerBody(ROT_ISSUER, kid, 1, TrustFlowTests.p256Jwk(kid));
     Map<String, Object> rev = revokeBody(ROT_ISSUER, kid, 1, "no authority");
@@ -586,9 +586,9 @@ class IssuerKeyLifecycleTests extends SovraAppRoleBase {
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
     assertThatThrownBy(() -> revoke(ops, rev))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
-    assertThatThrownBy(() -> register(planner, reg))
+    assertThatThrownBy(() -> register(member, reg))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
-    assertThatThrownBy(() -> revoke(planner, rev))
+    assertThatThrownBy(() -> revoke(member, rev))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
     Integer rows =
         owner.queryForObject(

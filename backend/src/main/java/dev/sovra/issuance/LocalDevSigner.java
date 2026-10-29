@@ -1,19 +1,15 @@
 package dev.sovra.issuance;
 
 import com.nimbusds.jose.crypto.impl.ECDSA;
-import com.nimbusds.jose.util.Base64URL;
 import java.math.BigInteger;
 import java.time.Clock;
 import java.time.Instant;
-import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
-import java.security.MessageDigest;
 import java.security.Signature;
 import java.security.interfaces.ECPrivateKey;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPrivateKeySpec;
-import java.security.spec.EllipticCurve;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +77,7 @@ public class LocalDevSigner implements IssuerSigner {
     this.mapper = mapper;
     this.clock = clock;
     KeyFactory factory = KeyFactory.getInstance("EC");
-    this.params = ECP256.params();
+    this.params = dev.sovra.crypto.P256.params();
     // Scalar 1: public key is the generator point. Anyone can recompute
     // this key, which is exactly why it must never leave synthetic use.
     this.privateKey =
@@ -137,23 +133,14 @@ public class LocalDevSigner implements IssuerSigner {
         Map.of(
             "kty", "EC",
             "crv", CURVE,
-            "x", base64UrlUnsigned(publicPoint.getAffineX()),
-            "y", base64UrlUnsigned(publicPoint.getAffineY()),
+            "x", dev.sovra.crypto.P256.base64UrlUnsigned(publicPoint.getAffineX()),
+            "y", dev.sovra.crypto.P256.base64UrlUnsigned(publicPoint.getAffineY()),
             "kid", KEY_ID);
     try {
       return mapper.writeValueAsString(jwk);
     } catch (tools.jackson.core.JacksonException e) {
       throw new IllegalStateException(e);
     }
-  }
-
-  private static String base64UrlUnsigned(BigInteger value) {
-    byte[] raw = value.toByteArray();
-    byte[] fixed = new byte[32];
-    int source = Math.max(0, raw.length - 32);
-    int target = Math.max(0, 32 - raw.length);
-    System.arraycopy(raw, source, fixed, target, Math.min(32, raw.length));
-    return Base64URL.encode(fixed).toString();
   }
 
   @Override
@@ -231,37 +218,4 @@ public class LocalDevSigner implements IssuerSigner {
         .orElse(false);
   }
 
-  /** P-256 parameters from the JDK's own named-curve table. */
-  static final class ECP256 {
-    private ECP256() {}
-
-    static ECParameterSpec params() throws Exception {
-      java.security.AlgorithmParameters parameters =
-          java.security.AlgorithmParameters.getInstance("EC");
-      parameters.init(new java.security.spec.ECGenParameterSpec("secp256r1"));
-      ECParameterSpec spec =
-          parameters.getParameterSpec(ECParameterSpec.class);
-      EllipticCurve curve = spec.getCurve();
-      return new ECParameterSpec(
-          curve, spec.getGenerator(), spec.getOrder(), spec.getCofactor());
-    }
-  }
-
-  /** RFC 7638 SHA-256 thumbprint of a P-256 public JWK. */
-  public static String thumbprint(BigInteger x, BigInteger y) {
-    try {
-      String canonical =
-          "{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\""
-              + base64UrlUnsigned(x)
-              + "\",\"y\":\""
-              + base64UrlUnsigned(y)
-              + "\"}";
-      byte[] digest =
-          MessageDigest.getInstance("SHA-256")
-              .digest(canonical.getBytes(StandardCharsets.UTF_8));
-      return Base64URL.encode(digest).toString();
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
-    }
-  }
 }

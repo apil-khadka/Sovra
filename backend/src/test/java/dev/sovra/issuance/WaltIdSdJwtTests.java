@@ -11,6 +11,7 @@ import com.nimbusds.jose.util.Base64URL;
 import id.walt.sdjwt.SDJwt;
 import id.walt.sdjwt.SimpleJWTCryptoProvider;
 import id.walt.sdjwt.VerificationResult;
+import dev.sovra.crypto.P256;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -90,7 +91,7 @@ class WaltIdSdJwtTests {
     jwk.put("y", base64UrlUnsigned(pub.getW().getAffineY()));
     JsonNode node = mapper.readTree(mapper.writeValueAsString(jwk));
     String thumbprint =
-        LocalDevSigner.thumbprint(pub.getW().getAffineX(), pub.getW().getAffineY());
+        P256.thumbprint(pub.getW().getAffineX(), pub.getW().getAffineY());
     return new Keys(pub, (ECPrivateKey) pair.getPrivate(), node, thumbprint);
   }
 

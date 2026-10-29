@@ -1,11 +1,10 @@
 package dev.sovra.auth;
 
+import dev.sovra.authz.Role;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -36,7 +35,7 @@ public class HumanMembershipRepository {
       String issuer,
       String subject,
       String displayName,
-      Set<String> roles,
+      Set<Role> roles,
       boolean revoked,
       Instant updatedAt) {
 
@@ -51,7 +50,7 @@ public class HumanMembershipRepository {
 
   /** First-login provision plus role sync; returns the stored row. */
   public MembershipRow upsert(
-      UUID tenantId, String issuer, String subject, String displayName, Set<String> roles) {
+      UUID tenantId, String issuer, String subject, String displayName, Set<Role> roles) {
     global.update(
         "INSERT INTO human_membership"
             + " (tenant_id, issuer, subject, display_name, roles, updated_at)"
@@ -59,7 +58,11 @@ public class HumanMembershipRepository {
             + " ON CONFLICT (issuer, subject) DO UPDATE SET"
             + " display_name = EXCLUDED.display_name,"
             + " roles = EXCLUDED.roles, updated_at = now()",
-        tenantId, issuer, subject, displayName, roles.toArray(new String[0]));
+        tenantId,
+        issuer,
+        subject,
+        displayName,
+        roles.stream().map(Role::name).toArray(String[]::new));
     return findBySubject(issuer, subject).orElseThrow();
   }
 
@@ -97,13 +100,16 @@ public class HumanMembershipRepository {
   private MembershipRow mapRow(ResultSet rs, int row) throws SQLException {
     Array rolesArray = rs.getArray("roles");
     String[] roles = rolesArray == null ? new String[0] : (String[]) rolesArray.getArray();
+    // Fail loud on corrupt rows: the V18 CHECK plus login-time
+    // mapping make unknown values unreachable in practice.
+    Set<Role> parsed = Role.parseAll(roles);
     return new MembershipRow(
         rs.getObject("id", UUID.class),
         rs.getObject("tenant_id", UUID.class),
         rs.getString("issuer"),
         rs.getString("subject"),
         rs.getString("display_name"),
-        new HashSet<>(Arrays.asList(roles)),
+        parsed,
         rs.getBoolean("revoked"),
         rs.getTimestamp("updated_at").toInstant());
   }

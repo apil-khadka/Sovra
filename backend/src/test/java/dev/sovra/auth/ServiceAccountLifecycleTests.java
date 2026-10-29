@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.HttpClientErrorException;
@@ -115,6 +116,33 @@ class ServiceAccountLifecycleTests extends SovraAppRoleBase {
             .retrieve()
             .body(String.class))
         .isInstanceOf(HttpClientErrorException.Unauthorized.class);
+  }
+
+  @Test
+  void databaseRejectsUnknownRoles() {
+    // Raw SQL bypasses ServiceAccountService validation; the V18
+    // CHECKs are the last door. Both inserts are otherwise valid,
+    // so the named constraint must be the one that fires.
+    TestAccount admin = TestAccounts.create(owner, "svc-roles", Set.of("TRUST_ADMIN"));
+    assertThatThrownBy(() -> owner.update(
+            "INSERT INTO service_account (tenant_id, name, token_prefix, token_hash, roles)"
+                + " VALUES (?, ?, ?, ?, ?::text[])",
+            admin.tenantId(),
+            "evil",
+            "ab12",
+            new byte[32],
+            new String[] {"TYPO_ROLE"}))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining("service_account_roles_known");
+    assertThatThrownBy(() -> owner.update(
+            "INSERT INTO human_membership (tenant_id, issuer, subject, roles)"
+                + " VALUES (?, ?, ?, ?::text[])",
+            admin.tenantId(),
+            "https://op.example/realms/sovra",
+            "evil-subject",
+            new String[] {"TYPO_ROLE"}))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining("human_membership_roles_known");
   }
 
   @Test

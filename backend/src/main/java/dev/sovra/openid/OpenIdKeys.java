@@ -56,7 +56,7 @@ public class OpenIdKeys {
           "OpenIdKeys needs both sovra.synthetic-issuers.enabled and"
               + " sovra.synthetic-issuers.acknowledge-non-production set to true");
     }
-    ECParameterSpec params = ECP256.params();
+    ECParameterSpec params = dev.sovra.crypto.P256.params();
     KeyFactory factory = KeyFactory.getInstance("EC");
     this.privateKey =
         (ECPrivateKey) factory.generatePrivate(new ECPrivateKeySpec(BigInteger.TWO, params));
@@ -141,20 +141,13 @@ public class OpenIdKeys {
   }
 
   private com.nimbusds.jose.util.Base64URL publicJwkX() {
-    return com.nimbusds.jose.util.Base64URL.encode(unsigned(publicKey.getW().getAffineX()));
+    return com.nimbusds.jose.util.Base64URL.encode(
+        dev.sovra.crypto.P256.fixed32(publicKey.getW().getAffineX()));
   }
 
   private com.nimbusds.jose.util.Base64URL publicJwkY() {
-    return com.nimbusds.jose.util.Base64URL.encode(unsigned(publicKey.getW().getAffineY()));
-  }
-
-  private static byte[] unsigned(BigInteger value) {
-    byte[] raw = value.toByteArray();
-    byte[] fixed = new byte[32];
-    System.arraycopy(
-        raw, Math.max(0, raw.length - 32), fixed, Math.max(0, 32 - raw.length),
-        Math.min(32, raw.length));
-    return fixed;
+    return com.nimbusds.jose.util.Base64URL.encode(
+        dev.sovra.crypto.P256.fixed32(publicKey.getW().getAffineY()));
   }
 
   /**
@@ -178,15 +171,4 @@ public class OpenIdKeys {
     return new ECPoint(rx, ry);
   }
 
-  /** P-256 parameters from the JDK's own named-curve table. */
-  static final class ECP256 {
-    private ECP256() {}
-
-    static ECParameterSpec params() throws Exception {
-      java.security.AlgorithmParameters parameters =
-          java.security.AlgorithmParameters.getInstance("EC");
-      parameters.init(new java.security.spec.ECGenParameterSpec("secp256r1"));
-      return parameters.getParameterSpec(ECParameterSpec.class);
-    }
-  }
 }

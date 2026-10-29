@@ -10,6 +10,7 @@ import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ReasonCode;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.config.DemoProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
@@ -48,6 +49,18 @@ public class VaultService {
    */
   public static final String QUARANTINE_PURPOSE = "quarantine-scan";
 
+  /**
+   * Byte provenance for {@link #store}. The public-demo boundary
+   * (SOV-027) rejects {@code CALLER} bytes when armed; {@code SERVER}
+   * is reserved for bytes the server already holds — today only the
+   * quarantine promotion re-seal. Every seal names its provenance,
+   * so a future caller cannot silently inherit the wrong side.
+   */
+  public enum IngestionSource {
+    CALLER,
+    SERVER
+  }
+
   private static final Pattern NAME = Pattern.compile("^[a-z0-9-]{1,64}$");
 
   private final AuthorizationService authz;
@@ -57,6 +70,7 @@ public class VaultService {
   private final VaultKekProvider kek;
   private final JdbcTemplate tenant;
   private final Clock clock;
+  private final DemoProperties demo;
 
   public VaultService(
       AuthorizationService authz,
@@ -65,7 +79,8 @@ public class VaultService {
       HumanMembershipRepository humans,
       VaultKekProvider kek,
       JdbcTemplate tenantJdbcTemplate,
-      Clock clock) {
+      Clock clock,
+      DemoProperties demo) {
     this.authz = authz;
     this.audit = audit;
     this.accounts = accounts;
@@ -73,6 +88,7 @@ public class VaultService {
     this.kek = kek;
     this.tenant = tenantJdbcTemplate;
     this.clock = clock;
+    this.demo = demo;
   }
 
   public record StoredVersion(UUID objectId, int version) {}
@@ -134,8 +150,12 @@ public class VaultService {
       String displayName,
       List<String> purposes,
       byte[] content,
-      String expectedSha256Hex) {
+      String expectedSha256Hex,
+      IngestionSource source) {
     Decision decision = require(caller, Action.VAULT_STORE_OBJECT, "vault-object", "store");
+    if (source == IngestionSource.CALLER) {
+      requireCallerIngestion();
+    }
     List<String> authorized = validatedPurposes(purposes);
     byte[] bytes = validatedContent(content, expectedSha256Hex);
     requireText(issuerId, "issuer id");
@@ -168,6 +188,9 @@ public class VaultService {
       String expectedSha256Hex) {
     Decision decision = require(caller, Action.VAULT_STORE_OBJECT, "vault-object",
         objectId.toString());
+    // New versions always carry caller bytes; the check sits before
+    // the object lookup so an armed demo answers 403, never 404.
+    requireCallerIngestion();
     List<String> authorized = validatedPurposes(purposes);
     byte[] bytes = validatedContent(content, expectedSha256Hex);
     String issuerId = issuerOf(objectId, caller.tenantId());
@@ -521,6 +544,18 @@ public class VaultService {
       throw new ForbiddenException(decision.reasonCode());
     }
     return decision;
+  }
+
+  /**
+   * Public-demo ingestion boundary (SOV-027). Runs after
+   * authorization — anonymous callers keep their 401 — and before
+   * any validation or lookup, so an armed demo answers 403 even for
+   * malformed bodies and missing objects.
+   */
+  private void requireCallerIngestion() {
+    if (demo.syntheticOnly()) {
+      throw new ForbiddenException(ReasonCode.DEMO_SYNTHETIC_ONLY);
+    }
   }
 
   private String issuerOf(UUID objectId, UUID tenantId) {

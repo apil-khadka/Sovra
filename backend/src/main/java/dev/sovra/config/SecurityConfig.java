@@ -10,6 +10,7 @@ import dev.sovra.bff.PkceAuthorizationRequestResolver;
 import dev.sovra.web.SpaRoutes;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -122,6 +123,25 @@ public class SecurityConfig {
                 exceptions.authenticationEntryPoint(
                     (request, response, authException) -> response.setStatus(401)));
     return http.build();
+  }
+
+  /**
+   * The machine filter runs ONLY inside the machine chain (see
+   * {@code filterChain} below). Without this registration, Boot
+   * auto-registers the {@code @Component} with the servlet container
+   * at lowest precedence, so it re-runs after the security chain on
+   * EVERY path — including BFF paths, where a valid Bearer would
+   * overwrite the session identity {@code BffSessionFilter} just
+   * established. Proven by
+   * {@code BffLoginTests#bearerNeverOverridesSessionOnBffPaths}.
+   */
+  @Bean
+  FilterRegistrationBean<ApiKeyAuthFilter> apiKeyAuthFilterRegistration(
+      ApiKeyAuthFilter apiKeyAuthFilter) {
+    FilterRegistrationBean<ApiKeyAuthFilter> registration =
+        new FilterRegistrationBean<>(apiKeyAuthFilter);
+    registration.setEnabled(false);
+    return registration;
   }
 
   @Bean

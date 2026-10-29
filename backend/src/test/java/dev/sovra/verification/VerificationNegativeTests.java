@@ -390,13 +390,13 @@ class VerificationNegativeTests extends SovraAppRoleBase {
             ConsentFixtures.AUDIENCE, mapper));
     String decisionId = decided.get("decisionId").toString();
 
-    TestAccount planner = TestAccounts.createInTenant(
-        owner, stage.rp().tenantId(), "v-planner", Set.of("PLANNER"));
+    TestAccount admin = TestAccounts.createInTenant(
+        owner, stage.rp().tenantId(), "v-admin", Set.of("TRUST_ADMIN"));
     TestAccount ops = TestAccounts.createInTenant(
         owner, stage.rp().tenantId(), "v-ops", Set.of("ISSUER_OPS"));
 
     // Only RP_CLIENT submits verifications.
-    assertThatThrownBy(() -> VerificationFixtures.verify(client, planner, freshBody(stage)))
+    assertThatThrownBy(() -> VerificationFixtures.verify(client, admin, freshBody(stage)))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
     assertThatThrownBy(() -> VerificationFixtures.verify(client, ops, freshBody(stage)))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
@@ -405,7 +405,7 @@ class VerificationNegativeTests extends SovraAppRoleBase {
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
 
     // Retrieval needs TENANT_MEMBER or RP_CLIENT.
-    assertThatThrownBy(() -> VerificationFixtures.decision(client, planner, decisionId))
+    assertThatThrownBy(() -> VerificationFixtures.decision(client, admin, decisionId))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
     assertThatThrownBy(() -> VerificationFixtures.decision(client, ops, decisionId))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);

@@ -331,7 +331,8 @@ class VaultNegativeTests extends SovraAppRoleBase {
     ServiceAccountPrincipal caller = new ServiceAccountPrincipal(
         issuer.accountId(), issuer.tenantId(), issuer.name(), issuer.roles());
     VaultService failing = new VaultService(authz, audit, accounts, humans,
-        new KmsVaultKekProvider(), new JdbcTemplate(new TenantDataSource(dataSource)), clock);
+        new KmsVaultKekProvider(), new JdbcTemplate(new TenantDataSource(dataSource)), clock,
+        new dev.sovra.config.DemoProperties());
     // The manual instance has no transaction proxy, so the test wraps
     // the call the way the runtime does: the failed seal must roll
     // the object shell back with it.
@@ -342,7 +343,8 @@ class VaultNegativeTests extends SovraAppRoleBase {
           try {
             assertThatThrownBy(() -> failing.store(caller, "https://issuer.example/x", "",
                     List.of("enrollment-review"),
-                    "outage-bytes".getBytes(StandardCharsets.UTF_8), null))
+                    "outage-bytes".getBytes(StandardCharsets.UTF_8), null,
+                    VaultService.IngestionSource.CALLER))
                 .isInstanceOf(KmsUnavailableException.class);
           } finally {
             TenantContext.clear();

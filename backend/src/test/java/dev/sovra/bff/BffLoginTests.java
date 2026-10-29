@@ -12,6 +12,7 @@ import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.authz.Role;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpClient.Redirect;
@@ -151,7 +152,7 @@ class BffLoginTests extends SovraAppRoleBase {
     MembershipRow stored =
         memberships.findBySubject(STUB.issuer(), subject).orElseThrow();
     assertThat(stored.tenantId()).isEqualTo(demoTenant());
-    assertThat(stored.roles()).isEqualTo(Set.of("TENANT_MEMBER"));
+    assertThat(stored.roles()).isEqualTo(Set.of(Role.TENANT_MEMBER));
 
     Map<String, Object> audit = TestAccounts.auditRow(owner, "BFF_LOGIN");
     assertThat(audit.get("decision")).isEqualTo("PERMIT");
@@ -255,7 +256,7 @@ class BffLoginTests extends SovraAppRoleBase {
     login(new StubOpenIdProvider.Script(
         subject, List.of("sovra-members"), "sovra-demo", List.of("pwd")));
     MembershipRow narrowed = memberships.findBySubject(STUB.issuer(), subject).orElseThrow();
-    assertThat(narrowed.roles()).isEqualTo(Set.of("TENANT_MEMBER"));
+    assertThat(narrowed.roles()).isEqualTo(Set.of(Role.TENANT_MEMBER));
 
     Decision after =
         authz.authorize(Optional.of(narrowed.principal()), Action.REQUEST_PROOF, resource);
@@ -283,6 +284,26 @@ class BffLoginTests extends SovraAppRoleBase {
 
     // No session at all: anonymous on the BFF.
     assertThat(get(BASE + "/api/bff/me", Map.of()).statusCode()).isEqualTo(401);
+  }
+
+  @Test
+  void bearerNeverOverridesSessionOnBffPaths() throws Exception {
+    String subject = "mix-" + UUID.randomUUID().toString().substring(0, 8);
+    Session session = login(new StubOpenIdProvider.Script(
+        subject, List.of("sovra-members"), "sovra-demo", List.of("pwd")));
+    TestAccount machine = TestAccounts.create(owner, "mix-machine", Set.of("TRUST_ADMIN"));
+
+    // Session + machine Bearer together: the BFF answers as the
+    // session. If the Bearer won, machine credentials would bypass
+    // per-request membership liveness and hardware-AMR gating on
+    // human endpoints.
+    HttpResponse<String> mixed = get(BASE + "/api/bff/me", Map.of(
+        "Cookie", "JSESSIONID=" + session.jsessionid(),
+        "Authorization", "Bearer " + machine.token()));
+    assertThat(mixed.statusCode()).isEqualTo(200);
+    JsonNode body = mapper.readTree(mixed.body());
+    assertThat(body.get("roles").toString()).contains("TENANT_MEMBER");
+    assertThat(body.get("roles").toString()).doesNotContain("TRUST_ADMIN");
   }
 
   @Test

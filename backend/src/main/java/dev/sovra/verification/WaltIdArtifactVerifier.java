@@ -202,7 +202,7 @@ public final class WaltIdArtifactVerifier {
       if (rawX.length != 32 || rawY.length != 32) {
         return null;
       }
-      return dev.sovra.issuance.LocalDevSigner.thumbprint(
+      return dev.sovra.crypto.P256.thumbprint(
           new BigInteger(1, rawX), new BigInteger(1, rawY));
     } catch (RuntimeException e) {
       return null;

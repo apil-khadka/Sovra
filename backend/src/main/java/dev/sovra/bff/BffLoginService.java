@@ -10,9 +10,9 @@ import dev.sovra.authz.Decision;
 import dev.sovra.authz.PermissionCache;
 import dev.sovra.authz.ReasonCode;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.authz.Role;
 import dev.sovra.tenancy.TenantContext;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -128,18 +128,18 @@ public class BffLoginService {
   }
 
   private LoginResult loginAttributed(OidcUser user, String issuer, String subject, UUID tenantId) {
-    Set<String> mapped = mapRoles(user);
+    Set<Role> mapped = mapRoles(user);
     if (mapped.isEmpty()) {
       denyAttributed(tenantId, issuer, subject, ReasonCode.MISSING_ROLE, "no mapped roles", Map.of());
       throw new BffLoginDeniedException(ReasonCode.MISSING_ROLE, "no mapped roles");
     }
     List<String> amr = user.getClaimAsStringList("amr");
     amr = amr == null ? List.of() : List.copyOf(amr);
-    Set<String> conferred = conferRoles(mapped, amr);
+    Set<Role> conferred = conferRoles(mapped, amr);
     if (conferred.isEmpty()) {
       denyAttributed(tenantId, issuer, subject, ReasonCode.ASSURANCE_INSUFFICIENT,
           "privileged roles need hardware-bound authentication",
-          Map.of("withheld_roles", String.join(",", new ArrayList<>(mapped))));
+          Map.of("withheld_roles", joinNames(mapped)));
       throw new BffLoginDeniedException(
           ReasonCode.ASSURANCE_INSUFFICIENT, "hardware-bound authentication required");
     }
@@ -158,11 +158,11 @@ public class BffLoginService {
     Instant authTime = authClaimTime(user);
     Map<String, String> detail = new LinkedHashMap<>();
     detail.put("subject_ref", issuer + "|" + subject);
-    detail.put("roles", String.join(",", new ArrayList<>(conferred)));
-    Set<String> withheld = new LinkedHashSet<>(mapped);
+    detail.put("roles", joinNames(conferred));
+    Set<Role> withheld = new LinkedHashSet<>(mapped);
     withheld.removeAll(conferred);
     if (!withheld.isEmpty()) {
-      detail.put("withheld_roles", String.join(",", new ArrayList<>(withheld)));
+      detail.put("withheld_roles", joinNames(withheld));
     }
     audit.record(
         stored.principal(),
@@ -173,6 +173,10 @@ public class BffLoginService {
         detail);
     String idToken = user.getIdToken() == null ? "" : user.getIdToken().getTokenValue();
     return new LoginResult(stored.principal(), amr, authTime, idToken);
+  }
+
+  private static String joinNames(Set<Role> roles) {
+    return String.join(",", roles.stream().map(Role::name).toList());
   }
 
   private void denyAttributed(UUID tenantId, String issuer, String subject, ReasonCode reason,
@@ -191,12 +195,12 @@ public class BffLoginService {
         full);
   }
 
-  private Set<String> mapRoles(OidcUser user) {
+  private Set<Role> mapRoles(OidcUser user) {
     List<String> groups = user.getClaimAsStringList(properties.groupsClaim());
-    Set<String> mapped = new LinkedHashSet<>();
+    Set<Role> mapped = new LinkedHashSet<>();
     if (groups != null) {
       for (String group : groups) {
-        String role = properties.groupRoleMap().get(group);
+        Role role = properties.groupRoleMap().get(group);
         if (role != null) {
           mapped.add(role);
         }
@@ -205,10 +209,10 @@ public class BffLoginService {
     return mapped;
   }
 
-  private Set<String> conferRoles(Set<String> mapped, List<String> amr) {
+  private Set<Role> conferRoles(Set<Role> mapped, List<String> amr) {
     boolean hardware = amr.stream().anyMatch(properties.hardwareAmr()::contains);
-    Set<String> conferred = new LinkedHashSet<>();
-    for (String role : mapped) {
+    Set<Role> conferred = new LinkedHashSet<>();
+    for (Role role : mapped) {
       if (properties.privilegedRoles().contains(role) && !hardware) {
         continue;
       }

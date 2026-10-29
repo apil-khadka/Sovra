@@ -3,9 +3,13 @@ package dev.sovra.bff;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.sovra.authz.Role;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.BindException;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
@@ -28,8 +32,8 @@ class BffConfigTests {
         "tenant_slug",
         "groups",
         List.of("sovra-demo"),
-        Map.of("sovra-members", "TENANT_MEMBER"),
-        List.of("TRUST_ADMIN"),
+        Map.of("sovra-members", Role.TENANT_MEMBER),
+        List.of(Role.TRUST_ADMIN),
         List.of("webauthn"),
         "sovra");
   }
@@ -62,6 +66,25 @@ class BffConfigTests {
     BffProperties off = new BffProperties(
         false, "", "", "", "", "", true, "", "", List.of(), Map.of(), List.of(), List.of(), "sovra");
     assertThatCode(off::validateSelf).doesNotThrowAnyException();
+  }
+
+  @Test
+  void unknownConfiguredRoleFailsBinding() {
+    // A typo in either role list must fail boot, never silently
+    // widen access (group map) or skip the hardware gate
+    // (privileged roles).
+    MapConfigurationPropertySource source = new MapConfigurationPropertySource();
+    source.put("sovra.bff.group-role-map.sovra-members", "TYPO_ROLE");
+    source.put("sovra.bff.privileged-roles[0]", "TRUST_ADMIN");
+    assertThatThrownBy(() -> new Binder(source).bind("sovra.bff", BffProperties.class))
+        .isInstanceOf(BindException.class)
+        .hasStackTraceContaining("TYPO_ROLE");
+    MapConfigurationPropertySource privileged = new MapConfigurationPropertySource();
+    privileged.put("sovra.bff.group-role-map.sovra-members", "TENANT_MEMBER");
+    privileged.put("sovra.bff.privileged-roles[0]", "TYPO_ROLE");
+    assertThatThrownBy(() -> new Binder(privileged).bind("sovra.bff", BffProperties.class))
+        .isInstanceOf(BindException.class)
+        .hasStackTraceContaining("TYPO_ROLE");
   }
 
   @Test

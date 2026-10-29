@@ -1,6 +1,7 @@
 package dev.sovra;
 
 import dev.sovra.auth.TokenHasher;
+import dev.sovra.authz.Role;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -13,7 +14,7 @@ public final class TestAccounts {
   private TestAccounts() {}
 
   public record TestAccount(
-      UUID tenantId, String tenantSlug, UUID accountId, String name, String token, Set<String> roles) {
+      UUID tenantId, String tenantSlug, UUID accountId, String name, String token, Set<Role> roles) {
 
     public java.util.function.Consumer<HttpHeaders> headers() {
       return headers -> headers.setBearerAuth(token);
@@ -37,6 +38,9 @@ public final class TestAccounts {
     String slug =
         owner.queryForObject("SELECT slug FROM tenant WHERE id = ?", String.class, tenantId);
     String token = TokenHasher.generate();
+    // Raw strings go to the database so the V18 CHECK also guards
+    // fixtures; the parsed set mirrors what authorization will see.
+    Set<Role> parsed = Role.parseAll(roles.toArray(new String[0]));
     UUID accountId =
         owner.queryForObject(
             "INSERT INTO service_account (tenant_id, name, token_prefix, token_hash, roles)"
@@ -47,7 +51,7 @@ public final class TestAccounts {
             TokenHasher.prefix(token),
             TokenHasher.hash(token),
             roles.toArray(new String[0]));
-    return new TestAccount(tenantId, slug, accountId, name, token, roles);
+    return new TestAccount(tenantId, slug, accountId, name, token, parsed);
   }
 
   public static void revoke(JdbcTemplate owner, UUID accountId) {

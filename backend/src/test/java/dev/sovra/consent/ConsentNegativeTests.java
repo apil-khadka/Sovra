@@ -297,13 +297,13 @@ class ConsentNegativeTests extends SovraAppRoleBase {
   @Test
   void wrongRolesAreDeniedAndAudited() throws Exception {
     Stage stage = stage("roles");
-    TestAccount planner = TestAccounts.createInTenant(
-        owner, stage.rp().tenantId(), "roles-planner", Set.of("PLANNER"));
+    TestAccount admin = TestAccounts.createInTenant(
+        owner, stage.rp().tenantId(), "roles-admin", Set.of("TRUST_ADMIN"));
     TestAccount ops = TestAccounts.createInTenant(
         owner, stage.rp().tenantId(), "roles-ops", Set.of("ISSUER_OPS"));
 
     // Only RP_CLIENT opens requests.
-    assertThatThrownBy(() -> ConsentFixtures.create(client, planner,
+    assertThatThrownBy(() -> ConsentFixtures.create(client, admin,
             ConsentFixtures.createBody(UUID.fromString(stage.credentialId()))))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
     assertThatThrownBy(() -> ConsentFixtures.create(client, ops,
@@ -314,13 +314,13 @@ class ConsentNegativeTests extends SovraAppRoleBase {
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
 
     // Only TENANT_MEMBER/RP_CLIENT read or deliver decisions.
-    assertThatThrownBy(() -> ConsentFixtures.review(client, planner, stage.requestId()))
+    assertThatThrownBy(() -> ConsentFixtures.review(client, admin, stage.requestId()))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
     assertThatThrownBy(() -> ConsentFixtures.review(client, ops, stage.requestId()))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
     assertThatThrownBy(
             () ->
-                ConsentFixtures.decide(client, planner, stage.requestId(),
+                ConsentFixtures.decide(client, admin, stage.requestId(),
                     ConsentFixtures.decideBody(stage.holder(), stage.review(), "deny", mapper)))
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
 

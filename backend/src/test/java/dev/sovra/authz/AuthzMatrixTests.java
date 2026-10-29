@@ -64,15 +64,16 @@ class AuthzMatrixTests extends SovraPostgresBase {
   }
 
   @Test
-  void plannerRoleIsDeniedEverywhere() throws Exception {
-    TestAccount planner = TestAccounts.create(owner, "planner", Set.of("PLANNER"));
+  void unrelatedRoleIsDeniedOnPrivilegedEndpoints() throws Exception {
+    TestAccount outsider =
+        TestAccounts.create(owner, "matrix-outsider", Set.of("RP_CLIENT"));
     Map<String, Object> issuance = issueBody();
     assertThatThrownBy(
             () ->
                 client
                     .post()
                     .uri("/api/trust/proposals")
-                    .headers(planner.headers())
+                    .headers(outsider.headers())
                     .contentType(MediaType.APPLICATION_JSON).body("{}")
                     .retrieve()
                     .toBodilessEntity())
@@ -82,7 +83,7 @@ class AuthzMatrixTests extends SovraPostgresBase {
                 client
                     .get()
                     .uri("/api/audit/events")
-                    .headers(planner.headers())
+                    .headers(outsider.headers())
                     .retrieve()
                     .toBodilessEntity())
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
@@ -93,7 +94,7 @@ class AuthzMatrixTests extends SovraPostgresBase {
                     .uri("/api/issuance/credentials")
                     .headers(
                         h -> {
-                          planner.headers().accept(h);
+                          outsider.headers().accept(h);
                           h.set("Idempotency-Key", "matrix-valid");
                         })
                     .contentType(MediaType.APPLICATION_JSON).body(issuance)
@@ -105,7 +106,7 @@ class AuthzMatrixTests extends SovraPostgresBase {
                 client
                     .get()
                     .uri("/api/issuance/credentials/00000000-0000-0000-0000-000000000000")
-                    .headers(planner.headers())
+                    .headers(outsider.headers())
                     .retrieve()
                     .toBodilessEntity())
         .isInstanceOf(HttpClientErrorException.Forbidden.class);

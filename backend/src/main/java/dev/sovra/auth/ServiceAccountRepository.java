@@ -1,13 +1,13 @@
 package dev.sovra.auth;
 
+import dev.sovra.authz.Role;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -46,12 +46,15 @@ public class ServiceAccountRepository {
   private AccountRow mapRow(ResultSet rs, int row) throws SQLException {
     Array rolesArray = rs.getArray("roles");
     String[] roles = rolesArray == null ? new String[0] : (String[]) rolesArray.getArray();
+    // Fail loud on corrupt rows: the V18 CHECK plus creation-time
+    // validation make unknown values unreachable in practice.
+    Set<Role> parsed = Role.parseAll(roles);
     return new AccountRow(
         rs.getObject("id", UUID.class),
         rs.getObject("tenant_id", UUID.class),
         rs.getString("name"),
         rs.getBytes("token_hash"),
-        new HashSet<>(Arrays.asList(roles)),
+        parsed,
         rs.getBoolean("revoked"),
         rs.getTimestamp("expires_at") == null
             ? null
@@ -63,7 +66,7 @@ public class ServiceAccountRepository {
       UUID tenantId,
       String name,
       byte[] tokenHash,
-      java.util.Set<String> roles,
+      java.util.Set<Role> roles,
       boolean revoked,
       Instant expiresAt) {
 

@@ -6,12 +6,12 @@ import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.PermissionCache;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.authz.Role;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,10 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ServiceAccountService {
 
-  /** Roles the registry may confer; anything else fails closed. */
-  static final Set<String> KNOWN_ROLES =
-      Set.of("TENANT_MEMBER", "ISSUER_OPS", "RP_CLIENT", "TRUST_ADMIN", "AUDIT_READER");
-
   public static class ServiceAccountNotFoundException extends RuntimeException {}
 
   public static class InvalidServiceAccountException extends RuntimeException {
@@ -55,7 +51,7 @@ public class ServiceAccountService {
   public record AccountView(
       UUID id,
       String name,
-      Set<String> roles,
+      Set<Role> roles,
       boolean revoked,
       Instant expiresAt,
       Instant createdAt) {}
@@ -89,7 +85,7 @@ public class ServiceAccountService {
         ResourceRef.tenantScoped("service-account", "create", caller.tenantId()));
     requirePermitted(decision);
     validateName(name);
-    Set<String> granted = validateRoles(roles);
+    Set<Role> granted = validateRoles(roles);
     if (expiresAt != null && !expiresAt.isAfter(clock.instant())) {
       throw new InvalidServiceAccountException("expiry must be in the future");
     }
@@ -99,12 +95,13 @@ public class ServiceAccountService {
         "INSERT INTO service_account (id, tenant_id, name, token_prefix, token_hash, roles,"
             + " expires_at) VALUES (?, ?, ?, ?, ?, ?::text[], ?)",
         id, caller.tenantId(), name.trim(), TokenHasher.prefix(token), TokenHasher.hash(token),
-        granted.toArray(new String[0]), expiresAt == null ? null
+        granted.stream().map(Role::name).toArray(String[]::new), expiresAt == null ? null
             : java.sql.Timestamp.from(expiresAt));
     AccountView view = load(caller.tenantId(), id).orElseThrow();
     Map<String, String> detail = new LinkedHashMap<>();
     detail.put("account_id", id.toString());
-    detail.put("roles", String.join(",", granted.stream().sorted().toList()));
+    detail.put(
+        "roles", String.join(",", granted.stream().map(Role::name).sorted().toList()));
     audit.record(
         caller, Action.CREATE_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()),
@@ -201,7 +198,7 @@ public class ServiceAccountService {
     return new AccountView(
         rs.getObject("id", UUID.class),
         rs.getString("name"),
-        new HashSet<>(Arrays.asList(roles)),
+        Role.parseAll(roles),
         rs.getBoolean("revoked"),
         expires == null ? null : expires.toInstant(),
         rs.getTimestamp("created_at").toInstant());
@@ -213,11 +210,19 @@ public class ServiceAccountService {
     }
   }
 
-  private static Set<String> validateRoles(Set<String> roles) {
-    if (roles == null || roles.isEmpty() || !KNOWN_ROLES.containsAll(roles)) {
+  private static Set<Role> validateRoles(Set<String> roles) {
+    if (roles == null || roles.isEmpty()) {
       throw new InvalidServiceAccountException("roles must be a non-empty known subset");
     }
-    return new HashSet<>(roles);
+    Set<Role> granted = new HashSet<>();
+    for (String role : roles) {
+      try {
+        granted.add(Role.from(role));
+      } catch (IllegalArgumentException e) {
+        throw new InvalidServiceAccountException("roles must be a non-empty known subset");
+      }
+    }
+    return granted;
   }
 
   private static void requirePermitted(Decision decision) {

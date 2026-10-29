@@ -1,6 +1,5 @@
 package dev.sovra.issuance;
 
-import com.nimbusds.jose.crypto.impl.ECDSA;
 import com.nimbusds.jose.util.Base64URL;
 import dev.sovra.audit.AuditService;
 import dev.sovra.auth.ServiceAccountPrincipal;
@@ -9,17 +8,14 @@ import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.crypto.HolderProofException;
+import dev.sovra.crypto.HolderProofs;
+import dev.sovra.crypto.P256;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.trust.IssuerKeyService;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
 import java.security.MessageDigest;
-import java.security.Signature;
 import java.security.interfaces.ECPublicKey;
-import java.security.spec.ECParameterSpec;
-import java.security.spec.ECPoint;
-import java.security.spec.ECPublicKeySpec;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -360,9 +356,9 @@ public class IssuanceService {
         || request.expiresAt().isAfter(now.plus(MAX_VALIDITY))) {
       throw new InvalidIssuanceException("validity is outside the permitted range");
     }
-    ECPublicKey holderKey = parseHolderKey(request.holderJwk());
+    ECPublicKey holderKey = holderKey(request.holderJwk());
     String thumbprint =
-        LocalDevSigner.thumbprint(holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
+        P256.thumbprint(holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
     if (vciNonce != null) {
       verifyVciProof(holderKey, request, vciNonce, now);
     } else {
@@ -372,20 +368,16 @@ public class IssuanceService {
     return new Validated(holderKey, thumbprint);
   }
 
-  private ECPublicKey parseHolderKey(JsonNode jwk) {
+  /**
+   * Shared holder-key parsing, translated to the issuance domain
+   * error. The checks live in {@link HolderProofs}; this seam only
+   * preserves the issuance HTTP mapping.
+   */
+  private ECPublicKey holderKey(JsonNode jwk) {
     try {
-      if (!"EC".equals(text(jwk, "kty")) || !"P-256".equals(text(jwk, "crv"))) {
-        throw new InvalidIssuanceException("holder key must be P-256");
-      }
-      BigInteger x = unsigned(text(jwk, "x"));
-      BigInteger y = unsigned(text(jwk, "y"));
-      ECParameterSpec params = LocalDevSigner.ECP256.params();
-      KeyFactory factory = KeyFactory.getInstance("EC");
-      return (ECPublicKey) factory.generatePublic(new ECPublicKeySpec(new ECPoint(x, y), params));
-    } catch (InvalidIssuanceException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new InvalidIssuanceException("holder key is malformed");
+      return HolderProofs.parseP256Key(jwk);
+    } catch (HolderProofException e) {
+      throw new InvalidIssuanceException(e.getMessage());
     }
   }
 
@@ -394,52 +386,16 @@ public class IssuanceService {
     return child != null && child.isString() ? child.asString() : null;
   }
 
-  private static BigInteger unsigned(String base64Url) {
-    if (base64Url == null) {
-      throw new InvalidIssuanceException("holder key is malformed");
-    }
-    byte[] raw;
-    try {
-      raw = Base64URL.from(base64Url).decode();
-    } catch (Exception e) {
-      throw new InvalidIssuanceException("holder key is malformed");
-    }
-    if (raw.length != 32) {
-      throw new InvalidIssuanceException("holder key is malformed");
-    }
-    return new BigInteger(1, raw);
-  }
-
-  /** Holder proof of possession: ES256 over the canonical proof message. */
+  /**
+   * Holder proof of possession: ES256 over the canonical proof
+   * message. Delegates to the shared checks; the wording is
+   * identical on both sides, so translation is exact.
+   */
   private void verifyProof(ECPublicKey holderKey, String proof, String expectedMessage) {
     try {
-      String[] parts = proof.split("\\.", -1);
-      if (parts.length != 3) {
-        throw new InvalidIssuanceException("holder proof is malformed");
-      }
-      JsonNode header = mapper.readTree(Base64URL.from(parts[0]).decode());
-      if (!"ES256".equals(text(header, "alg"))) {
-        throw new InvalidIssuanceException("holder proof must be ES256");
-      }
-      String message = new String(Base64URL.from(parts[1]).decode(), StandardCharsets.UTF_8);
-      if (!MessageDigest.isEqual(
-          message.getBytes(StandardCharsets.UTF_8),
-          expectedMessage.getBytes(StandardCharsets.UTF_8))) {
-        throw new InvalidIssuanceException("holder proof does not match this request");
-      }
-      Signature signature = Signature.getInstance("SHA256withECDSA");
-      signature.initVerify(holderKey);
-      signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
-      byte[] der = ECDSA.transcodeSignatureToDER(Base64URL.from(parts[2]).decode());
-      if (!signature.verify(der)) {
-        throw new InvalidIssuanceException("holder proof signature is invalid");
-      }
-    } catch (InvalidIssuanceException e) {
-      throw e;
-    } catch (JacksonException e) {
-      throw new InvalidIssuanceException("holder proof is malformed");
-    } catch (Exception e) {
-      throw new InvalidIssuanceException("holder proof is invalid");
+      HolderProofs.verifyEs256(holderKey, proof, expectedMessage, mapper);
+    } catch (HolderProofException e) {
+      throw new InvalidIssuanceException(e.getMessage());
     }
   }
 
@@ -467,7 +423,7 @@ public class IssuanceService {
       if (proofJwk == null || !proofJwk.isObject()) {
         throw new InvalidIssuanceException("holder proof must carry its key");
       }
-      ECPublicKey proofKey = parseHolderKey(proofJwk);
+      ECPublicKey proofKey = holderKey(proofJwk);
       if (!proofKey.getW().getAffineX().equals(holderKey.getW().getAffineX())
           || !proofKey.getW().getAffineY().equals(holderKey.getW().getAffineY())) {
         throw new InvalidIssuanceException("holder proof key does not match this request");
@@ -486,11 +442,12 @@ public class IssuanceService {
           || Math.abs(now.getEpochSecond() - iat.asLong()) > 5 * 60) {
         throw new InvalidIssuanceException("holder proof is stale");
       }
-      Signature signature = Signature.getInstance("SHA256withECDSA");
-      signature.initVerify(holderKey);
-      signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
-      byte[] der = ECDSA.transcodeSignatureToDER(Base64URL.from(parts[2]).decode());
-      if (!signature.verify(der)) {
+      // Field checks above are VCI-specific; the signature tail is
+      // the shared one. (A corrupt signature container surfaces as a
+      // signature failure, which is the accurate wording here.)
+      try {
+        HolderProofs.verifySignature(holderKey, request.holderProof());
+      } catch (HolderProofException e) {
         throw new InvalidIssuanceException("holder proof signature is invalid");
       }
     } catch (InvalidIssuanceException e) {

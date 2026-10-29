@@ -33,7 +33,7 @@ public final class HolderProofs {
       }
       BigInteger x = unsigned(text(jwk, "x"));
       BigInteger y = unsigned(text(jwk, "y"));
-      ECParameterSpec params = p256Params();
+      ECParameterSpec params = P256.params();
       KeyFactory factory = KeyFactory.getInstance("EC");
       return (ECPublicKey) factory.generatePublic(new ECPublicKeySpec(new ECPoint(x, y), params));
     } catch (HolderProofException e) {
@@ -54,13 +54,7 @@ public final class HolderProofs {
       if (parts.length != 3) {
         throw new HolderProofException("signature container is malformed");
       }
-      Signature signature = Signature.getInstance("SHA256withECDSA");
-      signature.initVerify(key);
-      signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
-      byte[] der = ECDSA.transcodeSignatureToDER(Base64URL.from(parts[2]).decode());
-      if (!signature.verify(der)) {
-        throw new HolderProofException("signature is invalid");
-      }
+      verifyTail(key, parts, "signature is invalid");
       return parts;
     } catch (HolderProofException e) {
       throw e;
@@ -87,13 +81,7 @@ public final class HolderProofs {
           expectedMessage.getBytes(StandardCharsets.UTF_8))) {
         throw new HolderProofException("holder proof does not match this request");
       }
-      Signature signature = Signature.getInstance("SHA256withECDSA");
-      signature.initVerify(holderKey);
-      signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
-      byte[] der = ECDSA.transcodeSignatureToDER(Base64URL.from(parts[2]).decode());
-      if (!signature.verify(der)) {
-        throw new HolderProofException("holder proof signature is invalid");
-      }
+      verifyTail(holderKey, parts, "holder proof signature is invalid");
     } catch (HolderProofException e) {
       throw e;
     } catch (JacksonException e) {
@@ -103,12 +91,25 @@ public final class HolderProofs {
     }
   }
 
-  /** P-256 parameters from the JDK's own named-curve table. */
-  private static ECParameterSpec p256Params() throws Exception {
-    java.security.AlgorithmParameters parameters =
-        java.security.AlgorithmParameters.getInstance("EC");
-    parameters.init(new java.security.spec.ECGenParameterSpec("secp256r1"));
-    return parameters.getParameterSpec(ECParameterSpec.class);
+  /**
+   * The one ECDSA transcode-and-verify tail. Both public entries
+   * funnel here so the JWS-to-DER handling cannot drift between
+   * callers; only the failure wording varies by entry.
+   */
+  private static void verifyTail(ECPublicKey key, String[] parts, String invalidMessage) {
+    try {
+      Signature signature = Signature.getInstance("SHA256withECDSA");
+      signature.initVerify(key);
+      signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
+      byte[] der = ECDSA.transcodeSignatureToDER(Base64URL.from(parts[2]).decode());
+      if (!signature.verify(der)) {
+        throw new HolderProofException(invalidMessage);
+      }
+    } catch (HolderProofException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new HolderProofException(invalidMessage, e);
+    }
   }
 
   private static String text(JsonNode node, String field) {

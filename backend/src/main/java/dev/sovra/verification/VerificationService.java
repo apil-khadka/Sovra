@@ -9,7 +9,7 @@ import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
 import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
-import dev.sovra.issuance.LocalDevSigner;
+import dev.sovra.crypto.P256;
 import dev.sovra.issuance.StatusEvidenceFetcher;
 import dev.sovra.issuance.TrustSnapshotProvider;
 import dev.sovra.ops.TelemetryService;
@@ -396,7 +396,7 @@ public class VerificationService {
       return new Evaluated(OUTCOME_REJECTED, "HOLDER_KEY_INVALID", snapshot.version(), keyRef,
           statusVersion);
     }
-    String thumbprint = LocalDevSigner.thumbprint(
+    String thumbprint = P256.thumbprint(
         holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
     if (!credential.holderThumbprint().equals(thumbprint)) {
       return new Evaluated(OUTCOME_REJECTED, "HOLDER_MISMATCH", snapshot.version(), keyRef,

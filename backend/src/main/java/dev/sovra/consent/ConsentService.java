@@ -15,7 +15,7 @@ import dev.sovra.guard.GuardService;
 import dev.sovra.guard.PlanGuard;
 import dev.sovra.guard.PlanParser;
 import dev.sovra.guard.SelectedPolicy;
-import dev.sovra.issuance.LocalDevSigner;
+import dev.sovra.crypto.P256;
 import dev.sovra.issuance.TrustSnapshotProvider;
 import dev.sovra.issuance.TrustUnavailableException;
 import dev.sovra.ops.TelemetryService;
@@ -235,7 +235,7 @@ public class ConsentService {
     }
     requireUsableCredential(row.credentialId());
     ECPublicKey holderKey = parseHolderKey(input.holderJwk());
-    String thumbprint = LocalDevSigner.thumbprint(
+    String thumbprint = P256.thumbprint(
         holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
     if (!row.holderThumbprint().equals(thumbprint)) {
       throw new InvalidConsentException("consent proof is bound to another holder");

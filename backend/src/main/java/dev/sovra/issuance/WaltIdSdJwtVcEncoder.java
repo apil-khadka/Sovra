@@ -1,13 +1,11 @@
 package dev.sovra.issuance;
 
-import com.nimbusds.jose.util.Base64URL;
 import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
 import id.walt.sdjwt.SDJwt;
 import id.walt.sdjwt.SDMap;
 import id.walt.sdjwt.SDMapBuilder;
 import id.walt.sdjwt.SDPayload;
-import java.math.BigInteger;
 import java.security.interfaces.ECPublicKey;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -95,16 +93,12 @@ public class WaltIdSdJwtVcEncoder implements CredentialEncoder {
         Map.of(
             "kty", JsonElementKt.JsonPrimitive("EC"),
             "crv", JsonElementKt.JsonPrimitive("P-256"),
-            "x", JsonElementKt.JsonPrimitive(base64UrlUnsigned(key.getW().getAffineX())),
-            "y", JsonElementKt.JsonPrimitive(base64UrlUnsigned(key.getW().getAffineY()))));
+            "x",
+            JsonElementKt.JsonPrimitive(
+                dev.sovra.crypto.P256.base64UrlUnsigned(key.getW().getAffineX())),
+            "y",
+            JsonElementKt.JsonPrimitive(
+                dev.sovra.crypto.P256.base64UrlUnsigned(key.getW().getAffineY()))));
   }
 
-  private static String base64UrlUnsigned(BigInteger value) {
-    byte[] raw = value.toByteArray();
-    byte[] fixed = new byte[32];
-    int source = Math.max(0, raw.length - 32);
-    int target = Math.max(0, 32 - raw.length);
-    System.arraycopy(raw, source, fixed, target, Math.min(32, raw.length));
-    return Base64URL.encode(fixed).toString();
-  }
 }

@@ -2,7 +2,6 @@ package dev.sovra.vault;
 
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ReasonCode;
-import dev.sovra.config.DemoProperties;
 import dev.sovra.vault.VaultService.GrantView;
 import dev.sovra.vault.VaultService.ObjectMetadata;
 import dev.sovra.vault.VaultService.ReadResult;
@@ -38,11 +37,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class VaultController {
 
   private final VaultService vault;
-  private final DemoProperties demo;
 
-  public VaultController(VaultService vault, DemoProperties demo) {
+  public VaultController(VaultService vault) {
     this.vault = vault;
-    this.demo = demo;
   }
 
   public record StoreRequest(
@@ -73,14 +70,14 @@ public class VaultController {
   public ResponseEntity<Map<String, Object>> store(@Valid @RequestBody StoreRequest request) {
     var caller =
         CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
-    requireCallerIngestion();
     StoredVersion stored = vault.store(
         caller,
         request.issuerId(),
         request.displayName(),
         request.purposes(),
         decode(request.contentBase64()),
-        request.contentSha256Hex());
+        request.contentSha256Hex(),
+        VaultService.IngestionSource.CALLER);
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(Map.of("objectId", stored.objectId().toString(), "version", stored.version()));
   }
@@ -90,7 +87,6 @@ public class VaultController {
       @PathVariable("id") UUID id, @Valid @RequestBody VersionRequest request) {
     var caller =
         CurrentPrincipal.get().orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
-    requireCallerIngestion();
     StoredVersion stored = vault.storeVersion(
         caller, id, request.purposes(), decode(request.contentBase64()),
         request.contentSha256Hex());
@@ -192,12 +188,6 @@ public class VaultController {
     body.put("expiresAt", grant.expiresAt().toString());
     body.put("createdAt", grant.createdAt().toString());
     return body;
-  }
-
-  private void requireCallerIngestion() {
-    if (demo.syntheticOnly()) {
-      throw new ForbiddenException(ReasonCode.DEMO_SYNTHETIC_ONLY);
-    }
   }
 
   private static byte[] decode(String base64) {

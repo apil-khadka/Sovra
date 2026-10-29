@@ -8,6 +8,7 @@ import com.nimbusds.jose.util.Base64URL;
 import dev.sovra.TestAccounts;
 import dev.sovra.TestAccounts.TestAccount;
 import dev.sovra.auth.ServiceAccountPrincipal;
+import dev.sovra.crypto.P256;
 import dev.sovra.tenancy.TenantContext;
 import dev.sovra.trust.TrustService;
 import java.math.BigInteger;
@@ -61,7 +62,7 @@ public final class IssuanceFixtures {
   }
 
   public static String thumbprint(HolderKeys holder) {
-    return LocalDevSigner.thumbprint(
+    return P256.thumbprint(
         holder.publicKey().getW().getAffineX(), holder.publicKey().getW().getAffineY());
   }
 
