@@ -217,10 +217,14 @@ public class EnrollmentService {
     }
     UUID enrollmentId = UUID.randomUUID();
     UUID subjectRef = UUID.randomUUID();
+    String thumbprint =
+        dev.sovra.crypto.P256.thumbprint(
+            holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
     tenant.update(
         "INSERT INTO enrollment (id, tenant_id, subject_ref, vault_object_id,"
-            + " extraction_record_id, bound_revision, holder_jwk, state, created_by_account,"
-            + " created_by) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, 'PENDING', ?, ?)",
+            + " extraction_record_id, bound_revision, holder_jwk, holder_thumbprint, state,"
+            + " created_by_account, created_by)"
+            + " VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, 'PENDING', ?, ?)",
         enrollmentId,
         caller.tenantId(),
         subjectRef,
@@ -228,6 +232,7 @@ public class EnrollmentService {
         extractionRecordId,
         record.approvedRevision(),
         writeJson(holderJwk),
+        thumbprint,
         caller.id(),
         caller.name());
     audit.record(

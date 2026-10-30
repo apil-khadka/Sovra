@@ -79,7 +79,7 @@ All 41 remote issues were observed open during this audit.
 | [SOV-021](#sov-021) | Ship tested Java and TypeScript SDKs | G3 | demo_implemented | SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/26) |
 | [SOV-022](#sov-022) | Build developer portal, sandbox and integration onboarding | G3 | not_started | SOV-005, SOV-006, SOV-015, SOV-021 | [Issue](https://github.com/apil-khadka/Sovra/issues/27) |
 | [SOV-023](#sov-023) | Build issuer information-management dashboard | G3 | demo_implemented | SOV-005, SOV-006, SOV-007, SOV-012, SOV-015, SOV-016, SOV-019 | [Issue](https://github.com/apil-khadka/Sovra/issues/28) |
-| [SOV-024](#sov-024) | Build holder enrollment, consent and credential dashboard | G3 | partial | SOV-005, SOV-010, SOV-015, SOV-019, SOV-020 | [Issue](https://github.com/apil-khadka/Sovra/issues/29) |
+| [SOV-024](#sov-024) | Build holder enrollment, consent and credential dashboard | G3 | demo_implemented | SOV-005, SOV-010, SOV-015, SOV-019, SOV-020 | [Issue](https://github.com/apil-khadka/Sovra/issues/29) |
 | [SOV-025](#sov-025) | Build RP and organization integration dashboard | G3 | not_started | SOV-005, SOV-006, SOV-015, SOV-021, SOV-022 | [Issue](https://github.com/apil-khadka/Sovra/issues/30) |
 | [SOV-026](#sov-026) | Build governed federation and security operations dashboard | G3 | demo_implemented | SOV-005, SOV-006, SOV-007, SOV-008, SOV-015, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/32) |
 | [SOV-027](#sov-027) | Implement approved issuer-local deployment and isolation | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-037, SOV-039 | [Issue](https://github.com/apil-khadka/Sovra/issues/21) |
@@ -652,7 +652,7 @@ Required closure evidence:
 Owner role: SDK engineering.
 Gate: G3; proposed priority: p1; triage: needs-triage.
 Progress: demo_implemented (reviewed 2026-10-30).
-Remaining/evidence scope: Java (sdk/java) and TypeScript (sdk/typescript) SDKs at contract 0.14.0 with 13 live-stack tests each, sdk-live CI job, READMEs and sdk/RELEASE.md; independent review remains.
+Remaining/evidence scope: Java (sdk/java) and TypeScript (sdk/typescript) SDKs at contract 0.15.0 with 13 live-stack tests each, sdk-live CI job, READMEs and sdk/RELEASE.md; independent review remains.
 Dependencies: SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/26).
 Requirements: FR-46, IF-13, NFR-09, NFR-13.
@@ -731,8 +731,8 @@ Required closure evidence:
 
 Owner role: Holder frontend.
 Gate: G3; proposed priority: p1; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Holder consent/verification views exist; full enrollment/documents/history/recovery dashboard and accessibility evidence remain.
+Progress: demo_implemented (reviewed 2026-10-30).
+Remaining/evidence scope: Holder dashboard over challenge-proof unlock (cases with corrections, disclosure history with outcomes, credentials, recovery), 6 unlock unit + 4 BFF flow + 5 browser tests; dedicated accessibility audit and independent review remain.
 Dependencies: SOV-005, SOV-010, SOV-015, SOV-019, SOV-020.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/29).
 Requirements: FR-42, UX-01, UX-02, UX-03, UX-04, UX-05, UX-06, UX-07, IF-13.

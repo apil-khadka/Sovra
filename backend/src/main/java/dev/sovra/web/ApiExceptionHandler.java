@@ -115,6 +115,23 @@ public class ApiExceptionHandler {
         .body(Map.of("error", "forbidden", "reason", e.reasonCode().name()));
   }
 
+  @ExceptionHandler(dev.sovra.bff.HolderUnlockException.class)
+  public ResponseEntity<Object> holderUnlock(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.BAD_REQUEST, "invalid_request", false);
+    }
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid_request"));
+  }
+
+  @ExceptionHandler(dev.sovra.bff.HolderLockedException.class)
+  public ResponseEntity<Object> holderLocked(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.FORBIDDEN, "forbidden:HOLDER_LOCKED", false);
+    }
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(Map.of("error", "forbidden", "reason", "HOLDER_LOCKED"));
+  }
+
   @ExceptionHandler({
     InvalidProposalException.class,
     InvalidIssuanceException.class,

@@ -117,6 +117,12 @@ public class AuthorizationService {
           Map.entry(
               Action.READ_ISSUER_AUDIT,
               EnumSet.of(Role.ISSUER_OPS, Role.AUDIT_READER, Role.TRUST_ADMIN)),
+          // Holder dashboard (SOV-024): members read only the
+          // cases, disclosures, credentials, and recovery bound
+          // to a holder key they just proved in-session. The
+          // session unlock — never a caller parameter — selects
+          // the thumbprint, so no person-search oracle exists.
+          Map.entry(Action.HOLDER_READ_SELF, EnumSet.of(Role.TENANT_MEMBER)),
           // OpenID4VCI (SOV-036): issuer operators publish offers; the
           // holder's tenant agent drives the synthetic authorization
           // server. Wallet token/credential calls carry no service

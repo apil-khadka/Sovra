@@ -12,6 +12,7 @@ import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 
 /**
  * Packaged SPA delivery (SOV-041): the backend origin serves the
@@ -27,6 +28,9 @@ import org.springframework.boot.test.context.SpringBootTest;
       "server.port=18084",
       "spring.web.resources.static-locations=classpath:/spa-packaged/"
     })
+// Frees this fixed-port context (and its JDBC pool) after the class: with six such
+// contexts the shared test Postgres runs out of connection slots otherwise.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SpaStaticServingTests extends SovraAppRoleBase {
 
   private static final String BASE = "http://localhost:18084";

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.14.0
+  version: 0.15.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -2258,6 +2258,118 @@ paths:
         '400': { description: Malformed cursor }
         '401': { description: No live session }
         '403': { description: Lacks ISSUER_OPS/AUDIT_READER/TRUST_ADMIN }
+  /api/bff/holder/challenge:
+    get:
+      operationId: bffHolderChallenge
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Mint a single-use unlock challenge for the holder dashboard
+        (SOV-024). The challenge lives server-side for five minutes;
+        signing it with the holder key unlocks that key's history.
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{challenge, expiresAt}' }
+        '401': { description: No live session }
+  /api/bff/holder/unlock:
+    post:
+      operationId: bffHolderUnlock
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Verify an ES256 proof over holder-unlock/v1/challenge/thumbprint
+        and bind the session to that key for fifteen minutes. The
+        challenge is consumed first, so failures never retry.
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [holderJwk, proof]
+              properties:
+                holderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+                proof:
+                  type: string
+                  description: ES256 JWS over the unlock message
+      responses:
+        '200': { description: '{thumbprint, expiresAt}' }
+        '400': { description: Expired challenge, bad key, or invalid proof }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER, or missing/invalid CSRF token }
+  /api/bff/holder/lock:
+    post:
+      operationId: bffHolderLock
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Drop the session's holder unlock and pending challenge
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{locked: true}' }
+        '401': { description: No live session }
+        '403': { description: Missing/invalid CSRF token }
+  /api/bff/holder/cases:
+    get:
+      operationId: bffHolderCases
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Enrollment cases for the unlocked holder key, newest first
+        (SOV-024). No thumbprint parameter exists; the session
+        unlock selects the key.
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '[{enrollmentId, subjectRef, vaultObjectId, extractionRecordId, boundRevision, state, createdBy, decidedBy, eligible, eligibilityReason, createdAt}]' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER, or key not unlocked (HOLDER_LOCKED) }
+  /api/bff/holder/cases/{id}:
+    get:
+      operationId: bffHolderCase
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        One enrollment case with its reviews and the holder's own
+        extraction revisions, when the case belongs to the unlocked
+        key; other holders' cases answer 404 indistinguishably.
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: Case with reviews plus observed/normalized revision fields }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER, or key not unlocked (HOLDER_LOCKED) }
+        '404': { description: Unknown case, or not this key's case }
+  /api/bff/holder/consents:
+    get:
+      operationId: bffHolderConsents
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Disclosure history for the unlocked key: relying party,
+        purpose, claims, state, and the latest verification
+        outcome per request.
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '[{requestId, rpId, audience, purpose, credentialId, claims, state, createdAt, expiresAt, decidedAt, verificationOutcome, trustSnapshot}]' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER, or key not unlocked (HOLDER_LOCKED) }
+  /api/bff/holder/credentials:
+    get:
+      operationId: bffHolderCredentials
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Credentials bound to the unlocked holder key
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '[{credentialId, issuerId, vct, keyRef, issuedAt, expiresAt, status, trustSnapshot}]' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER, or key not unlocked (HOLDER_LOCKED) }
+  /api/bff/holder/recovery:
+    get:
+      operationId: bffHolderRecovery
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Key custody state for the unlocked key: registration and
+        every loss report with its recovery state.
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{keyId?, thumbprint, status, recoveries[{recoveryId, reason, state, newThumbprint, createdAt}]}' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER, or key not unlocked (HOLDER_LOCKED) }
 components:
   securitySchemes:
     bearerAuth:

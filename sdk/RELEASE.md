@@ -1,5 +1,11 @@
 # SDK release record (SOV-021)
 
+## 0.15.0 — 2026-10-30
+
+Targets API contract `0.15.0`. No SDK surface change: the
+contract adds only the SOV-024 holder-dashboard BFF routes,
+which stay outside the machine SDKs by OD-16 scope.
+
 ## 0.14.0 — 2026-10-30
 
 Targets API contract `0.14.0`. Adds the SOV-023 review queues:

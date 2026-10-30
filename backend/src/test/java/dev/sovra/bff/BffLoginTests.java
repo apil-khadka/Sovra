@@ -33,6 +33,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -58,6 +59,9 @@ import tools.jackson.databind.ObjectMapper;
       "spring.security.oauth2.client.registration.sovra.scope=openid,profile,groups,tenant",
       "spring.security.oauth2.client.registration.sovra.redirect-uri=http://localhost:18082/login/oauth2/code/sovra"
     })
+// Frees this fixed-port context (and its JDBC pool) after the class: with six such
+// contexts the shared test Postgres runs out of connection slots otherwise.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class BffLoginTests extends SovraAppRoleBase {
 
   static final StubOpenIdProvider STUB;

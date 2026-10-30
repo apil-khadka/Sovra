@@ -68,6 +68,22 @@ export function machineSetup(): MachineSetup {
   return setup
 }
 
+/** Mint one more throwaway machine account in the same tenant (maker/checker). */
+export function mintExtraMachine(name: string, roles: string): MachineSetup {
+  const setup = machineSetup()
+  const token = `sovra_test_${randomBytes(32).toString('base64url')}`
+  const prefix = token.slice('sovra_test_'.length, 'sovra_test_'.length + 8)
+  const digest = createHash('sha256').update(token, 'utf-8').digest('hex')
+  const db = dockerDb()
+  psql(
+    db.container,
+    db.password,
+    `INSERT INTO service_account (tenant_id, name, token_prefix, token_hash, roles) ` +
+      `VALUES ('${setup.tenantId}', '${name}', '${prefix}', decode('${digest}', 'hex'), '{${roles}}');`,
+  )
+  return { base: setup.base, tenantId: setup.tenantId, token }
+}
+
 function b64uText(text: string): string {
   return Buffer.from(text, 'utf-8').toString('base64url')
 }

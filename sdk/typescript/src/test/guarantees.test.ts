@@ -33,7 +33,7 @@ test("originsValidateAtConstruction", () => {
   new SovraClient({ baseUrl: "http://localhost:8080/", token: "t" });
   new SovraClient({ baseUrl: "http://127.0.0.1:8080", token: "t" });
   new SovraClient({ baseUrl: "https://sovra.example", token: "t" });
-  assert.equal(SovraClient.SUPPORTED_CONTRACT, "0.14.0");
+  assert.equal(SovraClient.SUPPORTED_CONTRACT, "0.15.0");
 });
 
 test("idempotencyKeysMatchTheServerAlphabet", () => {

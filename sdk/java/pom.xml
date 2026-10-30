@@ -8,7 +8,7 @@
        version it targets (OD-16); see sdk/java/README.md. -->
   <groupId>dev.sovra</groupId>
   <artifactId>sovra-sdk</artifactId>
-  <version>0.14.0</version>
+  <version>0.15.0</version>
   <packaging>jar</packaging>
   <name>Sovra SDK</name>
   <description>Typed server-side client for the Sovra machine API.</description>

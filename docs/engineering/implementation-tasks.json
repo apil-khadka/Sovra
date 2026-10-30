@@ -1201,7 +1201,7 @@
         "AC-13"
       ],
       "implementation_progress": "demo_implemented",
-      "implementation_observation": "Java (sdk/java, Jackson-only runtime dep) and TypeScript (sdk/typescript, zero runtime deps) SDKs cover the machine chain at contract 0.14.0 with typed errors, origin validation, idempotency keys, ETag precondition reads and no write auto-retry; 13 live-stack tests each plus quickstart/negative coverage, sdk-live CI job, READMEs and sdk/RELEASE.md provenance. Independent review remains.",
+      "implementation_observation": "Java (sdk/java, Jackson-only runtime dep) and TypeScript (sdk/typescript, zero runtime deps) SDKs cover the machine chain at contract 0.15.0 with typed errors, origin validation, idempotency keys, ETag precondition reads and no write auto-retry; 13 live-stack tests each plus quickstart/negative coverage, sdk-live CI job, READMEs and sdk/RELEASE.md provenance. Independent review remains.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
@@ -1355,8 +1355,8 @@
         "AC-04",
         "AC-14"
       ],
-      "implementation_progress": "partial",
-      "implementation_observation": "Packaged native consent/verification plus an in-memory OpenID wallet implement browser consent and selected-profile pre-authorized issuance/encrypted presentation; full enrollment/documents/history/recovery dashboard remains.",
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Holder dashboard over challenge-proof session unlock (single-use challenges, 15-minute unlocks, no thumbprint parameters): cases with corrections, disclosure history with verification outcomes, credentials, and recovery state, all ownership-scoped by proven key. Covered by 6 unlock unit tests, 4 BFF flow tests and 5 browser tests (history, stranger isolation, hostile rendering, role gates). Dedicated accessibility audit and independent review remain.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/engineering/sov-041-browser-wallet.md"
