@@ -174,6 +174,15 @@ public class ApiExceptionHandler {
         .body(Map.of("error", "service_account_conflict"));
   }
 
+  @ExceptionHandler(dev.sovra.vault.VaultConflictException.class)
+  public ResponseEntity<Object> vaultConflict(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.CONFLICT, "vault_conflict", false);
+    }
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(Map.of("error", "vault_conflict"));
+  }
+
   @ExceptionHandler(VerificationConflictException.class)
   public ResponseEntity<Object> verificationConflict(HttpServletRequest request) {
     if (wantsProblem(request)) {

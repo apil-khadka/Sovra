@@ -165,6 +165,18 @@ public class VaultController {
             VaultObjectStatus.DELETED.name()));
   }
 
+  @PostMapping("/objects/{id}/versions/{version}/purge")
+  public ResponseEntity<Map<String, Object>> purge(
+      @PathVariable("id") UUID id, @PathVariable("version") int version) {
+    var caller =
+        CurrentPrincipal.require();
+    vault.purgeVersion(caller, id, version);
+    return ResponseEntity.ok(
+        Map.of(
+            "objectId", id.toString(), "version", version, "status",
+            VaultObjectStatus.PURGED.name()));
+  }
+
   private static Map<String, Object> versionView(VersionMetadata version) {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("version", version.version());

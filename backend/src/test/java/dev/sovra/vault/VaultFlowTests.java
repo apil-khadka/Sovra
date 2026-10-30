@@ -225,6 +225,79 @@ class VaultFlowTests extends SovraAppRoleBase {
     }
   }
 
+  @Test
+  @SuppressWarnings("unchecked")
+  void purgeDestroysBytesAfterDelete() {
+    TestAccount admin =
+        TestAccounts.create(owner, "vault-purge", Set.of("ISSUER_OPS", "TRUST_ADMIN"));
+    String objectId = store(admin, List.of("enrollment-review"), "purge-bytes");
+
+    // Live versions refuse: delete first, purge second.
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> post(
+            "/api/vault/objects/" + objectId + "/versions/1/purge", admin.headers(), Map.of()))
+        .isInstanceOf(org.springframework.web.client.HttpClientErrorException.Conflict.class);
+
+    Map<String, Object> deleted = post(
+        "/api/vault/objects/" + objectId + "/versions/1/delete", admin.headers(), Map.of());
+    assertThat(deleted.get("status")).isEqualTo("DELETED");
+    Map<String, Object> purged = post(
+        "/api/vault/objects/" + objectId + "/versions/1/purge", admin.headers(), Map.of());
+    assertThat(purged.get("status")).isEqualTo("PURGED");
+
+    // Ciphertext and every key-nonce column are gone; the
+    // tombstone (hash, standing) stays for audit.
+    Map<String, Object> row = owner.queryForMap(
+        "SELECT status, content_sha256, octet_length(wrapped_dek) AS dek,"
+            + " octet_length(ciphertext) AS ct FROM vault_object_version"
+            + " WHERE object_id = ? AND version = 1",
+        UUID.fromString(objectId));
+    assertThat(row.get("status")).isEqualTo("PURGED");
+    assertThat(row.get("content_sha256")).isNotNull();
+    assertThat(((Number) row.get("dek")).longValue()).isEqualTo(0);
+    assertThat(((Number) row.get("ct")).longValue()).isEqualTo(0);
+
+    // Repeats succeed; metadata keeps the PURGED tombstone.
+    Map<String, Object> again = post(
+        "/api/vault/objects/" + objectId + "/versions/1/purge", admin.headers(), Map.of());
+    assertThat(again.get("status")).isEqualTo("PURGED");
+    Map<String, Object> meta =
+        client.get().uri("/api/vault/objects/" + objectId).headers(admin.headers())
+            .retrieve().body(Map.class);
+    assertThat(meta).isNotNull();
+    List<Map<String, Object>> versions = (List<Map<String, Object>>) meta.get("versions");
+    assertThat(versions).hasSize(1);
+    assertThat(versions.get(0).get("status")).isEqualTo("PURGED");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void liveGrantBudgetCapsSixtyFourPerVersion() {
+    TestAccount issuer = TestAccounts.create(owner, "vault-budget", Set.of("ISSUER_OPS"));
+    String objectId = store(issuer, List.of("enrollment-review"), "budget-bytes");
+    String firstGrant = null;
+    for (int i = 0; i < 64; i++) {
+      Map<String, Object> granted = post("/api/vault/grants", issuer.headers(), Map.of(
+          "objectId", objectId, "objectVersion", 1, "purpose", "enrollment-review",
+          "workload", "review-desk", "ttlSeconds", 3600));
+      if (i == 0) {
+        firstGrant = granted.get("grantId").toString();
+      }
+    }
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> post(
+            "/api/vault/grants", issuer.headers(), Map.of(
+                "objectId", objectId, "objectVersion", 1, "purpose", "enrollment-review",
+                "workload", "review-desk", "ttlSeconds", 3600)))
+        .isInstanceOf(org.springframework.web.client.HttpClientErrorException.Conflict.class);
+    // Revoking one frees exactly one slot.
+    Map<String, Object> revoked = post(
+        "/api/vault/grants/" + firstGrant + "/revoke", issuer.headers(), Map.of());
+    assertThat(revoked).isNotNull();
+    Map<String, Object> granted = post("/api/vault/grants", issuer.headers(), Map.of(
+        "objectId", objectId, "objectVersion", 1, "purpose", "enrollment-review",
+        "workload", "review-desk", "ttlSeconds", 3600));
+    assertThat(granted.get("grantId")).isNotNull();
+  }
+
   private String store(TestAccount issuer, List<String> purposes, String content) {
     Map<String, Object> stored = post("/api/vault/objects", issuer.headers(), Map.of(
         "issuerId", "https://issuer.example/vault-1",

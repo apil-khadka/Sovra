@@ -63,3 +63,15 @@ Full disclosure is intentional for the frozen one-claim G1 profile; broader sele
 The synthetic verifier key bootstrap is application-local and does not support arbitrary external verifier discovery.
 Real third-party wallet builds, external conformance suites, artifact provenance, independent review and actual public deployment remain open.
 SOV-036/041 stay open against those remaining criteria.
+
+## 2026-10-30 authorization-code journey
+
+The wallet now also receives through `authorization_code`
+with a browser-owned PKCE verifier: New authorization
+request mints the pair in page memory, shows the S256
+challenge for the holder agent to authorize out of band,
+and redeems the pasted code with the in-memory verifier.
+The verifier is never rendered and never crosses the
+machine setup. `wallet.spec.ts` covers receipt plus
+single-use code refusal (5/5 green on the `sdjwt-vc`
+stack, 2026-10-30).

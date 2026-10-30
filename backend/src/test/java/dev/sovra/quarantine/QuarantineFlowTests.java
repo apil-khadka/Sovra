@@ -315,6 +315,69 @@ class QuarantineFlowTests extends SovraAppRoleBase {
         .hasMessageContaining("GRANT_INVALID");
   }
 
+  @Test
+  @SuppressWarnings("unchecked")
+  void queueListsTenantAdmissionsNewestFirst() throws Exception {
+    TestAccount ops = TestAccounts.create(owner, "quar-queue", Set.of("ISSUER_OPS"));
+    String first = admit(ops, "tiny.png", "png");
+    String second = admit(ops, "tiny.jpg", "jpg");
+
+    Map<String, Object> page = client.get().uri("/api/quarantine/admissions")
+        .headers(ops.headers()).retrieve().body(Map.class);
+    List<Map<String, Object>> items = (List<Map<String, Object>>) page.get("items");
+    assertThat(items).hasSize(2);
+    assertThat(items.get(0).get("admissionId")).isEqualTo(second);
+    assertThat(items.get(1).get("admissionId")).isEqualTo(first);
+    assertThat(items.get(0).toString()).doesNotContain("contentBase64", "ciphertext");
+
+    Map<String, Object> pending = client.get().uri("/api/quarantine/admissions?status=QUARANTINED")
+        .headers(ops.headers()).retrieve().body(Map.class);
+    assertThat(((List<?>) pending.get("items"))).hasSize(2);
+    drain();
+    Map<String, Object> clean = client.get().uri("/api/quarantine/admissions?status=CLEAN")
+        .headers(ops.headers()).retrieve().body(Map.class);
+    assertThat(((List<?>) clean.get("items"))).hasSize(2);
+    Map<String, Object> empty = client.get().uri("/api/quarantine/admissions?status=QUARANTINED")
+        .headers(ops.headers()).retrieve().body(Map.class);
+    assertThat(((List<?>) empty.get("items"))).isEmpty();
+
+    assertThatThrownBy(() -> client.get().uri("/api/quarantine/admissions?status=BOGUS")
+            .headers(ops.headers()).retrieve().toEntity(Map.class))
+        .isInstanceOf(HttpClientErrorException.BadRequest.class);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void metricsCountVerdictsPerTenant() throws Exception {
+    TestAccount ops = TestAccounts.create(owner, "quar-metrics", Set.of("ISSUER_OPS"));
+    admit(ops, "tiny.png", "png");
+    Map<String, Object> before = client.get().uri("/api/quarantine/metrics")
+        .headers(ops.headers()).retrieve().body(Map.class);
+    assertThat(((Number) before.get("total")).longValue()).isEqualTo(1);
+    assertThat(((Number) before.get("quarantined")).longValue()).isEqualTo(1);
+    drain();
+    Map<String, Object> after = client.get().uri("/api/quarantine/metrics")
+        .headers(ops.headers()).retrieve().body(Map.class);
+    assertThat(((Number) after.get("total")).longValue()).isEqualTo(1);
+    assertThat(((Number) after.get("clean")).longValue()).isEqualTo(1);
+    assertThat(((Number) after.get("quarantined")).longValue()).isEqualTo(0);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void auditorReadsQueueAndMetrics() throws Exception {
+    TestAccount ops = TestAccounts.create(owner, "quar-qops", Set.of("ISSUER_OPS"));
+    TestAccount auditor = TestAccounts.createInTenant(
+        owner, ops.tenantId(), "quar-qaud", Set.of("AUDIT_READER"));
+    admit(ops, "tiny.png", "png");
+    Map<String, Object> page = client.get().uri("/api/quarantine/admissions")
+        .headers(auditor.headers()).retrieve().body(Map.class);
+    assertThat(((List<?>) page.get("items"))).hasSize(1);
+    Map<String, Object> metrics = client.get().uri("/api/quarantine/metrics")
+        .headers(auditor.headers()).retrieve().body(Map.class);
+    assertThat(((Number) metrics.get("total")).longValue()).isEqualTo(1);
+  }
+
   @SuppressWarnings("unchecked")
   private String admit(TestAccount ops, String file, String claimedType) throws Exception {
     byte[] content = fixture(file);

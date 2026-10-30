@@ -904,8 +904,8 @@
         "AC-16"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Software-key vault/grants and HTTP evidence exist; KMS/attestation, key retirement/rewrap, purge and BFF viewing remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Software-key vault/grants, purpose-bound BFF review-view (SOV-023) and two-phase retention purge (V27 PURGED standing; V28 SECURITY DEFINER zeroing so the app role never rewrites sealed bytes, tombstone kept) with HTTP evidence exist; KMS/attestation, key retirement/rewrap and independent review remain production-gated.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/engineering/sov-016-vault-assessment.md"
       ]
@@ -966,8 +966,8 @@
         "AC-12"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Isolated PNG/JPEG quarantine worker and HTTP evidence exist; deeper scanning/review, production custody and worker operations remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Isolated PNG/JPEG quarantine worker, admission queue (newest-first, standing filter) and verdict-count metrics over QUARANTINE_READ with HTTP evidence exist; deeper scanning/review, production custody and independent review remain production-gated.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/engineering/sov-017-quarantine-assessment.md"
       ]
@@ -1578,8 +1578,8 @@
         "AC-17"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Build/CI and dependency artifacts exist; strong digest/provenance pinning, scanning and enforced deployment admission remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Pinned builds, CycloneDX SBOM at package, CI supply-chain job (pnpm audit high+, OSV-Scanner v2.7.0 over frontend/TS lockfiles and the Java SBOM) exist; locally verified zero findings 2026-10-30. Signed provenance, deployment admission enforcement and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -1689,8 +1689,8 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/34",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "Finite request/tool/token/worker budgets exist; aggregate grant enforcement, measured capacity and approved recovery/service targets remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Finite request/tool/token/worker budgets plus aggregate live-grant budget (64 per object version, row-locked count, 409 vault_conflict with revoke-first recovery) exist with HTTP evidence; measured staging capacity, approved recovery/service targets and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -1895,9 +1895,11 @@
         "AC-17"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Layered tests and assessment notes exist; no complete applicable ASVS/SEC evidence mapping or independent assessment established.",
-      "progress_reviewed_on": "2026-10-29",
-      "progress_evidence": []
+      "implementation_observation": "SEC-01..44 demo evidence map recorded (30 covered, 13 partial, 1 gap) with per-case test/assessment references plus one executed-and-reverted mutation proof; full ASVS L3 mapping, property/fuzz/mutation suites and independent review remain production-gated.",
+      "progress_reviewed_on": "2026-10-30",
+      "progress_evidence": [
+        "docs/engineering/sov-032-sec-evidence.md"
+      ]
     },
     {
       "id": "SOV-033",
@@ -2523,7 +2525,7 @@
         "AC-08"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Same-origin SPA/BFF and browser profile matrix cover native synthetic and SD-JWT wallet journeys, replay, denial and tampering. External conformance, remaining selected-profile criteria and full two-instance qualification remain. Keep issue 45 open.",
+      "implementation_observation": "Same-origin SPA/BFF and browser profile matrix cover native synthetic and SD-JWT wallet journeys (pre-authorized and authorization-code with browser-owned PKCE), replay, denial and tampering. External conformance, remaining selected-profile criteria and full two-instance qualification remain. Keep issue 45 open.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/engineering/sov-041-holder-browser-assessment.md",

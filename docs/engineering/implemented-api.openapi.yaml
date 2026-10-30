@@ -347,8 +347,8 @@ paths:
       x-sovra-scopes: [TRUST_ADMIN]
       summary: >-
         Terminally mark one version DELETED; reads refuse
-        afterwards. Idempotent. Purging bytes stays a reviewed
-        owner operation.
+        afterwards. Idempotent. First phase of retention
+        removal; purgeVaultVersion destroys the bytes second.
       parameters:
         - name: id
           in: path
@@ -363,6 +363,30 @@ paths:
         '401': { description: Anonymous }
         '403': { description: Lacks TRUST_ADMIN }
         '404': { description: Unknown or other-tenant object/version (empty body) }
+  /api/vault/objects/{id}/versions/{version}/purge:
+    post:
+      operationId: purgeVaultVersion
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Retention purge (SOV-016): destroy the ciphertext and
+        all key material of a DELETED version, keeping only
+        the tombstone. Refuses VALID versions with 409;
+        repeats on PURGED succeed idempotently.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: version
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: '{objectId, version, status PURGED}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown or other-tenant object/version (empty body) }
+        '409': { description: Version still VALID; delete first }
   /api/vault/grants:
     post:
       operationId: grantVaultAccess
@@ -371,7 +395,8 @@ paths:
         Issue a short-lived purpose- and workload-bound grant for
         one object version. The purpose must belong to the
         version's authorized set; TTL 60 to 86400 seconds.
-        Defaults to a self grant for service callers.
+        Defaults to a self grant for service callers. At most 64
+        live grants per version (SOV-030); over budget answers 409.
       requestBody:
         required: true
         content:
@@ -394,6 +419,7 @@ paths:
         '400': { description: Malformed shape, TTL, unknown purpose, or widened purpose }
         '401': { description: Anonymous }
         '403': { description: Lacks ISSUER_OPS }
+        '409': { description: Live grant budget exhausted; revoke first }
         '404': { description: Unknown object/version or principal (empty body) }
   /api/vault/grants/{id}/revoke:
     post:
@@ -424,6 +450,25 @@ paths:
         '401': { description: Anonymous }
         '403': { description: Lacks TRUST_ADMIN }
   /api/quarantine/admissions:
+    get:
+      operationId: listQuarantineAdmissions
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Admission queue (SOV-017 operations): newest first,
+        optionally narrowed to one standing. Metadata-only:
+        no endpoint serves quarantine bytes.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [all, QUARANTINED, SCANNING, CLEAN, REJECTED, PROMOTED] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        '200': { description: '{items[{admissionId, objectId, status, claimedType, actualType, sizeBytes, contentSha256Hex, verdict, imageWidth, imageHeight, scannedAt, createdAt}]}' }
+        '400': { description: Unknown standing filter }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a verdict-reading role }
     post:
       operationId: admitQuarantineBytes
       x-sovra-scopes: [ISSUER_OPS]
@@ -465,6 +510,17 @@ paths:
         '401': { description: Anonymous }
         '403': { description: Lacks a verdict-reading role }
         '404': { description: Unknown admission }
+  /api/quarantine/metrics:
+    get:
+      operationId: readQuarantineMetrics
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Verdict counts for quarantine operations (SOV-017):
+        queue depth at a glance.
+      responses:
+        '200': { description: '{total, quarantined, scanning, clean, rejected, promoted}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a verdict-reading role }
   /api/quarantine/admissions/{id}/promote:
     post:
       operationId: promoteQuarantineAdmission

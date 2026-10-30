@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -60,25 +61,37 @@ public class QuarantineController {
         "sizeBytes", admitted.sizeBytes()));
   }
 
+  @GetMapping("/admissions")
+  public ResponseEntity<Map<String, Object>> queue(
+      @RequestParam(required = false) String status,
+      @RequestParam(defaultValue = "50") int limit) {
+    var caller =
+        CurrentPrincipal.require();
+    QuarantineService.QueuePage page = quarantine.queue(caller, status, limit);
+    return ResponseEntity.ok(Map.of(
+        "items", page.items().stream().map(QuarantineController::view).toList()));
+  }
+
+  @GetMapping("/metrics")
+  public ResponseEntity<Map<String, Object>> metrics() {
+    var caller =
+        CurrentPrincipal.require();
+    QuarantineService.MetricsView metrics = quarantine.metrics(caller);
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("total", metrics.total());
+    body.put("quarantined", metrics.quarantined());
+    body.put("scanning", metrics.scanning());
+    body.put("clean", metrics.clean());
+    body.put("rejected", metrics.rejected());
+    body.put("promoted", metrics.promoted());
+    return ResponseEntity.ok(body);
+  }
+
   @GetMapping("/admissions/{id}")
   public ResponseEntity<Map<String, Object>> get(@PathVariable("id") UUID id) {
     var caller =
         CurrentPrincipal.require();
-    AdmissionView view = quarantine.get(caller, id);
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("admissionId", view.admissionId().toString());
-    body.put("objectId", view.objectId().toString());
-    body.put("status", view.status());
-    body.put("claimedType", view.claimedType());
-    body.put("actualType", view.actualType());
-    body.put("sizeBytes", view.sizeBytes());
-    body.put("contentSha256Hex", view.contentSha256Hex());
-    body.put("verdict", view.verdict());
-    body.put("imageWidth", view.imageWidth());
-    body.put("imageHeight", view.imageHeight());
-    body.put("scannedAt", view.scannedAt() == null ? null : view.scannedAt().toString());
-    body.put("createdAt", view.createdAt().toString());
-    return ResponseEntity.ok(body);
+    return ResponseEntity.ok(view(quarantine.get(caller, id)));
   }
 
   @PostMapping("/admissions/{id}/promote")
@@ -92,5 +105,22 @@ public class QuarantineController {
         "admissionId", promoted.admissionId().toString(),
         "objectId", promoted.objectId().toString(),
         "version", promoted.version()));
+  }
+
+  static Map<String, Object> view(AdmissionView view) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("admissionId", view.admissionId().toString());
+    body.put("objectId", view.objectId().toString());
+    body.put("status", view.status());
+    body.put("claimedType", view.claimedType());
+    body.put("actualType", view.actualType());
+    body.put("sizeBytes", view.sizeBytes());
+    body.put("contentSha256Hex", view.contentSha256Hex());
+    body.put("verdict", view.verdict());
+    body.put("imageWidth", view.imageWidth());
+    body.put("imageHeight", view.imageHeight());
+    body.put("scannedAt", view.scannedAt() == null ? null : view.scannedAt().toString());
+    body.put("createdAt", view.createdAt().toString());
+    return body;
   }
 }

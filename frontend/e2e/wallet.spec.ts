@@ -105,3 +105,31 @@ test('corrupted encrypted response refuses and the original ciphertext retries s
   await page.getByRole('button', { name: 'Retry same encrypted presentation', exact: true }).click()
   await expect(page.getByText('Wallet result: ACCEPTED', { exact: true })).toBeVisible()
 })
+
+test('browser wallet receives via authorization code with a browser-owned PKCE verifier', async ({ page, baseURL }) => {
+  const base = baseURL ?? 'http://localhost:8080'
+  const setup = machineSetup()
+  await loginAs(page, base, MEMBER)
+  await page.getByRole('link', { name: 'OpenID demo wallet', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'OpenID demo wallet', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Create wallet key' }).click()
+  await page.getByRole('button', { name: 'New authorization request' }).click()
+  const challenge = (await page.locator('.consent-field', { has: page.locator('dt', { hasText: 'PKCE challenge' }) }).locator('dd').textContent())?.trim()
+  if (!challenge) throw new Error('PKCE challenge missing')
+  // External actor: the holder agent authorizes the challenge out of
+  // band. It never sees the verifier, which stays in wallet memory.
+  const authorized = await api(setup.base, setup.token, 'POST', '/api/vci/authorize', { issuerId: ISSUER_ID, vct: VCT, codeChallenge: challenge })
+  expect(authorized.status).toBe(200)
+  const code = (authorized.json as { code: string }).code
+  await page.getByLabel('Authorization code').fill(code)
+  await page.getByRole('button', { name: 'Receive with authorization code', exact: true }).click()
+  await expect(page.getByText('Credential received', { exact: true })).toBeVisible()
+  // The consumed code is single-use: the wallet reports refusal, not a second credential.
+  await page.getByRole('button', { name: 'Forget wallet', exact: true }).click()
+  await page.getByRole('button', { name: 'Create wallet key' }).click()
+  await page.getByRole('button', { name: 'New authorization request' }).click()
+  await page.getByLabel('Authorization code').fill(code)
+  await page.getByRole('button', { name: 'Receive with authorization code', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('single-use')
+  await expect(page.getByText('Credential received', { exact: true })).toHaveCount(0)
+})

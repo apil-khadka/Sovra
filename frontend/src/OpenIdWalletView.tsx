@@ -4,8 +4,8 @@ import { generateHolder } from './crypto'
 import type { HolderKey } from './crypto'
 import { fetchReview, postDecision } from './consent'
 import type { ConsentReview } from './consent'
-import { encryptWalletPresentation, receiveCredential, reviewWalletRequest, sendWalletPresentation } from './openid-wallet'
-import type { WalletCredential, WalletRequest } from './openid-wallet'
+import { encryptWalletPresentation, newAuthorizationRequest, receiveCredential, receiveCredentialWithCode, reviewWalletRequest, sendWalletPresentation } from './openid-wallet'
+import type { AuthorizationRequest, WalletCredential, WalletRequest } from './openid-wallet'
 import type { VerificationDecision } from './verification'
 import Field from './components/Field'
 import StateCard from './components/StateCard'
@@ -14,6 +14,8 @@ import StateCard from './components/StateCard'
 export default function OpenIdWalletView({ session }: { session: SessionInfo | null }) {
   const [holder, setHolder] = useState<HolderKey | null>(null)
   const [code, setCode] = useState('')
+  const [authRequest, setAuthRequest] = useState<AuthorizationRequest | null>(null)
+  const [authCode, setAuthCode] = useState('')
   const [credential, setCredential] = useState<WalletCredential | null>(null)
   const [consentId, setConsentId] = useState('')
   const [consent, setConsent] = useState<ConsentReview | null>(null)
@@ -33,7 +35,7 @@ export default function OpenIdWalletView({ session }: { session: SessionInfo | n
     } finally { setBusy(false) }
   }
   function reset() {
-    setHolder(null); setCode(''); setCredential(null); setConsentId(''); setConsent(null)
+    setHolder(null); setCode(''); setAuthRequest(null); setAuthCode(''); setCredential(null); setConsentId(''); setConsent(null)
     setSessionId(''); setRequest(null); setEncrypted(''); setDecision(null); setReplayed(false); setError('')
   }
   async function loadConsent() {
@@ -88,6 +90,19 @@ export default function OpenIdWalletView({ session }: { session: SessionInfo | n
             <button className="primary" disabled={busy || code.trim() === ''} onClick={() => void run(async () => {
               setCredential(await receiveCredential(holder, code.trim())); setCode('')
             }, 'Credential receipt failed. Offer codes are single-use; request a fresh offer before trying again.')}>Receive credential</button>
+            <p>Or authorize with PKCE: the wallet owns the verifier, and the issuer desk authorizes the challenge out of band.</p>
+            <button disabled={busy || authRequest !== null} onClick={() => void run(async () => setAuthRequest(await newAuthorizationRequest()))}>New authorization request</button>
+            {authRequest !== null && <dl><Field label="PKCE challenge" value={authRequest.challenge} mono /></dl>}
+            {authRequest !== null && <>
+              <label>Authorization code
+                <input type="password" value={authCode} autoComplete="off" spellCheck={false}
+                  onChange={(event) => setAuthCode(event.target.value)} disabled={busy} />
+              </label>
+              <button className="primary" disabled={busy || authCode.trim() === ''} onClick={() => void run(async () => {
+                if (!authRequest) return
+                setCredential(await receiveCredentialWithCode(holder, authCode.trim(), authRequest.verifier)); setAuthCode(''); setAuthRequest(null)
+              }, 'Credential receipt failed. Authorization codes are single-use; request a fresh authorization before trying again.')}>Receive with authorization code</button>
+            </>}
           </>
         )}
         {credential !== null && <StateCard tone="verified" badge="Credential received">

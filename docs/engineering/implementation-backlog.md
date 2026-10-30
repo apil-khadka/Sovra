@@ -512,7 +512,7 @@ Required closure evidence:
 Owner role: Document backend and key operations.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Software-key vault/grants and HTTP evidence exist; KMS/attestation, key retirement/rewrap, purge and BFF viewing remain.
+Remaining/evidence scope: Software-key vault/grants, purpose-bound BFF review-view and two-phase retention purge (V28 SECURITY DEFINER zeroing, tombstones) with HTTP evidence exist; KMS/attestation, key retirement/rewrap and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-007, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/20).
 Requirements: FR-35, FR-40, DR-09, DR-12, DR-17, SR-19, SR-20, SR-21, SR-29, INV-10, INV-11.
@@ -541,7 +541,7 @@ Required closure evidence:
 Owner role: Document processing and platform security.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Isolated PNG/JPEG quarantine worker and HTTP evidence exist; deeper scanning/review, production custody and worker operations remain.
+Remaining/evidence scope: Isolated PNG/JPEG quarantine worker, admission queue and verdict metrics with HTTP evidence exist; deeper scanning/review, production custody and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-016, SOV-027.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/22).
 Requirements: SR-22, SR-23, SR-30, SR-33, NFR-03, NFR-14, INV-09, INV-11.
@@ -840,7 +840,7 @@ Required closure evidence:
 Owner role: Build and platform security.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Build/CI and dependency artifacts exist; strong digest/provenance pinning, scanning and enforced deployment admission remain.
+Remaining/evidence scope: Pinned builds, CycloneDX SBOM and CI supply-chain job (pnpm audit high+, OSV-Scanner v2.7.0, zero findings 2026-10-30) exist; signed provenance, deployment admission enforcement and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-027.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/33).
 Requirements: SR-14, SR-31, NFR-08, NFR-09.
@@ -893,7 +893,7 @@ Required closure evidence:
 Owner role: Product, performance and operations.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Finite request/tool/token/worker budgets exist; aggregate grant enforcement, measured capacity and approved recovery/service targets remain.
+Remaining/evidence scope: Finite request/tool/token/worker budgets and aggregate live-grant budget (64/version, 409 recovery) with HTTP evidence exist; measured staging capacity, approved recovery/service targets and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-015, SOV-027, SOV-029.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/34).
 Requirements: NFR-02, NFR-03, NFR-04, NFR-11, NFR-14, NFR-15.
@@ -946,7 +946,7 @@ Required closure evidence:
 Owner role: Security validation.
 Gate: G3; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Layered tests and assessment notes exist; no complete applicable ASVS/SEC evidence mapping or independent assessment established.
+Remaining/evidence scope: SEC-01..44 demo evidence map (30 covered, 13 partial, 1 gap) plus an executed mutation proof exist; full ASVS L3 mapping, property/fuzz/mutation suites and independent review remain.
 Dependencies: SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-036, SOV-038, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/36).
 Requirements: SR-10, SR-17, SR-18, NFR-01, NFR-06, NFR-15, NFR-17.
@@ -1199,7 +1199,7 @@ Required closure evidence:
 Owner role: Integration and security E2E engineering.
 Gate: G1; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Both artifact-profile HTTP E2E suites exist, the packaged same-origin SPA/BFF delivery is implemented with HTTP evidence, and a pinned Playwright/Chromium suite proves DOM/JS login, holder consent, and verification with a CI job; full external selected-profile flow evidence remains. Keep issue 45 open.
+Remaining/evidence scope: Both artifact-profile HTTP E2E suites exist, the packaged same-origin SPA/BFF delivery is implemented with HTTP evidence, and a pinned Playwright/Chromium suite proves DOM/JS login, holder consent, verification, and the SD-JWT wallet journeys (pre-authorized and authorization-code with browser-owned PKCE) with a CI job; full external selected-profile flow evidence remains. Keep issue 45 open.
 Dependencies: SOV-010, SOV-011, SOV-012, SOV-015, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/45).
 Requirements: FR-08, FR-19, FR-20, FR-21, FR-22, SR-03, SR-04, SR-05, SR-06, INV-01, INV-02, INV-07, INV-08, NFR-01, NFR-07.

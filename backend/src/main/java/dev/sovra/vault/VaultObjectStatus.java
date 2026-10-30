@@ -8,7 +8,8 @@ package dev.sovra.vault;
  */
 public enum VaultObjectStatus {
   VALID,
-  DELETED;
+  DELETED,
+  PURGED;
 
   /** Parses a stored status name, failing fast on unknown values. */
   public static VaultObjectStatus from(String name) {

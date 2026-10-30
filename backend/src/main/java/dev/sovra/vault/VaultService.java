@@ -41,6 +41,13 @@ public class VaultService {
   static final int MAX_CONTENT_BYTES = 16777216 - 16;
   static final long MIN_GRANT_TTL_SECONDS = 60;
   static final long MAX_GRANT_TTL_SECONDS = 86400;
+  /**
+   * Aggregate live-grant budget (SOV-030): at most this many
+   * unexpired, unrevoked grants per object version. The count
+   * runs under a row lock on the version, so concurrent
+   * issuers cannot overshoot the budget.
+   */
+  static final int MAX_LIVE_GRANTS_PER_VERSION = 64;
 
   /**
    * Byte provenance for {@link #store}. The public-demo boundary
@@ -266,6 +273,16 @@ public class VaultService {
     if (!principalLiveInTenant(principalType, principalId, caller.tenantId())) {
       throw new VaultNotFoundException();
     }
+    tenant.queryForObject(
+        "SELECT 1 FROM vault_object_version WHERE object_id = ? AND version = ? FOR UPDATE",
+        Integer.class, objectId, version);
+    Integer live = tenant.queryForObject(
+        "SELECT COUNT(*) FROM vault_grant WHERE object_id = ? AND object_version = ?"
+            + " AND revoked = FALSE AND expires_at > now()",
+        Integer.class, objectId, version);
+    if (live != null && live >= MAX_LIVE_GRANTS_PER_VERSION) {
+      throw new VaultConflictException("live grant budget exhausted; revoke first");
+    }
     Instant expiresAt = clock.instant().plusSeconds(ttlSeconds);
     UUID grantId = UUID.randomUUID();
     tenant.update(
@@ -408,6 +425,38 @@ public class VaultService {
         ResourceRef.tenantScoped("vault-kek", String.valueOf(version), caller.tenantId()),
         decision, "", Map.of("version", String.valueOf(version)));
     return version;
+  }
+
+  /**
+   * Retention purge (SOV-016): destroys the ciphertext and all
+   * key material of a DELETED version, leaving only the
+   * tombstone (id, version, hash, standing) for audit. Two
+   * phases on purpose — delete first, purge second — so no
+   * single call can destroy a live version. Already-purged
+   * repeats succeed idempotently.
+   */
+  @Transactional(noRollbackFor = {ForbiddenException.class, VaultAuthenticationException.class})
+  public void purgeVersion(ServiceAccountPrincipal caller, UUID objectId, int version) {
+    Decision decision = require(caller, Action.VAULT_DELETE_VERSION, "vault-object",
+        objectId.toString());
+    StoredRow row = versionRow(objectId, version);
+    if (row.status() == VaultObjectStatus.VALID) {
+      throw new VaultConflictException("delete before purge");
+    }
+    if (row.status() == VaultObjectStatus.DELETED) {
+      // Zeroing runs through the V27 SECURITY DEFINER function:
+      // the app role holds no UPDATE on the sealed columns, so
+      // arbitrary rewrites stay denied at the database.
+      Integer purged = tenant.queryForObject(
+          "SELECT purge_vault_version(?, ?)", Integer.class, objectId, version);
+      if (purged == null || purged != 1) {
+        throw new IllegalStateException("purge lost its DELETED row");
+      }
+    }
+    audit.record(
+        caller, Action.VAULT_DELETE_VERSION,
+        ResourceRef.tenantScoped("vault-object", objectId.toString(), caller.tenantId()),
+        decision, "", Map.of("version", String.valueOf(version), "phase", "purge"));
   }
 
   @Transactional(noRollbackFor = {ForbiddenException.class, VaultAuthenticationException.class})

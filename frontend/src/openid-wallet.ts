@@ -25,12 +25,36 @@ function requireText(value: unknown): string {
   return value
 }
 
+export interface AuthorizationRequest { verifier: string; challenge: string }
+
+/** Browser-owned PKCE pair: the verifier never leaves wallet memory except to the token endpoint. */
+export async function newAuthorizationRequest(): Promise<AuthorizationRequest> {
+  const raw = new Uint8Array(32)
+  crypto.getRandomValues(raw)
+  const verifier = base64url.encode(raw)
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
+  return { verifier, challenge: base64url.encode(new Uint8Array(digest)) }
+}
+
 export async function receiveCredential(holder: HolderKey, code: string): Promise<WalletCredential> {
-  const metadata = await json<{ credential_issuer: string }>('/.well-known/openid-credential-issuer')
-  const token = await json<{ access_token: string; c_nonce: string }>('/api/vci/token', {
+  const token = await redeemToken(new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:pre-authorized_code', 'pre-authorized_code': code }))
+  return issueWithToken(holder, token)
+}
+
+export async function receiveCredentialWithCode(holder: HolderKey, code: string, verifier: string): Promise<WalletCredential> {
+  const token = await redeemToken(new URLSearchParams({ grant_type: 'authorization_code', code, code_verifier: verifier }))
+  return issueWithToken(holder, token)
+}
+
+async function redeemToken(form: URLSearchParams): Promise<{ access_token: string; c_nonce: string }> {
+  return json<{ access_token: string; c_nonce: string }>('/api/vci/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:pre-authorized_code', 'pre-authorized_code': code }),
+    body: form,
   })
+}
+
+async function issueWithToken(holder: HolderKey, token: { access_token: string; c_nonce: string }): Promise<WalletCredential> {
+  const metadata = await json<{ credential_issuer: string }>('/.well-known/openid-credential-issuer')
   const proof = await new SignJWT({ aud: requireText(metadata.credential_issuer), nonce: requireText(token.c_nonce) })
     .setProtectedHeader({ alg: 'ES256', typ: 'openid4vci-proof+jwt', jwk: publicJwk(holder) })
     .setIssuedAt().sign(holder.privateKey)

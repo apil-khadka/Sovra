@@ -75,6 +75,11 @@ public class QuarantineService {
 
   public record Promoted(UUID admissionId, UUID objectId, int version) {}
 
+  public record QueuePage(List<AdmissionView> items) {}
+
+  public record MetricsView(long total, long quarantined, long scanning, long clean,
+      long rejected, long promoted) {}
+
   @Transactional(noRollbackFor = ForbiddenException.class)
   public Admitted admit(
       ServiceAccountPrincipal caller, byte[] content, String claimedType, String issuerId) {
@@ -126,6 +131,62 @@ public class QuarantineService {
             caller.tenantId()),
         decision, "", Map.of("status", view.status().name()));
     return view;
+  }
+
+  /**
+   * Admission queue (SOV-017 operations): newest first,
+   * optionally narrowed to one standing. Verdicts and
+   * dimensions only — bytes stay sealed behind grants.
+   */
+  @Transactional(noRollbackFor = ForbiddenException.class)
+  public QueuePage queue(ServiceAccountPrincipal caller, String status, int limit) {
+    Decision decision =
+        require(caller, Action.QUARANTINE_READ, "quarantine-admission", "queue");
+    QuarantineStatus filter = null;
+    if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
+      try {
+        filter = QuarantineStatus.valueOf(status.trim().toUpperCase());
+      } catch (IllegalArgumentException e) {
+        throw new QuarantineInvalidException("unknown quarantine status");
+      }
+    }
+    int bounded = Math.min(100, Math.max(1, limit));
+    String sql = "SELECT id, vault_object_id, status, claimed_type, actual_type, size_bytes,"
+        + " content_sha256, verdict, image_width, image_height, scanned_at, created_at"
+        + " FROM quarantine_admission WHERE tenant_id = ?"
+        + (filter == null ? "" : " AND status = ?")
+        + " ORDER BY created_at DESC, id DESC LIMIT ?";
+    List<AdmissionView> items = filter == null
+        ? tenant.query(sql, this::mapRow, caller.tenantId(), bounded)
+        : tenant.query(sql, this::mapRow, caller.tenantId(), filter.name(), bounded);
+    audit.record(
+        caller, Action.QUARANTINE_READ,
+        ResourceRef.tenantScoped("quarantine-admission", "queue", caller.tenantId()),
+        decision, "", Map.of("count", String.valueOf(items.size())));
+    return new QueuePage(items);
+  }
+
+  /** Verdict counts (SOV-017 operations): queue depth at a glance. */
+  @Transactional(noRollbackFor = ForbiddenException.class)
+  public MetricsView metrics(ServiceAccountPrincipal caller) {
+    Decision decision =
+        require(caller, Action.QUARANTINE_READ, "quarantine-admission", "metrics");
+    Map<String, Long> counts = new java.util.HashMap<>();
+    tenant.query(
+        "SELECT status, COUNT(*) FROM quarantine_admission WHERE tenant_id = ? GROUP BY status",
+        (rs, row) -> counts.put(rs.getString(1), rs.getLong(2)), caller.tenantId());
+    audit.record(
+        caller, Action.QUARANTINE_READ,
+        ResourceRef.tenantScoped("quarantine-admission", "metrics", caller.tenantId()),
+        decision, "", Map.of());
+    long quarantined = counts.getOrDefault("QUARANTINED", 0L);
+    long scanning = counts.getOrDefault("SCANNING", 0L);
+    long clean = counts.getOrDefault("CLEAN", 0L);
+    long rejected = counts.getOrDefault("REJECTED", 0L);
+    long promoted = counts.getOrDefault("PROMOTED", 0L);
+    return new MetricsView(
+        quarantined + scanning + clean + rejected + promoted,
+        quarantined, scanning, clean, rejected, promoted);
   }
 
   @Transactional(noRollbackFor = ForbiddenException.class)
@@ -182,25 +243,29 @@ public class QuarantineService {
         "SELECT id, vault_object_id, status, claimed_type, actual_type, size_bytes,"
             + " content_sha256, verdict, image_width, image_height, scanned_at, created_at"
             + " FROM quarantine_admission WHERE id = ?",
-        (rs, row) -> new AdmissionView(
-            rs.getObject("id", UUID.class),
-            rs.getObject("vault_object_id", UUID.class),
-            QuarantineStatus.from(rs.getString("status")),
-            rs.getString("claimed_type"),
-            rs.getString("actual_type"),
-            rs.getInt("size_bytes"),
-            HexFormat.of().formatHex(rs.getBytes("content_sha256")),
-            rs.getString("verdict"),
-            rs.getObject("image_width", Integer.class),
-            rs.getObject("image_height", Integer.class),
-            rs.getTimestamp("scanned_at") == null
-                ? null : rs.getTimestamp("scanned_at").toInstant(),
-            rs.getTimestamp("created_at").toInstant()),
+        this::mapRow,
         admissionId);
     if (rows.isEmpty()) {
       throw new QuarantineNotFoundException();
     }
     return rows.get(0);
+  }
+
+  private AdmissionView mapRow(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
+    return new AdmissionView(
+        rs.getObject("id", UUID.class),
+        rs.getObject("vault_object_id", UUID.class),
+        QuarantineStatus.from(rs.getString("status")),
+        rs.getString("claimed_type"),
+        rs.getString("actual_type"),
+        rs.getInt("size_bytes"),
+        HexFormat.of().formatHex(rs.getBytes("content_sha256")),
+        rs.getString("verdict"),
+        rs.getObject("image_width", Integer.class),
+        rs.getObject("image_height", Integer.class),
+        rs.getTimestamp("scanned_at") == null
+            ? null : rs.getTimestamp("scanned_at").toInstant(),
+        rs.getTimestamp("created_at").toInstant());
   }
 
   private Decision require(
