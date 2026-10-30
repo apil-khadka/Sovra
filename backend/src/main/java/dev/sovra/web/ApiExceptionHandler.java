@@ -87,6 +87,7 @@ public class ApiExceptionHandler {
     dev.sovra.auth.ServiceAccountService.ServiceAccountNotFoundException.class,
     dev.sovra.vault.VaultNotFoundException.class,
     dev.sovra.quarantine.QuarantineNotFoundException.class,
+    dev.sovra.extraction.ExtractionNotFoundException.class,
     dev.sovra.openid.OpenIdNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
@@ -250,6 +251,23 @@ public class ApiExceptionHandler {
     }
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "quarantine_conflict"));
+  }
+
+  @ExceptionHandler(dev.sovra.extraction.ExtractionInvalidException.class)
+  public ResponseEntity<Object> extractionInvalid(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.BAD_REQUEST, "invalid_request", false);
+    }
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid_request"));
+  }
+
+  @ExceptionHandler(dev.sovra.extraction.ExtractionConflictException.class)
+  public ResponseEntity<Object> extractionConflict(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.CONFLICT, "extraction_conflict", false);
+    }
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(Map.of("error", "extraction_conflict"));
   }
 
   @ExceptionHandler(dev.sovra.vault.VaultAuthenticationException.class)

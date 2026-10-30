@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.9.0
+  version: 0.10.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -497,6 +497,113 @@ paths:
         '403': { description: Lacks ISSUER_OPS, or scan grant invalid }
         '404': { description: Unknown admission, object, or grant }
         '409': { description: Admission is not CLEAN, or already promoted }
+  /api/extraction/records:
+    post:
+      operationId: runExtraction
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Run local extraction (SOV-018) over one vault source version
+        through a purpose grant. The profile engine reads the bytes,
+        fields normalize under normalizer-v1, and revision 1 stores
+        per-field canonical/exact digests. One record per
+        source/engine; a repeat run conflicts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vaultObjectId, objectVersion, grantId, purpose, workload, schemaId]
+              properties:
+                vaultObjectId: { type: string, format: uuid }
+                objectVersion: { type: integer, minimum: 1 }
+                grantId: { type: string, format: uuid }
+                purpose: { type: string }
+                workload: { type: string }
+                schemaId: { type: string, description: Engine schema, demo fixture-doc-v1 }
+      responses:
+        '201': { description: '{recordId, revision 1, sourceDigestHex}' }
+        '400': { description: Wrong source, unknown schema, or malformed shape }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS, or source grant invalid }
+        '404': { description: Unknown object, version, or grant }
+        '409': { description: Extraction already exists for this source version }
+  /api/extraction/records/{id}:
+    get:
+      operationId: readExtractionRecord
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Read an extraction record with its full provenance (SOV-018):
+        source object and digest, engine/schema/normalizer/canon
+        identifiers, every revision with observed/normalized fields
+        and per-field digests, and the approval pointer. Digests are
+        integrity references; no endpoint resolves by digest.
+      parameters:
+        - name: If-None-Match
+          in: header
+          schema: { type: string }
+          description: Strong ETag from a previous read; matches answer 304
+      responses:
+        '200':
+          description: >-
+            {recordId, vaultObjectId, objectVersion, sourceDigestHex,
+            engineId, schemaId, normalizerId, canonId,
+            approvedRevision, revisions[]}
+        '304': { description: Caller holds the current representation }
+        '401': { description: Anonymous }
+        '403': { description: Lacks an extraction-reading role }
+        '404': { description: Unknown record }
+  /api/extraction/records/{id}/revisions:
+    post:
+      operationId: correctExtraction
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Append a correction revision (SOV-018). Revisions are
+        append-only: the new revision supersedes the previous head
+        and prior approvals no longer cover it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fields]
+              properties:
+                fields:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: At least one non-empty field value
+                confidence: { type: number, minimum: 0, maximum: 1 }
+      responses:
+        '201': { description: '{recordId, revision}' }
+        '400': { description: Empty fields or confidence outside 0..1 }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown record }
+  /api/extraction/records/{id}/approval:
+    post:
+      operationId: approveExtraction
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Approve the current revision (SOV-018). Only the head
+        revision is approvable: approving a superseded revision
+        conflicts instead of re-arming older values (AC-12).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision]
+              properties:
+                revision: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: '{recordId, approvedRevision}' }
+        '400': { description: Revision does not exist on this record }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown record }
+        '409': { description: Revision is superseded by a correction }
   /api/audit/events:
     get:
       operationId: listAuditEvents

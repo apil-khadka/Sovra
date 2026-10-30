@@ -1025,10 +1025,12 @@
         "AC-11",
         "AC-12"
       ],
-      "implementation_progress": "not_started",
-      "implementation_observation": "No OCR/extraction/normalization/provenance revision module found; start synthetic implementation after demo launch foundations.",
-      "progress_reviewed_on": "2026-10-29",
-      "progress_evidence": []
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Fixture engine, normalizer-v1, per-field canonical/exact digests, append-only revisions, head-only approvals and 4 extraction endpoints exist with 16 tests; OD-15 frozen as mip-digest-v1. Production engine/schema registry, live OCR gates, live-only profile and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
+      "progress_evidence": [
+        "docs/architecture/decisions/SOV-018-digest-matching-profile.md"
+      ]
     },
     {
       "id": "SOV-019",

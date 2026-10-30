@@ -41,7 +41,9 @@ public class MigrationCheck implements ReadinessCheck {
           "quarantine_admission",
           "vci_grant",
           "vci_token",
-          "vp_session");
+          "vp_session",
+          "extraction_record",
+          "extraction_revision");
 
   private final JdbcTemplate global;
 

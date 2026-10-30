@@ -85,6 +85,14 @@ public class AuthorizationService {
           Map.entry(
               Action.QUARANTINE_READ, EnumSet.of(Role.ISSUER_OPS, Role.AUDIT_READER, Role.TRUST_ADMIN)),
           Map.entry(Action.QUARANTINE_PROMOTE, EnumSet.of(Role.ISSUER_OPS)),
+          // Extraction (SOV-018): operators run, correct, and
+          // approve; reads follow the quarantine read set.
+          Map.entry(Action.EXTRACTION_RUN, EnumSet.of(Role.ISSUER_OPS)),
+          Map.entry(Action.EXTRACTION_CORRECT, EnumSet.of(Role.ISSUER_OPS)),
+          Map.entry(Action.EXTRACTION_APPROVE, EnumSet.of(Role.ISSUER_OPS)),
+          Map.entry(
+              Action.EXTRACTION_READ,
+              EnumSet.of(Role.ISSUER_OPS, Role.AUDIT_READER, Role.TRUST_ADMIN)),
           // OpenID4VCI (SOV-036): issuer operators publish offers; the
           // holder's tenant agent drives the synthetic authorization
           // server. Wallet token/credential calls carry no service

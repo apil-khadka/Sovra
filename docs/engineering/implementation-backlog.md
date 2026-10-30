@@ -568,8 +568,8 @@ Required closure evidence:
 
 Owner role: Document and data engineering.
 Gate: G2; proposed priority: p1; triage: needs-triage.
-Progress: not_started (reviewed 2026-10-29).
-Remaining/evidence scope: No OCR/extraction/normalization/provenance revision module found; start synthetic implementation after demo launch foundations.
+Progress: demo_implemented (reviewed 2026-10-30).
+Remaining/evidence scope: Fixture engine, normalizer-v1, per-field canonical/exact digests, append-only revisions, head-only approvals and 4 extraction endpoints exist with 16 tests; OD-15 frozen as mip-digest-v1. Production engine/schema registry, live OCR gates, live-only profile and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-015, SOV-016, SOV-017.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/23).
 Requirements: FR-36, FR-38, DR-11, DR-13, DR-14, DR-15, SR-23, SR-24, INV-09, INV-10.

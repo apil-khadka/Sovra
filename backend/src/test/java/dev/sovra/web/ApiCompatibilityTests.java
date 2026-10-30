@@ -62,7 +62,7 @@ class ApiCompatibilityTests extends SovraAppRoleBase {
   }
 
   /** Contract version this build implements; bump with any behavior change. */
-  static final String EXPECTED_CONTRACT_VERSION = "0.9.0";
+  static final String EXPECTED_CONTRACT_VERSION = "0.10.0";
 
   @Autowired
   @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")
