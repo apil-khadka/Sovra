@@ -1,5 +1,13 @@
 # SDK release record (SOV-021)
 
+## 0.14.0 — 2026-10-30
+
+Targets API contract `0.14.0`. Adds the SOV-023 review queues:
+`ExtractionClient.list` (`listExtractionRecords`) and
+`EnrollmentClient.list` (`listEnrollments`) with posture/state
+filters and keyset cursors. No breaking changes; every other
+method is unchanged.
+
 ## 0.13.0 — 2026-10-30
 
 Targets API contract `0.13.0`

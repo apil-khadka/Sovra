@@ -33,7 +33,7 @@ test("originsValidateAtConstruction", () => {
   new SovraClient({ baseUrl: "http://localhost:8080/", token: "t" });
   new SovraClient({ baseUrl: "http://127.0.0.1:8080", token: "t" });
   new SovraClient({ baseUrl: "https://sovra.example", token: "t" });
-  assert.equal(SovraClient.SUPPORTED_CONTRACT, "0.13.0");
+  assert.equal(SovraClient.SUPPORTED_CONTRACT, "0.14.0");
 });
 
 test("idempotencyKeysMatchTheServerAlphabet", () => {
@@ -133,4 +133,7 @@ test("conditionalReadsReport304AsEmpty", async () => {
     await client.extraction.get(run.recordId, tagged.etag),
     undefined,
   );
+  // The review queue lists the new run under the pending posture.
+  const queue = await client.extraction.list("pending", 50);
+  assert.ok(queue.items.map((i) => i.recordId).includes(run.recordId));
 });

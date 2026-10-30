@@ -22,7 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 public final class SovraClient implements AutoCloseable {
 
   /** API contract version this SDK targets. */
-  public static final String SUPPORTED_CONTRACT = "0.13.0";
+  public static final String SUPPORTED_CONTRACT = "0.14.0";
 
   private static final int MAX_READ_ATTEMPTS = 3;
 

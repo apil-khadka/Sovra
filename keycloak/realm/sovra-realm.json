@@ -18,7 +18,9 @@
   "quickLoginCheckMilliSeconds": 1000,
   "passwordPolicy": "length(12)",
   "webAuthnPolicyRpEntityName": "sovra",
-  "webAuthnPolicySignatureAlgorithms": ["ES256"],
+  "webAuthnPolicySignatureAlgorithms": [
+    "ES256"
+  ],
   "webAuthnPolicyRpId": "",
   "webAuthnPolicyAttestationConveyancePreference": "not specified",
   "webAuthnPolicyAuthenticatorAttachment": "not specified",
@@ -28,7 +30,9 @@
   "webAuthnPolicyAvoidSameAuthenticatorRegister": false,
   "webAuthnPolicyAcceptableAaguids": [],
   "webAuthnPolicyPasswordlessRpEntityName": "sovra",
-  "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256"],
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": [
+    "ES256"
+  ],
   "webAuthnPolicyPasswordlessRpId": "",
   "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
   "webAuthnPolicyPasswordlessAuthenticatorAttachment": "not specified",
@@ -38,10 +42,22 @@
   "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister": false,
   "webAuthnPolicyPasswordlessAcceptableAaguids": [],
   "groups": [
-    {"name": "sovra-members", "path": "/sovra-members"},
-    {"name": "sovra-rp", "path": "/sovra-rp"},
-    {"name": "sovra-ops", "path": "/sovra-ops"},
-    {"name": "sovra-trust-admins", "path": "/sovra-trust-admins"}
+    {
+      "name": "sovra-members",
+      "path": "/sovra-members"
+    },
+    {
+      "name": "sovra-rp",
+      "path": "/sovra-rp"
+    },
+    {
+      "name": "sovra-ops",
+      "path": "/sovra-ops"
+    },
+    {
+      "name": "sovra-trust-admins",
+      "path": "/sovra-trust-admins"
+    }
   ],
   "users": [
     {
@@ -51,8 +67,15 @@
       "lastName": "Member",
       "email": "demo-member@example.invalid",
       "emailVerified": true,
-      "groups": ["/sovra-members", "/sovra-rp"],
-      "attributes": {"tenant_slug": ["sovra-demo"]},
+      "groups": [
+        "/sovra-members",
+        "/sovra-rp"
+      ],
+      "attributes": {
+        "tenant_slug": [
+          "sovra-demo"
+        ]
+      },
       "credentials": [
         {
           "type": "password",
@@ -68,12 +91,65 @@
       "lastName": "Privileged",
       "email": "demo-priv@example.invalid",
       "emailVerified": true,
-      "groups": ["/sovra-members", "/sovra-trust-admins"],
-      "attributes": {"tenant_slug": ["sovra-demo"]},
+      "groups": [
+        "/sovra-members",
+        "/sovra-trust-admins"
+      ],
+      "attributes": {
+        "tenant_slug": [
+          "sovra-demo"
+        ]
+      },
       "credentials": [
         {
           "type": "password",
           "value": "sovra-demo-priv-02",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "demo-maker",
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "Maker",
+      "email": "demo-maker@example.invalid",
+      "emailVerified": true,
+      "groups": [
+        "/sovra-ops"
+      ],
+      "attributes": {
+        "tenant_slug": [
+          "sovra-demo"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sovra-demo-maker-03",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "demo-checker",
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "Checker",
+      "email": "demo-checker@example.invalid",
+      "emailVerified": true,
+      "groups": [
+        "/sovra-ops"
+      ],
+      "attributes": {
+        "tenant_slug": [
+          "sovra-demo"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sovra-demo-checker-04",
           "temporary": false
         }
       ]
@@ -102,7 +178,12 @@
         "id.token.signed.response.alg": "ES256",
         "post.logout.redirect.uris": "http://localhost:8080/##http://localhost:8081/"
       },
-      "defaultClientScopes": ["profile", "groups", "tenant", "amr"],
+      "defaultClientScopes": [
+        "profile",
+        "groups",
+        "tenant",
+        "amr"
+      ],
       "optionalClientScopes": []
     }
   ],
@@ -111,7 +192,10 @@
       "name": "amr",
       "description": "Authentication method references. Password-only sessions emit an empty list (fail closed for privileged roles); executions declare reference values when WebAuthn joins the flow.",
       "protocol": "openid-connect",
-      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
       "protocolMappers": [
         {
           "name": "amr",
@@ -131,7 +215,10 @@
       "name": "profile",
       "description": "Minimal demo profile: username only. The built-in defaults are not created when an import defines clientScopes, so this realm ships exactly what the BFF reads.",
       "protocol": "openid-connect",
-      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
       "protocolMappers": [
         {
           "name": "username",
@@ -152,7 +239,10 @@
     {
       "name": "groups",
       "protocol": "openid-connect",
-      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
       "protocolMappers": [
         {
           "name": "groups",
@@ -172,7 +262,10 @@
     {
       "name": "tenant",
       "protocol": "openid-connect",
-      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
       "protocolMappers": [
         {
           "name": "tenant_slug",
@@ -198,8 +291,12 @@
         "providerId": "ecdsa-generated",
         "subComponents": {},
         "config": {
-          "priority": ["200"],
-          "algorithm": ["ES256"]
+          "priority": [
+            "200"
+          ],
+          "algorithm": [
+            "ES256"
+          ]
         }
       }
     ]

@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
@@ -80,6 +81,36 @@ public class EnrollmentController {
         "enrollmentId", decided.enrollmentId().toString(),
         "state", decided.state().name(),
         "boundRevision", decided.boundRevision()));
+  }
+
+  @GetMapping
+  public ResponseEntity<Map<String, Object>> list(
+      @RequestParam(required = false) String state,
+      @RequestParam(defaultValue = "50") int limit,
+      @RequestParam(required = false) String cursor) {
+    var caller = CurrentPrincipal.require();
+    EnrollmentService.EnrollmentPage page =
+        enrollment.listEnrollments(caller, state, limit, cursor);
+    List<Map<String, Object>> items = new ArrayList<>();
+    for (EnrollmentService.EnrollmentSummary summary : page.items()) {
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("enrollmentId", summary.enrollmentId().toString());
+      entry.put("subjectRef", summary.subjectRef().toString());
+      entry.put("vaultObjectId", summary.vaultObjectId().toString());
+      entry.put("extractionRecordId", summary.extractionRecordId().toString());
+      entry.put("boundRevision", summary.boundRevision());
+      entry.put("state", summary.state().name());
+      entry.put("createdBy", summary.createdBy());
+      entry.put("decidedBy", summary.decidedBy());
+      entry.put("eligible", summary.eligible());
+      entry.put("eligibilityReason", summary.eligibilityReason());
+      entry.put("createdAt", summary.createdAt());
+      items.add(entry);
+    }
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("items", items);
+    body.put("nextCursor", page.nextCursor());
+    return ResponseEntity.ok(body);
   }
 
   @GetMapping("/{id}")

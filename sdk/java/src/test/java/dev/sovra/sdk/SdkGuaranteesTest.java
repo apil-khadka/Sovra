@@ -29,7 +29,7 @@ class SdkGuaranteesTest extends SdkLiveBase {
     try (SovraClient loopback = new SovraClient("http://localhost:8080/", "t");
         SovraClient loopbackIp = new SovraClient("http://127.0.0.1:8080", "t");
         SovraClient tls = new SovraClient("https://sovra.example", "t")) {
-      assertThat(SovraClient.SUPPORTED_CONTRACT).isEqualTo("0.13.0");
+      assertThat(SovraClient.SUPPORTED_CONTRACT).isEqualTo("0.14.0");
     }
   }
 
@@ -108,6 +108,10 @@ class SdkGuaranteesTest extends SdkLiveBase {
       assertThat(tagged.value().engineId()).isEqualTo("fixture-v1");
       assertThat(tagged.etag()).isNotBlank();
       assertThat(client.extraction.get(run.recordId(), tagged.etag())).isEmpty();
+      // The review queue lists the new run under the pending posture.
+      ExtractionClient.RecordPage queue = client.extraction.list("pending", 50, null);
+      assertThat(queue.items().stream().map(ExtractionClient.RecordSummary::recordId))
+          .contains(run.recordId());
     }
   }
 

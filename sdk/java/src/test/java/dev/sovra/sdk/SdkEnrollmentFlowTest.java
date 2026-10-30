@@ -63,6 +63,11 @@ class SdkEnrollmentFlowTest extends SdkLiveBase {
       CustodyClient.KeyView key = makerClient.custody.get(reported.keyId());
       assertThat(key.status()).isEqualTo("COMPROMISED");
       assertThat(key.recoveries()).hasSize(1);
+      // The case queue lists the approved case with current eligibility.
+      EnrollmentClient.EnrollmentPage queue =
+          makerClient.enrollment.list("approved", 50, null);
+      assertThat(queue.items().stream().map(EnrollmentClient.EnrollmentSummary::enrollmentId))
+          .contains(created.enrollmentId());
     }
   }
 }

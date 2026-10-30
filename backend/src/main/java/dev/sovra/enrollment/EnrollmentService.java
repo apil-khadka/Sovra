@@ -11,6 +11,7 @@ import dev.sovra.authz.ResourceRef;
 import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
 import dev.sovra.extraction.ExtractionService;
+import dev.sovra.web.KeysetCursor;
 import java.security.interfaces.ECPublicKey;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -85,6 +86,111 @@ public class EnrollmentService {
       boolean eligible,
       String eligibilityReason,
       List<ReviewView> reviews) {}
+
+  public record EnrollmentSummary(
+      UUID enrollmentId,
+      UUID subjectRef,
+      UUID vaultObjectId,
+      UUID extractionRecordId,
+      int boundRevision,
+      EnrollmentState state,
+      String createdBy,
+      String decidedBy,
+      boolean eligible,
+      String eligibilityReason,
+      String createdAt) {}
+
+  public record EnrollmentPage(List<EnrollmentSummary> items, String nextCursor) {}
+
+  /**
+   * Case queue (SOV-023): newest cases first, keyset-paged. State
+   * filters the lifecycle — {@code pending}, {@code in_review},
+   * {@code approved}, {@code rejected}, {@code all} default.
+   * Eligibility mirrors {@link #eligibilityFor} (APPROVED on the
+   * current approved head) in one join; reviewed claims stay on
+   * the detail read. Audited as one read.
+   */
+  @Transactional(noRollbackFor = ForbiddenException.class)
+  public EnrollmentPage listEnrollments(
+      ServiceAccountPrincipal caller, String state, int limit, String cursor) {
+    Decision decision =
+        require(caller, Action.ENROLLMENT_READ, "enrollment", "list");
+    String wanted = state == null || state.isBlank() ? "all" : state.strip().toLowerCase();
+    String filter =
+        switch (wanted) {
+          case "all" -> "";
+          case "pending" -> " AND e.state = 'PENDING'";
+          case "in_review" -> " AND e.state = 'IN_REVIEW'";
+          case "approved" -> " AND e.state = 'APPROVED'";
+          case "rejected" -> " AND e.state = 'REJECTED'";
+          default -> throw new EnrollmentInvalidException("unknown queue state");
+        };
+    int page = Math.min(Math.max(limit, 1), 200);
+    KeysetCursor position = null;
+    if (cursor != null && !cursor.isBlank()) {
+      try {
+        position = KeysetCursor.decode(cursor);
+      } catch (IllegalArgumentException e) {
+        throw new EnrollmentInvalidException("malformed list cursor");
+      }
+    }
+    String keyset = position == null
+        ? ""
+        : " AND (e.created_at < ? OR (e.created_at = ? AND e.id < ?))";
+    Object[] args;
+    if (position == null) {
+      args = new Object[] {caller.tenantId(), page + 1};
+    } else {
+      java.sql.Timestamp at = java.sql.Timestamp.from(position.createdAt());
+      args = new Object[] {caller.tenantId(), at, at, position.id(), page + 1};
+    }
+    List<EnrollmentSummary> items =
+        tenant.query(
+            "SELECT e.id, e.subject_ref, e.vault_object_id, e.extraction_record_id,"
+                + " e.bound_revision, e.state, e.created_by, e.decided_by, e.created_at,"
+                + " r.approved_revision FROM enrollment e"
+                + " LEFT JOIN extraction_record r ON r.id = e.extraction_record_id"
+                + " WHERE e.tenant_id = ?" + filter + keyset
+                + " ORDER BY e.created_at DESC, e.id DESC LIMIT ?",
+            (rs, n) -> {
+              String stateName = rs.getString("state");
+              Integer head = rs.getObject("approved_revision", Integer.class);
+              boolean eligible = "APPROVED".equals(stateName)
+                  && head != null
+                  && head == rs.getInt("bound_revision");
+              String reason = "APPROVED".equals(stateName)
+                  ? (eligible ? "CURRENT" : "STALE_SOURCE")
+                  : "UNREVIEWED";
+              return new EnrollmentSummary(
+                  rs.getObject("id", UUID.class),
+                  rs.getObject("subject_ref", UUID.class),
+                  rs.getObject("vault_object_id", UUID.class),
+                  rs.getObject("extraction_record_id", UUID.class),
+                  rs.getInt("bound_revision"),
+                  EnrollmentState.from(stateName),
+                  rs.getString("created_by"),
+                  rs.getString("decided_by"),
+                  eligible,
+                  reason,
+                  rs.getTimestamp("created_at").toInstant().toString());
+            },
+            args);
+    String next = null;
+    List<EnrollmentSummary> shown = items;
+    if (items.size() > page) {
+      shown = items.subList(0, page);
+      EnrollmentSummary last = shown.get(shown.size() - 1);
+      next = KeysetCursor.encode(last.createdAt(), last.enrollmentId().toString());
+    }
+    audit.record(
+        caller,
+        Action.ENROLLMENT_READ,
+        ResourceRef.tenantScoped("enrollment", "list", caller.tenantId()),
+        decision,
+        "",
+        Map.of("state", wanted, "count", String.valueOf(shown.size())));
+    return new EnrollmentPage(List.copyOf(shown), next);
+  }
 
   @Transactional(noRollbackFor = ForbiddenException.class)
   public Created create(

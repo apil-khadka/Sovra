@@ -1201,7 +1201,7 @@
         "AC-13"
       ],
       "implementation_progress": "demo_implemented",
-      "implementation_observation": "Java (sdk/java, Jackson-only runtime dep) and TypeScript (sdk/typescript, zero runtime deps) SDKs cover the machine chain at contract 0.13.0 with typed errors, origin validation, idempotency keys, ETag precondition reads and no write auto-retry; 13 live-stack tests each plus quickstart/negative coverage, sdk-live CI job, READMEs and sdk/RELEASE.md provenance. Independent review remains.",
+      "implementation_observation": "Java (sdk/java, Jackson-only runtime dep) and TypeScript (sdk/typescript, zero runtime deps) SDKs cover the machine chain at contract 0.14.0 with typed errors, origin validation, idempotency keys, ETag precondition reads and no write auto-retry; 13 live-stack tests each plus quickstart/negative coverage, sdk-live CI job, READMEs and sdk/RELEASE.md provenance. Independent review remains.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
@@ -1299,9 +1299,9 @@
         "AC-11",
         "AC-14"
       ],
-      "implementation_progress": "not_started",
-      "implementation_observation": "No issuer enrollment/source-review/issuance dashboard found.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Issuer desk over machine review queues (extraction/enrollment lists) plus 14 session BFF endpoints: correction/approval, case intake/submit/decide with holder-proof approvals, credential status/revoke, purpose-bound PNG/JPEG original viewing, and a casework-scoped audit tail; human reviewers enabled via dual-registry enrollment actors and human vault grants. Covered by 3 queue tests, 5 BFF flow tests and 6 browser tests (maker/checker, hostile rendering, review-view, ETags). Production accreditation and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {

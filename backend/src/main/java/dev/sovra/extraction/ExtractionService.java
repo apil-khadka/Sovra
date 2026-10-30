@@ -9,6 +9,7 @@ import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
 import dev.sovra.vault.VaultService;
+import dev.sovra.web.KeysetCursor;
 import java.math.BigDecimal;
 import java.util.HexFormat;
 import java.util.List;
@@ -81,6 +82,97 @@ public class ExtractionService {
       String canonId,
       Integer approvedRevision,
       List<RevisionView> revisions) {}
+
+  public record RecordSummary(
+      UUID recordId,
+      UUID vaultObjectId,
+      int objectVersion,
+      String engineId,
+      String schemaId,
+      Integer approvedRevision,
+      int latestRevision,
+      String createdBy,
+      String createdAt) {}
+
+  public record RecordPage(List<RecordSummary> items, String nextCursor) {}
+
+  /**
+   * Review queue (SOV-023): newest records first, keyset-paged.
+   * State filters the approval posture — {@code pending} (never
+   * approved), {@code stale} (approved below the head), {@code
+   * approved} (any approval), {@code all} default. Audited as one
+   * read; summaries carry no field values or digests.
+   */
+  @Transactional(noRollbackFor = ForbiddenException.class)
+  public RecordPage listRecords(
+      ServiceAccountPrincipal caller, String state, int limit, String cursor) {
+    Decision decision =
+        require(caller, Action.EXTRACTION_READ, "extraction-record", "list");
+    String posture = state == null || state.isBlank() ? "all" : state.strip().toLowerCase();
+    String filter =
+        switch (posture) {
+          case "all" -> "";
+          case "pending" -> " AND r.approved_revision IS NULL";
+          case "approved" -> " AND r.approved_revision IS NOT NULL";
+          case "stale" -> " AND r.approved_revision IS NOT NULL"
+              + " AND r.approved_revision < COALESCE(m.max_rev, 0)";
+          default -> throw new ExtractionInvalidException("unknown queue state");
+        };
+    int page = Math.min(Math.max(limit, 1), 200);
+    KeysetCursor position = null;
+    if (cursor != null && !cursor.isBlank()) {
+      try {
+        position = KeysetCursor.decode(cursor);
+      } catch (IllegalArgumentException e) {
+        throw new ExtractionInvalidException("malformed list cursor");
+      }
+    }
+    String keyset = position == null
+        ? ""
+        : " AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))";
+    List<RecordSummary> items =
+        tenant.query(
+            "SELECT r.id, r.vault_object_id, r.object_version, r.engine_id, r.schema_id,"
+                + " r.approved_revision, COALESCE(m.max_rev, 0) AS latest_rev, r.created_by,"
+                + " r.created_at FROM extraction_record r LEFT JOIN (SELECT record_id,"
+                + " MAX(rev_no) AS max_rev FROM extraction_revision GROUP BY record_id) m"
+                + " ON m.record_id = r.id WHERE r.tenant_id = ?" + filter + keyset
+                + " ORDER BY r.created_at DESC, r.id DESC LIMIT ?",
+            (rs, n) -> new RecordSummary(
+                rs.getObject("id", UUID.class),
+                rs.getObject("vault_object_id", UUID.class),
+                rs.getInt("object_version"),
+                rs.getString("engine_id"),
+                rs.getString("schema_id"),
+                rs.getObject("approved_revision", Integer.class),
+                rs.getInt("latest_rev"),
+                rs.getString("created_by"),
+                rs.getTimestamp("created_at").toInstant().toString()),
+            keysetArgs(caller.tenantId(), position, page + 1));
+    String next = null;
+    List<RecordSummary> shown = items;
+    if (items.size() > page) {
+      shown = items.subList(0, page);
+      RecordSummary last = shown.get(shown.size() - 1);
+      next = KeysetCursor.encode(last.createdAt(), last.recordId().toString());
+    }
+    audit.record(
+        caller,
+        Action.EXTRACTION_READ,
+        ResourceRef.tenantScoped("extraction-record", "list", caller.tenantId()),
+        decision,
+        "",
+        Map.of("state", posture, "count", String.valueOf(shown.size())));
+    return new RecordPage(List.copyOf(shown), next);
+  }
+
+  private Object[] keysetArgs(UUID tenantId, KeysetCursor position, int limit) {
+    if (position == null) {
+      return new Object[] {tenantId, limit};
+    }
+    java.sql.Timestamp at = java.sql.Timestamp.from(position.createdAt());
+    return new Object[] {tenantId, at, at, position.id(), limit};
+  }
 
   @Transactional(noRollbackFor = ForbiddenException.class)
   public RunResult extract(

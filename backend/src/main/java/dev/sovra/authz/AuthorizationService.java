@@ -110,6 +110,13 @@ public class AuthorizationService {
           Map.entry(
               Action.HOLDER_READ,
               EnumSet.of(Role.ISSUER_OPS, Role.AUDIT_READER, Role.TRUST_ADMIN)),
+          // Issuer desk (SOV-023): operators read their own
+          // casework trail (extraction/enrollment/issuance/vault/
+          // quarantine actions only); the full audit stays with
+          // auditors and trust admins.
+          Map.entry(
+              Action.READ_ISSUER_AUDIT,
+              EnumSet.of(Role.ISSUER_OPS, Role.AUDIT_READER, Role.TRUST_ADMIN)),
           // OpenID4VCI (SOV-036): issuer operators publish offers; the
           // holder's tenant agent drives the synthetic authorization
           // server. Wallet token/credential calls carry no service

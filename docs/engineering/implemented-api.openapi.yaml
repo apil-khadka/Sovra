@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.13.0
+  version: 0.14.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -498,6 +498,31 @@ paths:
         '404': { description: Unknown admission, object, or grant }
         '409': { description: Admission is not CLEAN, or already promoted }
   /api/extraction/records:
+    get:
+      operationId: listExtractionRecords
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Extraction review queue (SOV-023): newest records first,
+        keyset-paged. State filters the approval posture — pending,
+        stale (approved below the head), approved, all default.
+        Summaries carry queue metadata only, no field values.
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [all, pending, stale, approved] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+          description: Page size, clamped to 1..200
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: Opaque nextCursor from the previous page
+      responses:
+        '200': { description: '{items[{recordId, vaultObjectId, objectVersion, engineId, schemaId, approvedRevision, latestRevision, createdBy, createdAt}], nextCursor?}' }
+        '400': { description: Unknown state or malformed cursor }
+        '401': { description: Anonymous }
+        '403': { description: Lacks an extraction-reading role }
     post:
       operationId: runExtraction
       x-sovra-scopes: [ISSUER_OPS]
@@ -688,6 +713,32 @@ paths:
         '403': { description: Lacks a custody-reading role }
         '404': { description: Unknown key }
   /api/enrollments:
+    get:
+      operationId: listEnrollments
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Enrollment case queue (SOV-023): newest cases first,
+        keyset-paged. State filters the lifecycle — pending,
+        in_review, approved, rejected, all default. Eligibility
+        mirrors the issuance gate (APPROVED on the current head);
+        reviewed claims stay on the detail read.
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [all, pending, in_review, approved, rejected] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+          description: Page size, clamped to 1..200
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: Opaque nextCursor from the previous page
+      responses:
+        '200': { description: '{items[{enrollmentId, subjectRef, vaultObjectId, extractionRecordId, boundRevision, state, createdBy, decidedBy, eligible, eligibilityReason, createdAt}], nextCursor?}' }
+        '400': { description: Unknown state or malformed cursor }
+        '401': { description: Anonymous }
+        '403': { description: Lacks an enrollment-reading role }
     post:
       operationId: createEnrollment
       x-sovra-scopes: [ISSUER_OPS]
@@ -1941,6 +1992,272 @@ paths:
         '200': { description: '[{alert, severity, status, code, check, firstObservedAt, observedAt}]' }
         '401': { description: No live session }
         '403': { description: Lacks AUDIT_READER/TRUST_ADMIN }
+  /api/bff/issuer/extraction/records:
+    get:
+      operationId: bffIssuerExtractionQueue
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Extraction queue for the issuer desk; same shape as listExtractionRecords
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [all, pending, stale, approved] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: '{items[], nextCursor?}, same as listExtractionRecords' }
+        '400': { description: Unknown state or malformed cursor }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS }
+  /api/bff/issuer/extraction/records/{id}:
+    get:
+      operationId: bffIssuerExtractionRecord
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Extraction record for the issuer desk; same shape as readExtractionRecord
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: If-None-Match
+          in: header
+          schema: { type: string }
+          description: Strong ETag from a previous read; matches answer 304
+      responses:
+        '200': { description: Full record with provenance, same as readExtractionRecord }
+        '304': { description: Caller holds the current representation }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown record }
+  /api/bff/issuer/extraction/records/{id}/revisions:
+    post:
+      operationId: bffIssuerCorrectExtraction
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Append a correction revision from the issuer desk; same rules as correctExtraction
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fields: { type: object, additionalProperties: { type: string } }
+                confidence: { type: number }
+      responses:
+        '201': { description: '{recordId, revision}' }
+        '400': { description: Malformed fields }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS, or missing/invalid CSRF token }
+        '404': { description: Unknown record }
+  /api/bff/issuer/extraction/records/{id}/approval:
+    post:
+      operationId: bffIssuerApproveExtraction
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Approve a revision from the issuer desk; same rules as approveExtraction
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision]
+              properties:
+                revision: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: '{recordId, approvedRevision}' }
+        '400': { description: Unknown revision }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS, or missing/invalid CSRF token }
+        '404': { description: Unknown record }
+        '409': { description: Revision is superseded }
+  /api/bff/issuer/enrollments:
+    get:
+      operationId: bffIssuerEnrollmentQueue
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Enrollment queue for the issuer desk; same shape as listEnrollments
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [all, pending, in_review, approved, rejected] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: '{items[], nextCursor?}, same as listEnrollments' }
+        '400': { description: Unknown state or malformed cursor }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS }
+    post:
+      operationId: bffIssuerCreateEnrollment
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Open an enrollment case from the issuer desk; same rules as createEnrollment
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vaultObjectId, extractionRecordId, holderJwk]
+              properties:
+                vaultObjectId: { type: string, format: uuid }
+                extractionRecordId: { type: string, format: uuid }
+                holderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+      responses:
+        '201': { description: '{enrollmentId, subjectRef, state PENDING}' }
+        '400': { description: Source/record mismatch, malformed holder key, or malformed shape }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS, or missing/invalid CSRF token }
+        '404': { description: Unknown extraction record }
+        '409': { description: Extraction revision is not approved }
+  /api/bff/issuer/enrollments/{id}:
+    get:
+      operationId: bffIssuerEnrollmentCase
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Enrollment case for the issuer desk; same shape as readEnrollment
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: If-None-Match
+          in: header
+          schema: { type: string }
+          description: Strong ETag from a previous read; matches answer 304
+      responses:
+        '200': { description: Full case with eligibility and reviews, same as readEnrollment }
+        '304': { description: Caller holds the current representation }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown enrollment }
+  /api/bff/issuer/enrollments/{id}/submit:
+    post:
+      operationId: bffIssuerSubmitEnrollment
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Submit a case for checker review from the issuer desk; same rules as submitEnrollment
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{enrollmentId, state IN_REVIEW}' }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS, or missing/invalid CSRF token }
+        '404': { description: Unknown enrollment }
+        '409': { description: Not submittable, or approval is current }
+  /api/bff/issuer/enrollments/{id}/decision:
+    post:
+      operationId: bffIssuerDecideEnrollment
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Decide a case from the issuer desk; same rules as decideEnrollment.
+        Rejects need no proof; approvals need the holder binding proof and a
+        checker who did not build the case.
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, decision]
+              properties:
+                revision: { type: integer, minimum: 1 }
+                decision: { type: string, enum: [approve, reject] }
+                bindingProof:
+                  type: string
+                  description: Holder ES256 proof over enrollment-binding/id/revision (approvals)
+      responses:
+        '200': { description: '{enrollmentId, state, boundRevision}' }
+        '400': { description: Bad decision value, or missing/invalid binding proof }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS, or missing/invalid CSRF token }
+        '404': { description: Unknown enrollment }
+        '409': { description: Not in review, self-approval, or stale revision }
+  /api/bff/issuer/credentials/{id}:
+    get:
+      operationId: bffIssuerCredential
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS]
+      summary: Credential detail for the issuer desk; same shape as readCredential
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{credentialId, issuerId, vct, keyRef, issuedAt, expiresAt, status, trustSnapshot}' }
+        '401': { description: No live session }
+        '403': { description: Lacks a credential-reading role }
+        '404': { description: Unknown credential }
+  /api/bff/issuer/credentials/{id}/status:
+    get:
+      operationId: bffIssuerCredentialStatus
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS]
+      summary: Credential status for the issuer desk; same shape as credentialStatus
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{status, version, fetchedAt, maxAgeSeconds}' }
+        '401': { description: No live session }
+        '403': { description: Lacks a credential-reading role }
+        '404': { description: Unknown credential }
+  /api/bff/issuer/credentials/{id}/revoke:
+    post:
+      operationId: bffIssuerRevokeCredential
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: Terminal revocation from the issuer desk; same rules as revokeCredential
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{credentialId, status REVOKED}' }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS, or missing/invalid CSRF token }
+        '404': { description: Unknown credential }
+  /api/bff/issuer/vault/review-view:
+    post:
+      operationId: bffIssuerReviewView
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Purpose-bound original viewing (SOV-023): mints a 5-minute grant
+        for exactly this reviewer and serves the bytes only when they
+        are a PNG or JPEG by magic bytes. Quarantine-marked bytes
+        stay refused; versions that never authorized the review
+        purpose stay out.
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectId, version]
+              properties:
+                objectId: { type: string, format: uuid }
+                version: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: '{objectId, version, contentType, contentBase64, sha256Hex}' }
+        '400': { description: Not a reviewable image, or purpose not authorized }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS, missing/invalid CSRF token, or grant invalid }
+        '404': { description: Unknown object or version }
+  /api/bff/issuer/audit/events:
+    get:
+      operationId: bffIssuerAuditEvents
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Issuer-scoped audit tail (SOV-023): extraction, enrollment,
+        issuance, vault, quarantine, and holder-report actions only.
+        Trust, login, and service-account administration never appear.
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: '[audit events], same row shape as bffAuditEvents' }
+        '400': { description: Malformed cursor }
+        '401': { description: No live session }
+        '403': { description: Lacks ISSUER_OPS/AUDIT_READER/TRUST_ADMIN }
 components:
   securitySchemes:
     bearerAuth:

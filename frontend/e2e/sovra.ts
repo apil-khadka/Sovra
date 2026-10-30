@@ -22,6 +22,8 @@ export const TOKEN_PREFIX = 'sovra_test_'
 
 export const MEMBER = { username: 'demo-member', password: 'sovra-demo-member-01' }
 export const PRIVILEGED = { username: 'demo-priv', password: 'sovra-demo-priv-02' }
+export const MAKER = { username: 'demo-maker', password: 'sovra-demo-maker-03' }
+export const CHECKER = { username: 'demo-checker', password: 'sovra-demo-checker-04' }
 
 export interface Credentials {
   username: string

@@ -22,6 +22,19 @@ public final class ExtractionClient {
 
   public record ApprovalResult(String recordId, int approvedRevision) {}
 
+  public record RecordSummary(
+      String recordId,
+      String vaultObjectId,
+      int objectVersion,
+      String engineId,
+      String schemaId,
+      Integer approvedRevision,
+      int latestRevision,
+      String createdBy,
+      String createdAt) {}
+
+  public record RecordPage(java.util.List<RecordSummary> items, String nextCursor) {}
+
   public record RevisionView(
       int revNo,
       Map<String, String> observed,
@@ -66,6 +79,18 @@ public final class ExtractionClient {
   /** Empty on 304 when the caller holds the current record. */
   public Optional<RecordView> get(String recordId, String ifNoneMatch) {
     return client.get("/api/extraction/records/" + recordId, ifNoneMatch, RecordView.class);
+  }
+
+  /** Review queue: state in all/pending/stale/approved, keyset-paged. */
+  public RecordPage list(String state, int limit, String cursor) {
+    StringBuilder path = new StringBuilder("/api/extraction/records?limit=" + limit);
+    if (state != null) {
+      path.append("&state=").append(Url.encode(state));
+    }
+    if (cursor != null) {
+      path.append("&cursor=").append(Url.encode(cursor));
+    }
+    return client.get(path.toString(), RecordPage.class);
   }
 
   public CorrectionResult correct(

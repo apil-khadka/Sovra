@@ -485,6 +485,24 @@ public class VaultService {
         row.kekVersion(), row.purposes());
   }
 
+  /**
+   * Grants bind to one credential registry: machines redeem
+   * {@code service_account} grants, humans redeem
+   * {@code human_membership} grants. The caller's stable
+   * (issuer, subject) binding — null for machines — is what
+   * tells the two apart, so a grant issued to one registry is
+   * unusable from the other even when the ids collide.
+   */
+  private boolean grantMatchesCaller(GrantRow grant, ServiceAccountPrincipal caller) {
+    boolean human = caller.issuer() != null && caller.subject() != null;
+    if (human) {
+      return "human_membership".equals(grant.principalType())
+          && grant.principalId().equals(caller.id());
+    }
+    return "service_account".equals(grant.principalType())
+        && grant.principalId().equals(caller.id());
+  }
+
   private void checkGrant(
       ServiceAccountPrincipal caller,
       GrantRow grant,
@@ -495,8 +513,7 @@ public class VaultService {
       Decision decision) {
     if (!grant.objectId().equals(objectId)
         || grant.objectVersion() != version
-        || !"service_account".equals(grant.principalType())
-        || !grant.principalId().equals(caller.id())
+        || !grantMatchesCaller(grant, caller)
         || !grant.purpose().equals(purpose)
         || !grant.workload().equals(workload)) {
       deny(caller, Action.VAULT_READ_OBJECT, objectId.toString(), decision,

@@ -320,6 +320,9 @@ test("enrollmentCustodyQuickstart", async () => {
   const key = await makerClient.custody.get(reported.keyId);
   assert.equal(key?.status, "COMPROMISED");
   assert.equal(key?.recoveries.length, 1);
+  // The case queue lists the approved case with current eligibility.
+  const queue = await makerClient.enrollment.list("approved", 50);
+  assert.ok(queue.items.map((i) => i.enrollmentId).includes(created.enrollmentId));
 });
 
 /** Trust lifecycle: queue, onboard, approve, activate — with the two-person rule. */

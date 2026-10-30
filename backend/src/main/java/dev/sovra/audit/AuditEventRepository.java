@@ -107,6 +107,54 @@ public class AuditEventRepository {
         args);
   }
 
+  /**
+   * Issuer-scoped page (SOV-023): same ordering and cursor as
+   * {@link #listRecent}, restricted to the issuer casework action
+   * set. Operators see their own trail, never trust, login, or
+   * service-account administration.
+   */
+  public List<Map<String, Object>> listIssuerActions(
+      UUID tenantId, int limit, AuditCursor cursor, List<String> actions) {
+    String sql =
+        "SELECT id, occurred_at, actor_type, actor_id, action, resource_type,"
+            + " resource_id, decision, reason_code, policy_version, correlation_id, detail"
+            + " FROM audit_event WHERE (tenant_id = ? OR tenant_id IS NULL) AND action = ANY (?)";
+    Object[] args;
+    if (cursor == null) {
+      args = new Object[] {tenantId, actions.toArray(new String[0]), bounded(limit)};
+    } else {
+      sql += " AND (occurred_at, id) < (?, ?)";
+      args =
+          new Object[] {
+            tenantId,
+            actions.toArray(new String[0]),
+            java.sql.Timestamp.from(cursor.occurredAt()),
+            cursor.id(),
+            bounded(limit)
+          };
+    }
+    sql += " ORDER BY occurred_at DESC, id DESC LIMIT ?";
+    return tenant.query(
+        sql,
+        (rs, row) -> {
+          Map<String, Object> event = new LinkedHashMap<>();
+          event.put("id", rs.getString("id"));
+          event.put("occurredAt", rs.getTimestamp("occurred_at").toInstant().toString());
+          event.put("actorType", rs.getString("actor_type"));
+          event.put("actorId", rs.getString("actor_id"));
+          event.put("action", rs.getString("action"));
+          event.put("resourceType", rs.getString("resource_type"));
+          event.put("resourceId", rs.getString("resource_id"));
+          event.put("decision", rs.getString("decision"));
+          event.put("reasonCode", rs.getString("reason_code"));
+          event.put("policyVersion", rs.getLong("policy_version"));
+          event.put("correlationId", rs.getString("correlation_id"));
+          event.put("detail", readTree(rs.getString("detail")));
+          return event;
+        },
+        args);
+  }
+
   private static int bounded(int limit) {
     return Math.min(Math.max(limit, 1), 100);
   }

@@ -722,6 +722,23 @@ export interface ApprovalResult {
   approvedRevision: number;
 }
 
+export interface RecordSummary {
+  recordId: string;
+  vaultObjectId: string;
+  objectVersion: number;
+  engineId: string;
+  schemaId: string;
+  approvedRevision: number | null;
+  latestRevision: number;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface RecordPage {
+  items: RecordSummary[];
+  nextCursor: string | null;
+}
+
 export interface RevisionView {
   revNo: number;
   observed: Record<string, string>;
@@ -777,6 +794,18 @@ export class ExtractionResource extends Resource {
     );
   }
 
+  /** Review queue: state in all/pending/stale/approved, keyset-paged. */
+  list(state: string | undefined, limit: number, cursor?: string): Promise<RecordPage> {
+    let path = `/api/extraction/records?limit=${limit}`;
+    if (state !== undefined) {
+      path += `&state=${encodeURIComponent(state)}`;
+    }
+    if (cursor !== undefined) {
+      path += `&cursor=${encodeURIComponent(cursor)}`;
+    }
+    return this.client.get(path);
+  }
+
   correct(
     recordId: string,
     fields: Record<string, string>,
@@ -830,6 +859,25 @@ export interface EnrollmentReview {
   reviewer: string;
 }
 
+export interface EnrollmentSummary {
+  enrollmentId: string;
+  subjectRef: string;
+  vaultObjectId: string;
+  extractionRecordId: string;
+  boundRevision: number;
+  state: string;
+  createdBy: string;
+  decidedBy: string;
+  eligible: boolean;
+  eligibilityReason: string;
+  createdAt: string;
+}
+
+export interface EnrollmentPage {
+  items: EnrollmentSummary[];
+  nextCursor: string | null;
+}
+
 export interface EnrollmentView {
   enrollmentId: string;
   subjectRef: string;
@@ -881,6 +929,18 @@ export class EnrollmentResource extends Resource {
 
   get(enrollmentId: string, ifNoneMatch?: string): Promise<EnrollmentView | undefined> {
     return this.client.getOptional(`/api/enrollments/${enrollmentId}`, ifNoneMatch);
+  }
+
+  /** Case queue: state in all/pending/in_review/approved/rejected, keyset-paged. */
+  list(state: string | undefined, limit: number, cursor?: string): Promise<EnrollmentPage> {
+    let path = `/api/enrollments?limit=${limit}`;
+    if (state !== undefined) {
+      path += `&state=${encodeURIComponent(state)}`;
+    }
+    if (cursor !== undefined) {
+      path += `&cursor=${encodeURIComponent(cursor)}`;
+    }
+    return this.client.get(path);
   }
 
   eligibility(enrollmentId: string): Promise<Eligibility> {

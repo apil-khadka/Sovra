@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ConsentView from './ConsentView'
 import DemoView from './DemoView'
 import FederationView from './FederationView'
+import IssuerDeskView from './IssuerDeskView'
 import SecOpsView from './SecOpsView'
 import VerifyView from './VerifyView'
 import OpenIdWalletView from './OpenIdWalletView'
@@ -11,7 +12,7 @@ import { useAsync } from './hooks/useAsync'
 import { fetchSession, login, logout } from './auth'
 import { fetchHealth, fetchReadiness } from './ops'
 
-type ViewName = 'status' | 'demo' | 'consent' | 'verify' | 'wallet' | 'federation' | 'secops'
+type ViewName = 'status' | 'demo' | 'consent' | 'verify' | 'wallet' | 'federation' | 'secops' | 'issuer'
 
 const VIEW_TITLES: Record<ViewName, string> = {
   status: 'Sovra — Status',
@@ -21,6 +22,7 @@ const VIEW_TITLES: Record<ViewName, string> = {
   wallet: 'Sovra - OpenID demo wallet',
   federation: 'Sovra — Federation desk',
   secops: 'Sovra — Security operations',
+  issuer: 'Sovra — Issuer desk',
 }
 
 const NAV: Array<{ view: ViewName; label: string }> = [
@@ -31,6 +33,7 @@ const NAV: Array<{ view: ViewName; label: string }> = [
   { view: 'wallet', label: 'OpenID demo wallet' },
   { view: 'federation', label: 'Federation desk' },
   { view: 'secops', label: 'Security operations' },
+  { view: 'issuer', label: 'Issuer desk' },
 ]
 
 function viewFromHash(): ViewName {
@@ -146,6 +149,7 @@ export default function App() {
         {view === 'wallet' && <OpenIdWalletView session={sessionInfo} />}
         {view === 'federation' && <FederationView session={sessionInfo} />}
         {view === 'secops' && <SecOpsView session={sessionInfo} />}
+        {view === 'issuer' && <IssuerDeskView session={sessionInfo} />}
       </main>
     </>
   )

@@ -29,6 +29,21 @@ public final class EnrollmentClient {
   public record ReviewView(
       int revision, String decision, boolean bindingProofOk, String reviewer) {}
 
+  public record EnrollmentSummary(
+      String enrollmentId,
+      String subjectRef,
+      String vaultObjectId,
+      String extractionRecordId,
+      int boundRevision,
+      String state,
+      String createdBy,
+      String decidedBy,
+      boolean eligible,
+      String eligibilityReason,
+      String createdAt) {}
+
+  public record EnrollmentPage(java.util.List<EnrollmentSummary> items, String nextCursor) {}
+
   public record EnrollmentView(
       String enrollmentId,
       String subjectRef,
@@ -75,6 +90,18 @@ public final class EnrollmentClient {
   /** Empty on 304 when the caller holds the current case. */
   public Optional<EnrollmentView> get(String enrollmentId, String ifNoneMatch) {
     return client.get("/api/enrollments/" + enrollmentId, ifNoneMatch, EnrollmentView.class);
+  }
+
+  /** Case queue: state in all/pending/in_review/approved/rejected, keyset-paged. */
+  public EnrollmentPage list(String state, int limit, String cursor) {
+    StringBuilder path = new StringBuilder("/api/enrollments?limit=" + limit);
+    if (state != null) {
+      path.append("&state=").append(Url.encode(state));
+    }
+    if (cursor != null) {
+      path.append("&cursor=").append(Url.encode(cursor));
+    }
+    return client.get(path.toString(), EnrollmentPage.class);
   }
 
   public EligibilityView eligibility(String enrollmentId) {
