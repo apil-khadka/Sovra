@@ -537,6 +537,31 @@ public class IssuanceService {
   }
 
   /**
+   * Bulk terminal revocation by holder (SOV-020): every VALID
+   * credential bound to the thumbprint becomes REVOKED in one
+   * convergent statement. Returns the revoked count; re-running
+   * after full revocation revokes zero and stays truthful.
+   */
+  @Transactional
+  public int revokeByHolder(ServiceAccountPrincipal caller, String thumbprint) {
+    ResourceRef resource =
+        ResourceRef.tenantScoped("credential", "holder", caller.tenantId());
+    Decision decision =
+        AuditedAuthorizer.require(authz, audit, caller, Action.ISSUE_CREDENTIAL, resource);
+    int revoked =
+        tenant.update(
+            "UPDATE credential_artifact SET status = ?, status_updated_at = ?,"
+                + " status_version = status_version + 1"
+                + " WHERE tenant_id = ? AND holder_thumbprint = ? AND status = ?",
+            CredentialStatus.REVOKED.name(), java.sql.Timestamp.from(clock.instant()),
+            caller.tenantId(), thumbprint, CredentialStatus.VALID.name());
+    audit.record(
+        caller, Action.ISSUE_CREDENTIAL, resource, decision, "",
+        Map.of("holder", thumbprint, "revoked", String.valueOf(revoked)));
+    return revoked;
+  }
+
+  /**
    * Public federation metadata: verification keys of authorized
    * issuers, minus revoked key versions. The snapshots stay immutable
    * — this filter applies at serve time only — and unrevoked rotation

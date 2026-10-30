@@ -75,7 +75,7 @@ All 41 remote issues were observed open during this audit.
 | [SOV-017](#sov-017) | Implement encrypted quarantine and isolated hostile-image admission | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-016, SOV-027 | [Issue](https://github.com/apil-khadka/Sovra/issues/22) |
 | [SOV-018](#sov-018) | Implement local extraction, protected digests and provenance revisions | G2 | demo_implemented | SOV-002, SOV-003, SOV-015, SOV-016, SOV-017 | [Issue](https://github.com/apil-khadka/Sovra/issues/23) |
 | [SOV-019](#sov-019) | Implement enrollment review, corrections and claim eligibility | G2 | demo_implemented | SOV-001, SOV-002, SOV-005, SOV-007, SOV-008, SOV-015, SOV-018, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/24) |
-| [SOV-020](#sov-020) | Implement holder credential custody and secure recovery | G2 | not_started | SOV-001, SOV-002, SOV-004, SOV-005, SOV-006, SOV-010, SOV-012, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/25) |
+| [SOV-020](#sov-020) | Implement holder credential custody and secure recovery | G2 | demo_implemented | SOV-001, SOV-002, SOV-004, SOV-005, SOV-006, SOV-010, SOV-012, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/25) |
 | [SOV-021](#sov-021) | Ship tested Java and TypeScript SDKs | G3 | not_started | SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/26) |
 | [SOV-022](#sov-022) | Build developer portal, sandbox and integration onboarding | G3 | not_started | SOV-005, SOV-006, SOV-015, SOV-021 | [Issue](https://github.com/apil-khadka/Sovra/issues/27) |
 | [SOV-023](#sov-023) | Build issuer information-management dashboard | G3 | not_started | SOV-005, SOV-006, SOV-007, SOV-012, SOV-015, SOV-016, SOV-019 | [Issue](https://github.com/apil-khadka/Sovra/issues/28) |
@@ -623,8 +623,8 @@ Required closure evidence:
 
 Owner role: Holder security.
 Gate: G2; proposed priority: p0; triage: needs-triage.
-Progress: not_started (reviewed 2026-10-29).
-Remaining/evidence scope: Demo holder proof helpers do not implement device custody, encrypted backup recovery or loss/theft/reissuance.
+Progress: demo_implemented (reviewed 2026-10-30).
+Remaining/evidence scope: Holder key registry with approval-time activation, loss/theft/compromise reports that revoke at once, TRUST_ADMIN recovery with fresh-key proofs and eligibility re-proof, and issuance bound to the ACTIVE key exist with 12 tests; OD-09 frozen and DR-10 demo threat model recorded. Device custody, encrypted backup, MFA/reauth, holder recovery UX and independent review remain.
 Dependencies: SOV-001, SOV-002, SOV-004, SOV-005, SOV-006, SOV-010, SOV-012, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/25).
 Requirements: FR-14, FR-20, DR-10, DR-16, SR-02, SR-11, UX-05.

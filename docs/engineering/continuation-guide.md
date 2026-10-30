@@ -8,7 +8,7 @@ Use this guide with the [implementation plan](implementation-plan.md), [task reg
 ## Current implementation
 
 The Java backend implements authorization, audit, governed trust, issuance/status, consent, durable verification, deterministic planning guards, fixture/live planning adapters, semantic readiness, Keycloak/BFF sessions, a software-key vault and isolated image quarantine.
-The implemented API contract is [0.11.0](implemented-api.openapi.yaml).
+The implemented API contract is [0.12.0](implemented-api.openapi.yaml).
 React provides demo, consent and verification screens rather than the complete issuer/holder/RP/developer dashboard product.
 The container build packages React assets into Spring, so SPA, BFF, callback and logout share one application origin.
 Node/pnpm run only during asset building and development.

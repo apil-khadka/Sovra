@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.11.0
+  version: 0.12.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -604,6 +604,89 @@ paths:
         '403': { description: Lacks ISSUER_OPS }
         '404': { description: Unknown record }
         '409': { description: Revision is superseded by a correction }
+  /api/holder-keys/report:
+    post:
+      operationId: reportHolderKey
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Report a holder key lost, stolen, or compromised (SOV-020,
+        OD-09). The key flips to COMPROMISED, a recovery case opens,
+        and every credential bound to the key revokes at once — a
+        stolen key loses presentation authority immediately.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [thumbprint, reason]
+              properties:
+                thumbprint: { type: string }
+                reason: { type: string, description: loss, theft, or compromise }
+      responses:
+        '200': { description: '{keyId, recoveryId, thumbprint, revokedCredentials}' }
+        '400': { description: Missing thumbprint or bad reason }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown thumbprint }
+        '409': { description: Key already reported }
+  /api/holder-keys/recover:
+    post:
+      operationId: recoverHolderKey
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Recover a reported key (SOV-020, OD-09): requires a trust
+        admin, a still-eligible live enrollment, and a possession
+        proof from the fresh replacement key over the recovery id.
+        Activates the new key and closes the case; reissuance uses
+        normal issuance, never resurrection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recoveryId, newHolderJwk]
+              properties:
+                recoveryId: { type: string, format: uuid }
+                newHolderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+                newKeyProof:
+                  type: string
+                  description: >-
+                    ES256 JWS by the replacement key over
+                    holder-recovery, the recovery id, and the new
+                    thumbprint
+      responses:
+        '200': { description: '{recoveryId, newThumbprint}' }
+        '400': { description: Malformed key or missing/invalid proof }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown recovery }
+        '409': { description: Recovery complete, stale enrollment, or key already registered }
+  /api/holder-keys/{id}:
+    get:
+      operationId: readHolderKey
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Read a holder key and its recovery cases (SOV-020).
+        Metadata-only: status and case state, never private
+        material.
+      parameters:
+        - name: If-None-Match
+          in: header
+          schema: { type: string }
+          description: Strong ETag from a previous read; matches answer 304
+      responses:
+        '200':
+          description: >-
+            {keyId, enrollmentId, thumbprint, status, createdBy,
+            recoveries[]}
+        '304': { description: Caller holds the current representation }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a custody-reading role }
+        '404': { description: Unknown key }
   /api/enrollments:
     post:
       operationId: createEnrollment

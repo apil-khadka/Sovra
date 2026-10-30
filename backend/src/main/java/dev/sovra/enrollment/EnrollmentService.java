@@ -192,10 +192,14 @@ public class EnrollmentService {
       throw new EnrollmentConflictException("revision is not the approved head");
     }
     boolean proofOk = false;
+    String activatedThumbprint = null;
     if (approve) {
       ECPublicKey holderKey = holderKey(readJwk(row.holderJwk));
       verifyBinding(holderKey, bindingProof, enrollmentId, revision);
       proofOk = true;
+      activatedThumbprint =
+          dev.sovra.crypto.P256.thumbprint(
+              holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
     }
     EnrollmentState next = approve ? EnrollmentState.APPROVED : EnrollmentState.REJECTED;
     tenant.update(
@@ -213,6 +217,34 @@ public class EnrollmentService {
         proofOk,
         caller.id(),
         caller.name());
+    if (approve) {
+      // Approval activates the case key in the custody registry
+      // (SOV-020): the key gains issuance authority here, and only
+      // here. Re-review keeps the live key — a recovered enrollment
+      // never falls back to its compromised original — and a key
+      // already serving another enrollment conflicts instead of
+      // aliasing.
+      Integer live =
+          tenant.queryForObject(
+              "SELECT COUNT(*) FROM holder_key WHERE enrollment_id = ? AND status = ?",
+              Integer.class,
+              enrollmentId,
+              dev.sovra.custody.HolderKeyStatus.ACTIVE.name());
+      if (live == null || live == 0) {
+        try {
+          tenant.update(
+              "INSERT INTO holder_key (tenant_id, enrollment_id, thumbprint, jwk, created_by)"
+                  + " VALUES (?, ?, ?, ?::jsonb, ?)",
+              caller.tenantId(),
+              enrollmentId,
+              activatedThumbprint,
+              row.holderJwk,
+              caller.name());
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+          throw new EnrollmentConflictException("holder key is already registered");
+        }
+      }
+    }
     audit.record(
         caller,
         Action.ENROLLMENT_DECIDE,
@@ -283,11 +315,11 @@ public class EnrollmentService {
   }
 
   /**
-   * Issuance authorization (FR-37/39): returns the reviewed claims
-   * only while the enrollment is APPROVED on the current head AND
-   * the issuance holder key equals the enrolled key. Anything else
-   * terminates, so obsolete approvals, unreviewed cases, and
-   * key-substituted requests can never reach the signer.
+   * Issuance authorization (FR-37/39, SOV-020): returns the reviewed
+   * claims only while the enrollment is APPROVED on the current
+   * head AND the issuance holder key equals the enrollment's
+   * ACTIVE registry key. Compromised keys lose issuance authority
+   * at report time, even before recovery completes.
    */
   @Transactional(noRollbackFor = ForbiddenException.class)
   public Map<String, String> issuanceClaims(
@@ -299,21 +331,26 @@ public class EnrollmentService {
     if (!view.eligible()) {
       throw new EnrollmentConflictException("enrollment is " + view.reason().toLowerCase());
     }
-    ECPublicKey enrolled = holderKey(readJwk(row.holderJwk));
+    List<String> active =
+        tenant.query(
+            "SELECT thumbprint FROM holder_key WHERE enrollment_id = ? AND status = ?",
+            (rs, n) -> rs.getString(1),
+            enrollmentId,
+            dev.sovra.custody.HolderKeyStatus.ACTIVE.name());
+    if (active.isEmpty()) {
+      throw new EnrollmentConflictException("holder key is not active");
+    }
     ECPublicKey offered;
     try {
       offered = HolderProofs.parseP256Key(holderJwk);
     } catch (HolderProofException e) {
       throw new EnrollmentInvalidException("issuance holder key is malformed");
     }
-    String expected =
-        dev.sovra.crypto.P256.thumbprint(
-            enrolled.getW().getAffineX(), enrolled.getW().getAffineY());
     String actual =
         dev.sovra.crypto.P256.thumbprint(
             offered.getW().getAffineX(), offered.getW().getAffineY());
     if (!java.security.MessageDigest.isEqual(
-        expected.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        active.get(0).getBytes(java.nio.charset.StandardCharsets.UTF_8),
         actual.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
       throw new EnrollmentConflictException("holder is not bound to this enrollment");
     }

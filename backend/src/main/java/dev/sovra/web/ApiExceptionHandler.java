@@ -89,6 +89,7 @@ public class ApiExceptionHandler {
     dev.sovra.quarantine.QuarantineNotFoundException.class,
     dev.sovra.extraction.ExtractionNotFoundException.class,
     dev.sovra.enrollment.EnrollmentNotFoundException.class,
+    dev.sovra.custody.HolderCustodyNotFoundException.class,
     dev.sovra.openid.OpenIdNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
@@ -286,6 +287,23 @@ public class ApiExceptionHandler {
     }
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "enrollment_conflict"));
+  }
+
+  @ExceptionHandler(dev.sovra.custody.HolderCustodyInvalidException.class)
+  public ResponseEntity<Object> holderCustodyInvalid(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.BAD_REQUEST, "invalid_request", false);
+    }
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid_request"));
+  }
+
+  @ExceptionHandler(dev.sovra.custody.HolderCustodyConflictException.class)
+  public ResponseEntity<Object> holderCustodyConflict(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.CONFLICT, "holder_custody_conflict", false);
+    }
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(Map.of("error", "holder_custody_conflict"));
   }
 
   @ExceptionHandler(dev.sovra.vault.VaultAuthenticationException.class)

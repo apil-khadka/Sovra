@@ -1148,10 +1148,13 @@
         "AC-14",
         "AC-16"
       ],
-      "implementation_progress": "not_started",
-      "implementation_observation": "An in-memory synthetic OpenID browser wallet now receives and presents SD-JWT credentials; production device custody, encrypted backup/recovery, loss/theft and reissuance remain unimplemented.",
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Holder key registry with approval-time activation, loss/theft/compromise reports that revoke at once, TRUST_ADMIN recovery with fresh-key proofs and eligibility re-proof, and issuance bound to the ACTIVE key exist with 12 tests; OD-09 frozen and DR-10 demo threat model recorded. Device custody, encrypted backup, MFA/reauth, holder recovery UX and independent review remain.",
       "progress_reviewed_on": "2026-10-30",
-      "progress_evidence": []
+      "progress_evidence": [
+        "docs/architecture/decisions/SOV-020-custody-recovery.md",
+        "docs/engineering/sov-020-custody-threat-model.md"
+      ]
     },
     {
       "id": "SOV-021",

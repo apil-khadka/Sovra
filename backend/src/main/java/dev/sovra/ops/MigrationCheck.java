@@ -45,7 +45,9 @@ public class MigrationCheck implements ReadinessCheck {
           "extraction_record",
           "extraction_revision",
           "enrollment",
-          "enrollment_review");
+          "enrollment_review",
+          "holder_key",
+          "holder_recovery");
 
   private final JdbcTemplate global;
 
