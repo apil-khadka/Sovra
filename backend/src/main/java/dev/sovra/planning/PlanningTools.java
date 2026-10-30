@@ -1,6 +1,7 @@
 package dev.sovra.planning;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
@@ -192,18 +193,8 @@ public class PlanningTools {
             .orElseThrow(
                 () -> new IllegalStateException("planning tool outside an authorized invocation"));
     var caller = invocation.caller();
-    Decision decision =
-        authz.authorize(
-            Optional.of(caller),
-            Action.PROPOSE_PLAN,
-            ResourceRef.tenantScoped("planning", "tools", caller.tenantId()));
-    if (!decision.permitted()) {
-      audit.recordDenial(
-          caller, Action.PROPOSE_PLAN,
-          ResourceRef.tenantScoped("planning", "tools", caller.tenantId()),
-          decision.reasonCode(), decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.PROPOSE_PLAN, ResourceRef.tenantScoped("planning", "tools", caller.tenantId()));
     invocation.charge();
     return invocation;
   }

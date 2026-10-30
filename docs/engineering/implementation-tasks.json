@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "baseline": "SRS v0.6",
-  "updated": "2026-10-29",
+  "updated": "2026-10-30",
   "status": "Source/evidence audit: demo implementations and remaining acceptance gaps recorded separately from unchanged maintainer triage; no task closure or production approval implied.",
   "tasks": [
     {
@@ -59,8 +59,8 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/5",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "SOV-001 v0.4 records artifact-layer qualification; VCI/VP, kb+jwt, independent interoperability and strong digest pinning remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "SOV-001 v0.5 and the protocol assessment record SD-JWT/key-binding and synthetic OpenID flows; external conformance, complete browser flow, strong digest pinning and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/architecture/decisions/SOV-001-proof-profile.md"
       ]
@@ -330,8 +330,8 @@
         "AC-16"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Keycloak OIDC/BFF and service-account lifecycle exist; browser-origin packaging, hardware/recovery/elevation and full privileged acceptance remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Keycloak OIDC/BFF, packaged same-origin delivery and browser login/logout exist; API requests are no longer replayed as login destinations. Production hardware/recovery/elevation qualification remains.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "backend/src/main/java/dev/sovra/bff",
         "scripts/e2e-bff-login.py"
@@ -434,8 +434,8 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/12",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "Versioned/sealed trust and policy workflows exist; person-verified human quorum and actual accreditation remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Versioned/sealed trust and policy workflows plus stable human-subject quorum tests exist; actual accreditation and independent production approval remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -490,8 +490,8 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/13",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "Constrained synthetic and SD-JWT artifact issuance exists; VCI flows, approved enrollment provenance and real KMS remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Constrained synthetic/SD-JWT issuance and synthetic VCI flows exist; approved enrollment provenance, external protocol qualification and real KMS remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -542,8 +542,8 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/14",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "Consent APIs, BFF holder paths and React consent view exist; packaged browser and external wallet/profile evidence remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Consent APIs, BFF holder paths and packaged React review/decision views exist with browser evidence; complete selected-profile wallet flow remains.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -728,8 +728,8 @@
         "AC-07"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Fixture/live adapters and a dated successful Baseten smoke exist; latest changes are uncommitted. Hard no-charge limit, retention and full live evaluation remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Fixture/live adapters, bounds and dated successful grant smoke are committed; hard no-charge limits, cumulative controls, retention qualification and full live evaluation remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/ai/live-integration.md",
         "scripts/smoke-live-planning.py"
@@ -840,8 +840,8 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/17",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "Implemented API 0.6.0 and contract tests cover current routes; remaining product APIs, compatibility and profile contracts remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Implemented API 0.9.0 and served/documented parity tests cover current machine and BFF routes; remaining product APIs and full profile contracts remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -1523,7 +1523,9 @@
       "implementation_progress": "partial",
       "implementation_observation": "Local Compose includes migrations and worker isolation; synthetic-only demo admission (403 demo_synthetic_only on vault/quarantine ingestion) plus compose.public-demo.yaml profile with hard live-planner disarm added 2026-10-29. TLS, private admin, runtime privilege, credential rotation and actual host qualification remain.",
       "progress_reviewed_on": "2026-10-29",
-      "progress_evidence": ["docs/engineering/sov-027-public-demo-assessment.md"]
+      "progress_evidence": [
+        "docs/engineering/sov-027-public-demo-assessment.md"
+      ]
     },
     {
       "id": "SOV-028",
@@ -2123,8 +2125,8 @@
         "AC-08"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Demo UI, prior clean-checkout proof and live smoke exist; reproducible packaged browser journey, protocol qualification and zero-charge public release evidence remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Packaged same-origin browser journey and prior live smoke exist; full selected-profile browser qualification and zero-charge public release evidence remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/engineering/first-vertical-slice.md"
       ]
@@ -2429,8 +2431,8 @@
         "AC-16"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Trust sealing, stable subject/quorum checks and production startup guards exist; BFF human trust changes, source provenance and actual issuer authority remain.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Trust sealing, stable human subject/quorum binding, tenant binding and production startup guards exist; approved source provenance and actual issuer authority remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/engineering/sov-040-hardening-assessment.md"
       ]

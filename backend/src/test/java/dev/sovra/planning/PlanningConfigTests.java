@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.sovra.SovraAppRoleBase;
 import dev.sovra.trust.IssuerKeys;
+import dev.sovra.trust.IssuerStatus;
 import dev.sovra.trust.TrustService;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -92,22 +93,22 @@ class PlanningConfigTests extends SovraAppRoleBase {
     TrustService.IssuerView active =
         new TrustService.IssuerView(
             "i", "d", "s", java.util.List.of("t"), "k", 1, null,
-            now.minusSeconds(60), now.plusSeconds(60), "ACTIVE");
+            now.minusSeconds(60), now.plusSeconds(60), IssuerStatus.ACTIVE);
     assertThat(IssuerKeys.usable(active, now)).isTrue();
     TrustService.IssuerView suspended =
         new TrustService.IssuerView(
             "i", "d", "s", java.util.List.of("t"), "k", 1, null,
-            now.minusSeconds(60), now.plusSeconds(60), "SUSPENDED");
+            now.minusSeconds(60), now.plusSeconds(60), IssuerStatus.SUSPENDED);
     assertThat(IssuerKeys.usable(suspended, now)).isFalse();
     TrustService.IssuerView expired =
         new TrustService.IssuerView(
             "i", "d", "s", java.util.List.of("t"), "k", 1, null,
-            now.minusSeconds(120), now.minusSeconds(60), "ACTIVE");
+            now.minusSeconds(120), now.minusSeconds(60), IssuerStatus.ACTIVE);
     assertThat(IssuerKeys.usable(expired, now)).isFalse();
     TrustService.IssuerView premature =
         new TrustService.IssuerView(
             "i", "d", "s", java.util.List.of("t"), "k", 1, null,
-            now.plusSeconds(60), now.plusSeconds(120), "ACTIVE");
+            now.plusSeconds(60), now.plusSeconds(120), IssuerStatus.ACTIVE);
     assertThat(IssuerKeys.usable(premature, now)).isFalse();
   }
 }

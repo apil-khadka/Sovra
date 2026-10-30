@@ -1,6 +1,7 @@
 package dev.sovra.verification;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -9,6 +10,7 @@ import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
 import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
+import dev.sovra.consent.ConsentState;
 import dev.sovra.crypto.P256;
 import dev.sovra.issuance.StatusEvidenceFetcher;
 import dev.sovra.trust.TrustSnapshotProvider;
@@ -145,12 +147,8 @@ public class VerificationService {
   private String verifyInner(ServiceAccountPrincipal caller, VerifyRequest request) {
     ResourceRef resource =
         ResourceRef.tenantScoped("verification", "presentations", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.VERIFY_PRESENTATION, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.VERIFY_PRESENTATION, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.VERIFY_PRESENTATION, resource);
     Validated validated = validate(request);
     StoredRequest stored = loadRequest(caller, request.requestId());
     Credential credential = loadCredential(stored.credentialId());
@@ -223,12 +221,8 @@ public class VerificationService {
   public DecisionView get(ServiceAccountPrincipal caller, UUID decisionId) {
     ResourceRef resource =
         ResourceRef.tenantScoped("verification", decisionId.toString(), caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.READ_VERIFICATION, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.READ_VERIFICATION, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.READ_VERIFICATION, resource);
     List<DecisionView> rows =
         tenant.query(
             "SELECT id, request_id, outcome, reason_code, profile, trust_snapshot_version, key_ref,"
@@ -275,7 +269,7 @@ public class VerificationService {
       String rpId,
       String audience,
       String purpose,
-      String state,
+      ConsentState state,
       Instant expiresAt,
       String consentArtifact) {}
 
@@ -332,7 +326,7 @@ public class VerificationService {
     if (mode.isProduction() && !"sdjwt-vc".equals(profile)) {
       return new Evaluated(OUTCOME_REJECTED, "SYNTHETIC_PROFILE_REJECTED", 0, "", 0);
     }
-    if (!"APPROVED".equals(stored.state()) || stored.consentArtifact() == null) {
+    if (stored.state() != ConsentState.APPROVED || stored.consentArtifact() == null) {
       return new Evaluated(OUTCOME_REJECTED, "CONSENT_NOT_APPROVED", 0, "", 0);
     }
     if (!stored.expiresAt().isAfter(now)) {
@@ -518,7 +512,7 @@ public class VerificationService {
                     rs.getString("rp_id"),
                     rs.getString("audience"),
                     rs.getString("purpose"),
-                    rs.getString("state"),
+                    ConsentState.from(rs.getString("state")),
                     rs.getTimestamp("expires_at").toInstant(),
                     rs.getString("consent_artifact")),
             requestId,

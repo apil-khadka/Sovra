@@ -2,6 +2,7 @@ package dev.sovra.openid;
 
 import com.nimbusds.jose.util.Base64URL;
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.auth.ServiceAccountRepository;
 import dev.sovra.authz.Action;
@@ -142,12 +143,8 @@ public class VciService {
   public String createOffer(ServiceAccountPrincipal caller, String issuerId, String vct) {
     ResourceRef resource =
         ResourceRef.tenantScoped("vci-offer", "offers", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.VCI_CREATE_OFFER, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.VCI_CREATE_OFFER, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.VCI_CREATE_OFFER, resource);
     requireKnownConfiguration(issuerId, vct);
     requireTrustedNow(issuerId, vct);
     Instant now = clock.instant();
@@ -188,12 +185,8 @@ public class VciService {
       ServiceAccountPrincipal caller, String issuerId, String vct, String codeChallenge) {
     ResourceRef resource =
         ResourceRef.tenantScoped("vci-grant", "authorize", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.VCI_AUTHORIZE, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.VCI_AUTHORIZE, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.VCI_AUTHORIZE, resource);
     requireKnownConfiguration(issuerId, vct);
     requireTrustedNow(issuerId, vct);
     if (codeChallenge == null || !codeChallenge.matches("[A-Za-z0-9_-]{43,128}")) {
@@ -450,9 +443,7 @@ public class VciService {
                         .anyMatch(
                             issuer ->
                                 issuerId.equals(issuer.issuerId())
-                                    && "ACTIVE".equals(issuer.status())
-                                    && !issuer.validFrom().isAfter(now)
-                                    && !issuer.validThrough().isBefore(now)
+                                    && dev.sovra.trust.IssuerKeys.usable(issuer, now)
                                     && issuer.credentialTypes().contains(vct)))
             .orElse(false);
     if (!trusted) {

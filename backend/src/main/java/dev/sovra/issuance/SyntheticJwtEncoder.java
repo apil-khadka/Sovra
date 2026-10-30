@@ -56,10 +56,12 @@ public class SyntheticJwtEncoder implements CredentialEncoder {
       // AAD context mirrors the evidence; the signer refuses unless it
       // names this call's issuer (see IssuerSigner).
       String aad =
-          "issuer=" + evidence.issuerId()
-              + ";key=" + evidence.keyRef().encode()
-              + ";credential=" + evidence.credentialId()
-              + ";purpose=issuance;schema=" + PROFILE;
+          AadContext.issuance(
+                  evidence.issuerId(),
+                  evidence.keyRef().encode(),
+                  evidence.credentialId().toString(),
+                  PROFILE)
+              .encode();
       byte[] signature =
           signer.sign(evidence.keyRef(), signingInput.getBytes(StandardCharsets.US_ASCII), aad);
       String artifact = signingInput + "." + Base64URL.encode(signature);

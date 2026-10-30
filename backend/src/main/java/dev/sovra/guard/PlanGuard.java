@@ -159,7 +159,7 @@ public final class PlanGuard {
   }
 
   private static GuardVerdict checkStanding(TrustedIssuer issuer, GuardInputs inputs) {
-    if (!"ACTIVE".equals(issuer.status())
+    if (issuer.status() != dev.sovra.trust.IssuerStatus.ACTIVE
         || issuer.validFrom() == null
         || issuer.validThrough() == null
         || issuer.validFrom().isAfter(inputs.now())

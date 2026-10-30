@@ -63,6 +63,12 @@ jobs:
     name: Real-browser login/consent/verification
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      SOVRA_AI_LIVE_ENABLED: 'false'
+      SOVRA_AI_API_KEY: ''
+      SOVRA_AI_BASE_URL: ''
+      SOVRA_AI_MODEL: ''
+      SOVRA_PROFILE: synthetic
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

@@ -54,6 +54,30 @@ class ServiceAccountLifecycleTests extends SovraAppRoleBase {
   }
 
   @Test
+  void deniedCreateLeavesDenialEvidence() {
+    TestAccount member = TestAccounts.create(owner, "denied-creator", Set.of("TENANT_MEMBER"));
+    assertThatThrownBy(
+            () ->
+                client
+                    .post()
+                    .uri("/api/auth/service-accounts")
+                    .headers(member.headers())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("name", "nope", "roles", List.of("TENANT_MEMBER")))
+                    .retrieve()
+                    .toBodilessEntity())
+        .isInstanceOf(HttpClientErrorException.Forbidden.class);
+    Map<String, Object> denial =
+        owner.queryForMap(
+            "SELECT decision, reason_code FROM audit_event"
+                + " WHERE tenant_id = ? AND action = 'CREATE_SERVICE_ACCOUNT'"
+                + " ORDER BY occurred_at DESC LIMIT 1",
+            member.tenantId());
+    assertThat(denial.get("decision")).isEqualTo("DENY");
+    assertThat(denial.get("reason_code")).isEqualTo("MISSING_ROLE");
+  }
+
+  @Test
   void createReturnsOneTimeTokenThatAuthenticates() {
     TestAccount admin = TestAccounts.create(owner, "svc-admin", Set.of("TRUST_ADMIN"));
     Map<String, Object> created = create(

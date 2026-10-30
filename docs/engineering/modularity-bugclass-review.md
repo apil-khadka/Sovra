@@ -149,3 +149,125 @@ rest is ordered backlog below.
 Full verification: backend 495/495, frontend build/lint/typecheck
 clean, Playwright 11/11 on the rebuilt compose stack,
 `check_repository.py` green.
+
+## Batch 4 (same day): remaining backlog items
+
+1. **VCI proof verifier moved (item 4).** `verifyVciProof` moved
+   from `IssuanceService` to `openid.VciProofVerifier`, mirroring
+   the `KeyBindingVerifier` shape (static, throws
+   `HolderProofException`, caller maps with messages preserved).
+   The issuance-side guarantee ("no caller reaches encoding
+   without a valid proof") is intact — the call still happens
+   inside validation. `aud` comparison is now constant-time
+   (`nonce` already was). Covered by the existing 54
+   VCI/issuance tests, all green unmodified.
+2. **Structured signer AAD (item 6).** New `AadContext` value type:
+   construction rejects framing-breakers (`;`, `=`, blanks) and
+   parsing refuses duplicate keys instead of last-wins. This kills
+   a real injection shape — issuer ids have no charset
+   restriction, so a crafted id could previously inject a second
+   `issuer=` field. Both encoders build through it; the signer's
+   hand parser is deleted; refusal messages preserved. Pinned by
+   new `AadContextTests` (5 tests).
+3. **Key-status enum (item 3, first domain).** `KeyStatus`
+   (`ACTIVE`/`REVOKED`) with `Role.from`-style fail-fast parsing;
+   `KeyView.status` is now typed (JSON wire unchanged),
+   `IssuerKeys.active` parses instead of string-comparing, and
+   V21 adds the rest-side `CHECK`. Remaining status domains
+   (credential, consent, VP session, quarantine) left as
+   follow-up: their typos fail closed today, and each needs its
+   own wire-compatible pass. Also repointed two missed inline
+   issuer-usability checks to `IssuerKeys.usable`, completing the
+   predicate unification (5 sites, 1 definition).
+4. **Silent denials eliminated (item 1, defects).** New
+   `AuditedAuthorizer.require` (audit package, edge-clean):
+   authorize + mandatory denial record + correctly-mapped throw.
+   Migrated all 9 silent sites (5 service-account operations, 4
+   read-path `enforce()` calls) and deleted the now-unused
+   `enforce()`, so the silent path cannot be reintroduced.
+   `noRollbackFor = ForbiddenException` on the three
+   transactional mutations, mirroring the trust-service
+   precedent. Pinned by denial-evidence assertions in
+   `ServiceAccountLifecycleTests` and `AuthzMatrixTests`.
+   Not reproduced: "services skip the membership check" —
+   `authorize()` centralizes liveness for both credential stores
+   and no bypass exists; the gap was auditing, now closed.
+   Follow-up (not done): migrating the other ~28 already-correct
+   hand-rolled sites to the helper, and the full
+   `DenyingScope`/`ControllerAdvice` rework.
+5. **Frontend queue closed (item 7).** `no-explicit-any` enabled
+   and green; `jose` is unused (WebCrypto direct, already
+   off-main-thread); no external links/downloads to harden.
+
+Full verification: backend 501/501, frontend build/lint/typecheck
+clean, Playwright 11/11 on the rebuilt compose stack,
+`check_repository.py` green. Changes uncommitted pending review.
+
+## Batch 5 (same day): status enums + authz unification
+
+1. **Status enums, all domains (item 3 complete).** Seven closed
+   enums, each mirroring its rest-side `CHECK`, with `Role.from`-
+   style fail-fast parsing: `VpSessionState`, `ConsentState`
+   (stored lifecycle only; derived view states stay display
+   strings), `QuarantineStatus`, `CredentialStatus`,
+   `VaultObjectStatus`, `KekStatus`, `IssuerStatus`. Java
+   comparisons are now `==`; SQL state literals became enum bind
+   parameters (a typo'd literal can no longer silently match zero
+   rows). `TrustedIssuer` is typed too; plan-context JSON maps
+   through a strict `standing()` that throws `MalformedPlan`
+   on unknown text (null stays null and refuses closed).
+   No new migration was needed — every `CHECK` already existed
+   except key status (V21, batch 4).
+2. **Predicate unification finished.** Two more inline
+   issuer-usability copies found during the enum pass (VCI offer
+   trust check, signer registry check) now delegate to
+   `IssuerKeys.usable`: 7 sites, 1 definition.
+3. **Authz migration complete (item 1 complete).** All 24
+   hand-rolled authorize+deny+throw sites now call
+   `AuditedAuthorizer.require` (verified exact-shape before each
+   rewrite; behavior identical — the added `WRONG_TENANT` mapping
+   is unreachable at these sites). No `authz.authorize` call site
+   outside the helper remains except the helper itself.
+4. **No live issues found in passing.** `PlanParser.parseContext`
+   (plan-supplied trust data) is test-fixture-only; production
+   guards build context from snapshots.
+
+Full verification: backend 501/501, Playwright 11/11 on the
+rebuilt compose stack, `check_repository.py` green. Frontend
+unchanged this batch (last green stands). Changes uncommitted
+pending review alongside batch 4.
+
+## 2026-10-30 verification and corrections
+
+A fresh clean Java 25 build passed 496 tests before the new denial regression.
+The historical 501-test totals above are not the current clean baseline.
+
+The authorization helper migration did not by itself guarantee durable denial evidence.
+An HTTP regression against issuer-key registration/revocation reproduced a 403 with no retained denial row because the enclosing transaction rolled back on `ForbiddenException`.
+`AuditService.recordDenial` now owns a separate transaction, so a caller rollback cannot erase its refusal evidence.
+Success audit records still join the business transaction and preserve atomicity.
+`IssuerKeyLifecycleTests.forbiddenKeyMutationsRetainDenialEvidence` checks both denied operations, retained reason/action evidence and absence of a registered key.
+This corrects the earlier claim that helper migration alone completed denial durability.
+
+`AadContext` now validates every direct constructor call as well as the issuance factory.
+Untrusted parsed fields use a separate internal `Parsed` value, preserving the signer's exact missing-field refusal behavior without exposing an encodable invalid context.
+The regression covers direct construction with framing injection and missing required values.
+
+The frontend standalone typecheck now uses `tsc -b` across all project references.
+A temporary intentional application type error passed under the old command and failed under the corrected command; the probe was removed afterward.
+The BFF disables saved API requests, fixing the reproduced post-login JSON landing.
+Browser tests assert direct SPA landing and no longer navigate home to hide it.
+The verification browser cases now include actual signed-POST replay, signature tampering and a different holder key.
+See the [browser assessment](sov-041-browser-e2e.md) for scope and retained results.
+
+Independent denial transactions also required tenant-pin cleanup across transaction suspension.
+A two-connection pool regression reproduced a retained tenant setting after an inner `REQUIRES_NEW` transaction inherited the outer cleanup marker.
+`TenantDataSource` now suspends and restores that marker with its transaction synchronization, so each transaction registers cleanup for its own connection.
+`TenantDataSourceTests.suspendedTransactionsResetBothConnectionPins` checks both raw pooled connections after completion and confirms the resumed outer transaction still sees its intended tenant.
+
+Final clean verification on 2026-10-30: backend `clean verify` passed 498/498 with zero failures/errors/skips; frontend typecheck/build/lint, repository validation and whitespace checks passed.
+The expanded browser suite passed 13/13 before the final image rebuild.
+A later run exposed a test helper view-transition race: filling before React switched views could target the old consent form and leave the verification request ID empty.
+The helper now waits for the verification heading before filling shared fields; final-image results are recorded after retest.
+
+After the view-transition correction, the final rebuilt-image browser run passed 13/13 and all four verification cases passed three repeated runs (12/12).

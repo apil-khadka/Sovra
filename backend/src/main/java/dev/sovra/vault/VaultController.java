@@ -160,7 +160,9 @@ public class VaultController {
         CurrentPrincipal.require();
     vault.deleteVersion(caller, id, version);
     return ResponseEntity.ok(
-        Map.of("objectId", id.toString(), "version", version, "status", "DELETED"));
+        Map.of(
+            "objectId", id.toString(), "version", version, "status",
+            VaultObjectStatus.DELETED.name()));
   }
 
   private static Map<String, Object> versionView(VersionMetadata version) {

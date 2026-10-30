@@ -39,7 +39,10 @@ public class SyntheticStatusService implements StatusEvidenceFetcher {
     if (rows.size() != 1) {
       return new StatusEvidence(Status.UNKNOWN, 0, clock.instant(), MAX_AGE);
     }
-    Status status = "REVOKED".equals(rows.get(0).status()) ? Status.REVOKED : Status.VALID;
+    Status status =
+        CredentialStatus.from(rows.get(0).status()) == CredentialStatus.REVOKED
+            ? Status.REVOKED
+            : Status.VALID;
     return new StatusEvidence(status, rows.get(0).version(), clock.instant(), MAX_AGE);
   }
 }

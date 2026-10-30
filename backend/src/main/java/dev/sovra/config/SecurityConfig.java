@@ -60,6 +60,11 @@ public class SecurityConfig {
       HumanMembershipRepository memberships)
       throws Exception {
     http.securityMatcher("/oauth2/**", "/login/**", "/api/bff/**")
+        // The SPA probes /api/bff/me before login. Saving that 401
+        // would send the browser to raw JSON after the callback.
+        // BFF requests are APIs, not navigable login destinations.
+        .requestCache(cache -> cache.requestCache(
+            new org.springframework.security.web.savedrequest.NullRequestCache()))
         // SPA pattern: the CSRF cookie is readable by script so the
         // frontend can echo it; the session cookie stays HttpOnly.
         // The plain request handler is deliberate: Security 7

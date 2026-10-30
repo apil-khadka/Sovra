@@ -23,7 +23,7 @@ public final class IssuerKeys {
                 + " WHERE issuer_id = ? AND key_id = ? AND key_version = ?",
             (rs, row) -> rs.getString(1),
             issuerId, keyId, keyVersion);
-    if (rows.size() != 1 || !"ACTIVE".equals(rows.get(0))) {
+    if (rows.size() != 1 || KeyStatus.from(rows.get(0)) != KeyStatus.ACTIVE) {
       return false;
     }
     Integer revoked =
@@ -42,7 +42,7 @@ public final class IssuerKeys {
    * can never surface an issuer the verifier would refuse.
    */
   public static boolean usable(TrustService.IssuerView issuer, Instant now) {
-    return "ACTIVE".equals(issuer.status())
+    return issuer.status() == IssuerStatus.ACTIVE
         && issuer.validFrom() != null
         && issuer.validThrough() != null
         && !issuer.validFrom().isAfter(now)

@@ -16,6 +16,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Tenant datasource behavior on a shared pool: context is required, pinned
@@ -38,6 +42,41 @@ class TenantDataSourceTests extends SovraPostgresBase {
     JdbcTemplate tenant = tenantTemplate();
     assertThatThrownBy(() -> tenant.queryForList("SELECT 1"))
         .isInstanceOf(TenantRequiredException.class);
+  }
+
+  @Test
+  void suspendedTransactionsResetBothConnectionPins() throws Exception {
+    HikariDataSource source = (HikariDataSource) appRoleDataSource();
+    try (HikariDataSource pool = new HikariDataSource()) {
+      pool.setJdbcUrl(source.getJdbcUrl());
+      pool.setUsername(source.getUsername());
+      pool.setPassword(source.getPassword());
+      pool.setMaximumPoolSize(2);
+      JdbcTemplate tenant = new JdbcTemplate(new TenantDataSource(pool));
+      var manager = new DataSourceTransactionManager(pool);
+      var outer = new TransactionTemplate(manager);
+      var inner = new TransactionTemplate(manager);
+      inner.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+      UUID tenantId = UUID.randomUUID();
+      TenantContext.set(new ServiceAccountPrincipal(UUID.randomUUID(), tenantId, "nested", Set.of()));
+      outer.executeWithoutResult(status -> {
+        tenant.queryForObject("SELECT 1", Integer.class);
+        inner.executeWithoutResult(nested -> tenant.queryForObject("SELECT 1", Integer.class));
+        assertThat(tenant.queryForObject("SELECT current_setting('app.tenant')", String.class))
+            .isEqualTo(tenantId.toString());
+      });
+      // Hold both borrows at once, so both physical connections are inspected.
+      try (var first = pool.getConnection(); var second = pool.getConnection()) {
+        for (var connection : List.of(first, second)) {
+          try (var statement = connection.createStatement();
+              var result = statement.executeQuery(
+                  "SELECT NULLIF(current_setting('app.tenant', true), '') IS NULL")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getBoolean(1)).as("tenant pin reset before pool reuse").isTrue();
+          }
+        }
+      }
+    }
   }
 
   @Test

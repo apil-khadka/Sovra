@@ -4,6 +4,7 @@ import dev.sovra.guard.GuardPolicies;
 import dev.sovra.guard.Recommendation;
 import dev.sovra.issuance.SyntheticJwtEncoder;
 import dev.sovra.planning.BaselinePlanner;
+import dev.sovra.trust.IssuerStatus;
 import dev.sovra.trust.TrustService;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -147,7 +148,7 @@ public class CanaryService {
               jwk,
               now.minusSeconds(60),
               now.plusSeconds(3600),
-              "ACTIVE");
+              IssuerStatus.ACTIVE);
       var policy =
           new TrustService.PolicyView(
               "canary-rp", "canary", List.of(SyntheticJwtEncoder.ADULT_VCT), "low");

@@ -236,11 +236,7 @@ export async function loginAs(page: Page, baseURL: string, creds: Credentials): 
   await page.locator('#username').fill(creds.username)
   await page.locator('#password').fill(creds.password)
   await page.locator('#kc-login').click()
-  // The callback lands on the saved request (/api/bff/me?continue);
-  // same origin and a live session are the assertions — the human
-  // demo then returns to /.
-  await page.waitForURL((url) => url.href.startsWith(baseURL), { timeout: 20_000 })
-  await page.goto('/')
+  await page.waitForURL(`${baseURL}/`, { timeout: 20_000 })
   await page.getByRole('button', { name: 'Log out' }).waitFor({ timeout: 10_000 })
 }
 

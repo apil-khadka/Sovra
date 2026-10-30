@@ -1,157 +1,106 @@
 # Implementation status and continuation guide
 
-**Reviewed:** 2026-10-29.
-**Scope:** zero-new-payment public demo with synthetic identities/documents only.
-This is a source/evidence reconciliation, not an independent security assessment or authorization to publish.
-Use this guide before the [business plan](implementation-plan.md) and [task backlog](implementation-backlog.md); their production requirements still apply to later real-data work.
+**Reviewed:** 2026-10-30.
+**Scope:** public demo with synthetic identities/documents only and no new paid services.
+Passing synthetic checks does not authorize publication, real identity-data use or production claims.
+Use this guide with the [implementation plan](implementation-plan.md), [task registry](implementation-tasks.json) and dated assessments.
 
 ## Current implementation
 
-The Java backend now contains authorization/audit/trust, issuance/status, consent, durable verification, deterministic guard, bounded fixture/live planning, semantic readiness, Keycloak/BFF login, software-key vault and isolated image quarantine.
-React contains demo, consent and verification views; it is not the complete issuer/holder/RP/developer dashboard product.
-The implemented contract is 0.6.0 in [implemented-api.openapi.yaml](implemented-api.openapi.yaml); the other API documents contain target or historical contracts.
-These implementations are synthetic/demo foundations rather than completed production tasks.
+The Java backend implements authorization, audit, governed trust, issuance/status, consent, durable verification, deterministic planning guards, fixture/live planning adapters, semantic readiness, Keycloak/BFF sessions, a software-key vault and isolated image quarantine.
+The implemented API contract is [0.9.0](implemented-api.openapi.yaml).
+React provides demo, consent and verification screens rather than the complete issuer/holder/RP/developer dashboard product.
+The container build packages React assets into Spring, so SPA, BFF, callback and logout share one application origin.
+Node/pnpm run only during asset building and development.
 
-Retained local Surefire XML contains 385 tests with zero failures/errors/skips across 60 report files.
-Those are existing reports, not a fresh backend run for this review; stale/orphaned report files are possible and a clean `verify` result governs the next release candidate.
-Frontend build and lint were rerun successfully on 2026-10-29.
-The dated [browser assessment](sov-041-holder-browser-assessment.md), [vault assessment](sov-016-vault-assessment.md), [quarantine assessment](sov-017-quarantine-assessment.md) and [authority assessment](sov-040-hardening-assessment.md) describe narrower implementation evidence and remaining gaps.
-All 41 GitHub issues were observed open; task implementation progress is now recorded separately from maintainer triage and issue closure.
+The repository-owned Playwright suite exercises DOM/JS login, consent and native synthetic verification against the packaged application.
+The BFF does not cache API requests for replay after login; successful login returns to the SPA root without a manual navigation workaround.
+See [browser evidence](sov-041-browser-e2e.md) and [packaging](sov-041-same-origin-packaging.md).
 
-The current working tree also contains uncommitted live-planner/tool/prompt/config changes, `.env.example` and `scripts/smoke-live-planning.py`.
-Preserve and review that work before adding unrelated implementation changes.
-The [live integration record](../ai/live-integration.md) reports a successful Baseten grant smoke on 2026-10-29; this review made no live provider requests and did not inspect secret values.
-Endpoint/model availability is no longer the missing OD-02 item: spend/credit enforcement, processing/retention terms and complete frozen live-evaluation evidence still need verification.
-Do not ask for a provider choice or a fresh API key merely to resume local work.
+The protocol implementation includes SD-JWT artifacts and `kb+jwt`, synthetic OpenID4VCI grants, signed OpenID4VP requests, DCQL and encrypted `direct_post.jwt` responses.
+Separate JOSE wallet fixtures and backend adversarial suites exercise those adapters.
+External wallet/conformance evidence and the complete selected-profile browser journey remain open; see [SOV-036](sov-036-protocol-assessment.md).
+The current React verifier signs the native synthetic binding, so changing `SOVRA_PROFILE` alone does not qualify the browser journey for SD-JWT.
 
-## What blocks the public demo
+Vault and quarantine service entry points reject caller ingestion when `SOVRA_DEMO_SYNTHETIC_ONLY=true`.
+The public-demo Compose overlay forces this boundary and disables live planning on both application instances.
+This overlay is a restriction layer, not a provisioned or reviewed public hosting environment.
 
-1. The browser starts on the Vite origin while OIDC callbacks/landing target backend ports; the production-like same-origin SPA path is not packaged yet.
-2. No repository-owned real-browser DOM/JS suite proves login, consent and verification; the existing Python scripts exercise HTTP, not browser behavior.
-3. SD-JWT artifact handling exists, but `kb+jwt`, OpenID4VCI issuance, OpenID4VP/DCQL request/response transport and independent interoperability/conformance evidence remain open under SOV-036.
-4. The local Compose stack exposes development services and known fixture credentials; it is not a reviewed public hosting configuration.
-5. The UI has no upload form, but authenticated vault/quarantine APIs accept caller-supplied bytes; UI omission alone does not enforce synthetic-only public inputs.
-6. No actual no-charge public host/capacity, HTTPS origin, provider hard spend enforcement or complete release-evidence pack has been established by this review.
+The security remediation includes BFF/machine filter isolation, shared P-256 primitives, closed roles/statuses, independently durable denial audits, transaction-safe tenant-pin cleanup, stable human quorum identities, tenant binding, platform audit scope and durable VP replay.
+Signer contexts separate validated encodable values from untrusted parsed fields.
+See the dated [modularity review](modularity-bugclass-review.md) for implementation history.
 
-SOV-036 and SOV-041 stay open.
-An artifact-layer demonstration can be labelled accurately during development, but it does not close the selected full-profile acceptance requirements.
-Production KMS/HSM, an external assessor and sovereign-region procurement are not prerequisites for the synthetic implementation steps below.
+Planner implementation was committed before this review; preserve any current local changes based on `git status`, not an old handoff's file list.
+A successful grant smoke is technical evidence, not proof of no-overage behavior, approved retention terms or complete live evaluation.
+No cumulative usage ledger currently enforces an aggregate budget across application instances.
+Use the [live integration record](../ai/live-integration.md) for the remaining evidence and operating rules.
 
-## Work in this order
+## Verification baseline
 
-### 1. Preserve the current planner work and establish an offline baseline
+The clean 2026-10-30 Java 25 build passed 498 tests with zero failures/errors/skips, including durable-denial and nested tenant-pin regressions.
+An earlier 501-test report does not match that clean baseline; do not reuse retained report totals as new evidence.
+Frontend typecheck/build/lint and repository checks passed.
+The expanded Playwright suite passed 13/13, including tampering, wrong-holder and signed-POST replay checks.
+Subsequent change-specific results belong in their dated assessments and must state the actual command, profile and deployment scope.
+No live provider call is needed for the offline checks.
 
-Review the existing dirty diff, including `PlanningProperties`, `PlanningTools`, `PlanningPrompts`, their bounds tests, Compose wiring and the new smoke script.
-Ensure `.env` stays ignored and only empty credential placeholders enter `.env.example`.
-Use fixture mode for ordinary development/CI; do not run the live smoke automatically or leave a public endpoint armed against unverified credit limits.
-The last handoff reported live mode armed; inspect only sanitized planner status before relying on that state, and explicitly disarm the controlled deployment when live execution is not intended.
-Changing a shell override once does not change the persistent secret configuration for the next Compose run.
-Review and commit the implementation baseline separately from follow-up features when the existing commit/push authorization applies.
-
-Run the offline checks below and retain the actual commands, artifact/commit, effective profile and outcomes rather than copying a historical test count.
-Do not print credentials, resolve Compose configuration containing secret values into logs, or upload provider responses containing sensitive material.
-
-### 2. Package one browser origin (SOV-006/024/027/041)
-
-Use Spring to serve the built React assets for the demo, keeping Node/pnpm in the asset-build stage only.
-Use one browser-facing origin for SPA, BFF cookies, authorization callback and logout; Keycloak remains its own explicitly trusted issuer/origin.
-Keep both backend instances behind that entry point for multi-instance tests.
-Choose shared/persistent session behavior or explicit affinity with tested restart/logout semantics; do not assume a cookie alone makes backend sessions portable.
-Configure exact Keycloak redirect/logout URIs and HTTPS behavior for the deployment profile; keep loopback allowances confined to local development.
-Implement asset/history fallback without swallowing `/api`, `/oauth2`, `/login`, error dispatch or unauthorized responses.
-Update the container build context/asset packaging, Compose fixture origins and documented startup command together.
-
-Acceptance: a fresh checkout loads the built SPA, logs in, returns to the same application origin, retains the intended BFF session and logs out without manually returning from port 8080 to 5173.
-
-### 3. Add real-browser evidence (SOV-041, issue 45)
-
-Add a maintained, pinned repository-owned browser automation harness and a CI job using disposable synthetic services.
-Drive actual DOM/JS login, consent review, approval/refusal, verification and logout through the packaged origin.
-Exercise CSRF, unauthenticated access, password-only privileged login, expired/changed consent, wrong holder/audience, tampering and replay.
-Use the holder/browser proof path rather than replacing it with Python-generated proofs, direct database approval or fabricated authenticated principals.
-Retain the two-instance PostgreSQL HTTP concurrency/restart suites alongside the browser suite; those tests cover different boundaries.
-Record synthetic and SD-JWT artifact-profile evidence separately.
-Do not close SOV-041 until the actual browser and selected-profile criteria are met, including the protocol work below.
-
-### 4. Complete the selected protocol profile (SOV-036, issue 40)
-
-Follow [SOV-001 v0.4](../architecture/decisions/SOV-001-proof-profile.md), especially the explicit deviations in section 11.4.
-Finish strong artifact origin/digest/provenance pinning and the unexercised protocol-module dependency/support review.
-Implement the frozen OpenID4VCI flow and OpenID4VP signed requests, DCQL and encrypted `direct_post.jwt` response transport using the qualified maintained library interfaces.
-Replace the custom `sovra-presentation/v1` binding with the selected `kb+jwt`/`sd_hash`/audience/nonce semantics in that protocol path.
-Preserve current policy, consent, trust/status freshness, atomic replay, audit, idempotency and cross-profile rejection gates through the adapters.
-Use independent wallet/issuer/verifier fixtures and applicable conformance suites, including malformed disclosures, downgrade, encrypted-response and replay failures.
-Re-run HTTP and real-browser evidence after integration; only then reconcile full SOV-036/041 acceptance and claims.
-If a selected module cannot meet the profile, document the exact incompatibility and qualify an alternative rather than inventing protocol code or silently weakening the requirement.
-
-### 5. Qualify the live planner within the grant (SOV-013/035, OD-02)
-
-Retain the successful smoke as technical evidence, not proof that billing is capped or provider retention terms are approved.
-Verify the actual grant expiry, hard no-overage/no-auto-charge behavior, allowed model, rate limits and relevant processing/retention terms without posting credentials or private account screenshots publicly.
-Add application-level admission/rate/concurrency and cumulative usage controls across both instances; per-call token limits and spend alerts are not a total spend cap.
-Default public operation to fixture/unavailable mode until the no-charge boundary is evidenced; label fixture results and never silently substitute them for a failed live request.
-Run any further live evaluation only within the verified existing no-charge authorization and a bounded call/token budget.
-Complete the frozen baseline-versus-live corpus, unseen/incompatible-schema and citation/injection cases with failures, versions, usage and latency retained.
-Smoke success alone does not complete the full evaluation or grant permission to exceed credits.
-Update OD-02 status by evidence component; no new paid account, hardware or provider subscription is authorized.
-
-### 6. Enforce the public-demo boundary and qualify hosting (SOV-027/028/030/035)
-
-Create a separate public-demo deployment profile instead of publishing the local Compose defaults.
-Use only existing/verified no-charge capacity, an approved HTTPS origin and actual charge-prevention controls; record capacity/expiry limits and a rollback/stop procedure.
-Keep database, migration runner, Keycloak administration and internal worker interfaces private, rotate deployment credentials and remove schema-owner credentials from serving containers.
-Restrict demo accounts/roles, disable unrestricted enrollment and avoid real-person identity fields.
-Deny arbitrary vault/quarantine ingestion on every externally reachable path, including authenticated demo callers and alternate origins; permit only server-selected synthetic fixtures where the demo needs images.
-Test that valid-looking caller-uploaded image bytes are rejected by the public profile even though local synthetic API tests can use them.
-Keep production issuer connectivity and production credential authority unavailable; explicitly label software fixture keys and profile limitations.
-Protect actual visitor/session metadata, apply abuse/resource/egress bounds and prove no diagnostics expose secrets or source content.
-Retest liveness versus semantic readiness, public origin/cookies, all reachable endpoints and image/profile admission through the actual deployment configuration.
-Add provenance/SBOM/secret/dependency checks, digest-pinned release inputs and a complete sanitized evidence pack before claiming public-release readiness.
-Reconcile the dated Java baseline with actual local and container JDK builds: the inspected Dockerfile still pins Temurin `25.0.4.1_1` while newer candidates appear in the baseline notes.
-Verify supported patch/image availability and effective dependency/plugin versions during release qualification; do not describe a proposed version as the installed or scanned artifact.
-No host has been selected or provisioned by this documentation review.
-
-## Work after the demo foundations
-
-SOV-018/019 implement local extraction, protected exact-byte/normalized digests, immutable revisions and reviewer/source-claim eligibility; these modules are not present yet.
-Their synthetic implementation can follow the existing vault/quarantine seams without waiting for production HSM procurement, and must not turn OCR/job success into identity approval.
-SOV-020 adds real holder custody/recovery behavior; current demo signing/proof helpers do not satisfy that lifecycle.
-SOV-021/022 add supported SDKs, developer portal, sandbox and onboarding; frontend fetch helpers are not released SDKs.
-SOV-023 through SOV-026 add role dashboards; the current demo/consent/verify pages provide only a subset of the holder experience.
-Vault retirement/rewrap/purge, BFF image grants, quarantine scanning/review depth and operational worker scaling remain tracked in their assessments.
-Plan broader product features after the public-demo origin/browser/protocol/admission work, retaining all existing acceptance criteria.
-
-SOV-037/038/039, production portions of SOV-006/016/017/027/028/030/031, and full SOV-032/033/034 assurance remain gates before real identity-data use or production claims.
-Independent reviewers, actual sovereign locations and production key-provider access are still unappointed/unqualified; do not fabricate those approvals or make them blockers for labelled synthetic work.
-
-## Offline verification and evidence rules
-
-Run from the repository root using the project's existing Java 25 setup and installed validation dependencies:
+Use the installed Java 25 toolchain explicitly when the system default is older:
 
 ```sh
+export JAVA_HOME="$HOME/.sdkman/candidates/java/25.0.2-tem"
+export PATH="$JAVA_HOME/bin:$PATH"
 (cd backend && ./mvnw clean verify)
 pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend run typecheck
 pnpm --dir frontend run build
 pnpm --dir frontend run lint
 python3 scripts/check_repository.py
 git diff --check
 ```
 
-The clean backend run removes ambiguity from retained report counts; it is an instruction for the next implementation baseline, not a run performed by this review.
-Inspect `.env` arming flags privately and explicitly force fixture mode in controlled synthetic Compose configurations before any suite that rebuilds/restarts the stack.
-Never run `docker compose config` into shared logs when secrets are populated.
+`typecheck` uses TypeScript build mode to check all referenced application, tooling and E2E projects.
+The SDKMAN path above is the observed local installation, not a declaration of the current release-qualified Java patch.
+Reconcile local, CI and container patch levels during release qualification.
 
-Use `scripts/e2e-issuance.py`, `scripts/e2e-verification.py`, `scripts/e2e-bff-login.py`, `scripts/e2e-vault.py`, `scripts/e2e-quarantine.py` and `scripts/smoke-two-instance.sh` only with disposable synthetic data and their documented prerequisites.
-Several scripts rebuild/restart services, and `e2e-verification.py` ends with `docker compose down -v`; never point them at a shared or valuable database.
-Qualify an isolated Compose project plus supported container/origin overrides before running suites beside an existing demo stack; do not assume every script supports the same overrides.
-Repeat verification in both artifact profiles after protocol/security changes and retain the result profile labels.
-The real-browser harness exists since 2026-10-29: run `pnpm --dir frontend run test:e2e` with the compose stack up (one-time `pnpm --dir frontend exec playwright install chromium`); CI evidence comes from the `browser-e2e` job in `.github/workflows/app-checks.yml`. Scope and observed behavior are recorded in [sov-041-browser-e2e.md](sov-041-browser-e2e.md).
-`scripts/smoke-live-planning.py` is an explicitly credit-consuming procedure and is excluded from the offline/default CI list.
+For the browser suite, use a disposable local synthetic stack with live planning explicitly disabled:
 
-## Instruction for the next implementation agent
+```sh
+SOVRA_AI_LIVE_ENABLED=false SOVRA_AI_API_KEY='' SOVRA_AI_BASE_URL='' SOVRA_AI_MODEL='' docker compose up --build -d
+pnpm --dir frontend exec playwright install chromium
+pnpm --dir frontend run test:e2e
+```
 
-Read this guide, the task's acceptance criteria and the relevant current API/decision record.
-Preserve the existing dirty planner diff and do not reopen the already chosen Keycloak, synthetic-only or zero-new-payment decisions.
-First establish the fixture-only baseline, then implement same-origin packaged SPA delivery and real-browser E2E; complete protocol qualification, budget enforcement and public-profile admission before publication.
-Keep the registry/backlog progress, API contract, versioned proof deviations and dated assessments consistent with actual evidence.
-Commit/push only the authorized reviewed changes, exclude `.intel` and secrets, and keep SOV-036/041 open until their complete criteria pass.
+Do not print populated `.env` values or resolved Compose configuration into shared logs.
+A shell override controls this invocation; it does not change the persistent configuration for future runs.
+The browser setup creates synthetic machine-account and journey data in the selected database.
+Use disposable data and do not run destructive HTTP harnesses against a shared or valuable database.
+In particular, `scripts/e2e-verification.py` ends with `docker compose down -v`.
+The HTTP suites also rebuild/restart services, so qualify isolation, ports, origins and container overrides before running beside another stack.
+
+## Next implementation priorities
+
+1. Preserve and review the complete working tree, including untracked Java classes and migrations.
+   Keep the continuation records consistent with implemented behavior and fresh evidence.
+   Exclude `.intel` and secrets before any authorized commit or push.
+2. Complete SOV-036/041 selected-profile browser evidence.
+   Add the holder's VCI issuance and encrypted VP journey while preserving consent, trust/status freshness, RLS, audit and durable replay.
+   The native React verifier still needs the selected profile's binding and artifact-delivery path.
+   Add browser-visible tampering, expiry and wrong-holder/audience failures alongside the existing HTTP concurrency/restart tests.
+   Qualify external wallet/conformance compatibility and record exact library adoption or incompatibilities.
+   Keep SOV-036/041 open until their complete criteria pass.
+3. Qualify the actual public synthetic deployment before publication.
+   Establish the approved HTTPS origin, exact OIDC redirect/logout configuration, restricted accounts, private administration, rotated credentials, resource limits, rollback and sanitized release evidence.
+   Verify artifact digests/provenance and effective dependency/JDK versions for the built artifact.
+   Keep production issuer authority and real identity-data ingestion unavailable.
+4. Before exposing live metered planning, verify grant expiry, hard no-overage/no-auto-charge enforcement, model limits and processing/retention terms.
+   Implement shared admission, concurrency and cumulative usage reservations across both instances.
+   Per-request token limits and spend alerts do not constitute an aggregate cap.
+   Complete the frozen baseline/live evaluation only within a verified no-charge call/token budget.
+5. Build SOV-018 extraction/provenance and SOV-019 enrollment review as the next product vertical slice.
+   Bind protected exact-byte/normalized digests and immutable extraction revisions to source versions, corrections and reviewer eligibility.
+   Require eligible approved claims at issuance; OCR/job completion must never confer identity approval.
+   Follow with holder custody/recovery, SDKs, portals and role dashboards.
+
+Production KMS/HSM, sovereign deployment qualification and independent assessment remain real-data gates.
+They do not prevent continued labelled synthetic implementation.
+Do not fabricate assessor approvals, provider terms, host capacity or completed external interoperability evidence.

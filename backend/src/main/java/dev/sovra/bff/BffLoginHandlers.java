@@ -13,8 +13,8 @@ import org.springframework.security.web.authentication.SavedRequestAwareAuthenti
 
 /**
  * Login landing: provisions membership, pins the session to the
- * membership id, holds tokens server-side, then replays the saved
- * same-origin request (or the frontend root). Denials redirect with
+ * membership id, holds tokens server-side, then returns to the
+ * frontend root (the BFF does not cache API requests). Denials redirect with
  * the audit-safe reason; nothing secret-bearing ever lands in the
  * URL.
  */

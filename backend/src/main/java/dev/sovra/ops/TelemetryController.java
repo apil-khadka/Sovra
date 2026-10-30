@@ -1,5 +1,7 @@
 package dev.sovra.ops;
 
+import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.ForbiddenException;
@@ -25,12 +27,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class TelemetryController {
 
   private final AuthorizationService authz;
+  private final AuditService audit;
   private final TelemetryService telemetry;
   private final CanaryService canary;
 
   public TelemetryController(
-      AuthorizationService authz, TelemetryService telemetry, CanaryService canary) {
+      AuthorizationService authz,
+      AuditService audit,
+      TelemetryService telemetry,
+      CanaryService canary) {
     this.authz = authz;
+    this.audit = audit;
     this.telemetry = telemetry;
     this.canary = canary;
   }
@@ -39,8 +46,10 @@ public class TelemetryController {
   public ResponseEntity<TelemetrySummary> summary() {
     var caller = CurrentPrincipal.get();
     var principal = caller.orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
-    authz.enforce(
-        caller,
+    AuditedAuthorizer.require(
+        authz,
+        audit,
+        principal,
         Action.READ_TELEMETRY,
         ResourceRef.tenantScoped("ops", "telemetry", principal.tenantId()));
     return ResponseEntity.ok(
@@ -52,8 +61,10 @@ public class TelemetryController {
   public ResponseEntity<CanaryService.CanaryReport> canary() {
     var caller = CurrentPrincipal.get();
     var principal = caller.orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
-    authz.enforce(
-        caller,
+    AuditedAuthorizer.require(
+        authz,
+        audit,
+        principal,
         Action.RUN_CANARY,
         ResourceRef.tenantScoped("ops", "canary", principal.tenantId()));
     return ResponseEntity.ok(canary.run());

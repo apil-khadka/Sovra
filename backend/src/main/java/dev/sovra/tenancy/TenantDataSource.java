@@ -130,6 +130,18 @@ public class TenantDataSource extends DelegatingDataSource {
     }
 
     @Override
+    public void suspend() {
+      // REQUIRES_NEW must register cleanup for its own connection,
+      // rather than inheriting the suspended transaction's marker.
+      TransactionSynchronizationManager.unbindResource(PIN_KEY);
+    }
+
+    @Override
+    public void resume() {
+      TransactionSynchronizationManager.bindResource(PIN_KEY, Boolean.TRUE);
+    }
+
+    @Override
     public void afterCompletion(int status) {
       TransactionSynchronizationManager.unbindResourceIfPossible(PIN_KEY);
       try {

@@ -1,78 +1,61 @@
-# SOV-041 real-browser E2E decision (G1 synthetic)
+# SOV-041 real-browser E2E evidence
 
-Date: 2026-10-29. Status: implemented. This records the browser
-automation harness that the [continuation
-guide](continuation-guide.md) step 3 asked for. It does not close
-SOV-041: the selected protocol profile (SOV-036) and its
-full-profile browser evidence are still outstanding.
+**Updated:** 2026-10-30.
+**Scope:** packaged native synthetic journey, not full selected-profile acceptance.
+SOV-041 remains open for the complete SD-JWT/OpenID browser flow and its other acceptance requirements.
 
 ## Harness
 
-Playwright Test, pinned exact in `frontend/package.json`
-(`@playwright/test`), Chromium only, specs in `frontend/e2e/`.
-No separate web driver and no `/etc/hosts` edit: the Playwright
-config maps `sovra-keycloak` to loopback with
-`--host-resolver-rules`, so the real browser reaches the real
-Keycloak hostname exactly as a demo machine would with the
-documented hosts line. CI runs the same suite in the `browser-e2e`
-job of `.github/workflows/app-checks.yml` against a disposable
-compose stack (`docker compose up --build -d`, torn down with
-`down -v` afterwards).
+Playwright Test is pinned exactly in `frontend/package.json`.
+Chromium runs specs in `frontend/e2e/` against the packaged Spring origin.
+The browser resolves `sovra-keycloak` to loopback through `--host-resolver-rules`, avoiding a host-file edit.
+CI uses the `browser-e2e` job in `.github/workflows/app-checks.yml` with explicit synthetic profile and live-provider access disabled.
+The CI stack is disposable and is removed with its volumes afterward.
 
 ```sh
-docker compose up --build -d
+SOVRA_AI_LIVE_ENABLED=false SOVRA_AI_API_KEY='' SOVRA_AI_BASE_URL='' SOVRA_AI_MODEL='' docker compose up --build -d
 pnpm --dir frontend install --frozen-lockfile
 pnpm --dir frontend exec playwright install chromium
 pnpm --dir frontend run test:e2e
 ```
 
-Global setup fails fast unless the packaged origin reports READY,
-then mints one disposable machine account in `sovra-demo` for the
-server-side actors (issuer minting, RP request creation) via the
-same `docker exec` psql path as `scripts/e2e-verification.py`.
-Every holder proof — consent decision, binding proof — is produced
-by WebCrypto inside the page through the real React UI: the holder
-key is generated in the browser, exported through the real
-clipboard button, and issuance binds that same thumbprint.
+Setup waits for semantic readiness and creates a disposable machine account for issuer/RP setup calls.
+Holder keys are generated in the page and exported through the real clipboard control.
+Consent and verification proofs are signed with WebCrypto in the page through the application UI.
+Issuer-side setup signing uses Node crypto and is not a browser VCI issuance flow.
 
-## Scope
+## Covered behavior
 
-Eleven tests across login, consent, and verification:
+- Keycloak login asserts S256 PKCE, lands directly on the SPA root, shows the session roles, logs out of both the application and provider, and requires a fresh provider form afterward.
+- Password-only privileged login withholds `TRUST_ADMIN`; wrong credentials and anonymous/machine-token BFF reads fail closed.
+- Consent review displays the exact relying party, audience, purpose, claims, plan hash, challenge and holder binding before approval or denial.
+- Denial produces no presentation; a wrong holder disables approval; a missing CSRF echo is rejected while the UI echo succeeds.
+- A browser-signed native binding verifies to ACCEPTED and the stored decision is read back.
+- Repeating the exact signed verification POST through the browser session returns the same decision.
+- Wrong audience, a changed signature byte and a different holder key reject without acceptance.
 
-- Member login through the real Keycloak form (PKCE S256
-  asserted), session roles shown, logout back to the same origin
-  with no session left, and a fresh login proving the provider SSO
-  session died too.
-- Password-only privileged login withholds `TRUST_ADMIN`; wrong
-  password shows the Keycloak error and creates no session;
-  anonymous and machine-token BFF reads are rejected.
-- Holder reviews the exact bound relying party, audience, purpose,
-  claims, plan hash, challenge, and holder thumbprint, then
-  approves (WebCrypto-signed) or denies; denial leaves no
-  presentation behind.
-- A non-matching holder key disables approval in the UI; a
-  decision POST without the CSRF echo is rejected while the UI
-  echo succeeds; anonymous consent reads fail closed.
-- The imported holder key, a fresh UI nonce, and the consented
-  audience verify to ACCEPTED with the stored decision re-read
-  identically; a mismatched audience rejects.
+## Login regression and correction
 
-## Explicit non-scope
+The previous suite navigated manually to `/` after the callback.
+Removing that workaround reproduced a landing on `/api/bff/me?continue`, displaying raw JSON instead of the application.
+Spring had cached the SPA's anonymous session probe as a saved request.
+The BFF now uses `NullRequestCache`, so API calls cannot become login destinations.
+Both the login regression and shared journey helper require direct landing at the SPA root.
 
-Expiry waits, proof tampering, concurrent replay, kill/restart
-recovery, and the wrong-issuer/revoked-credential matrix stay with
-the two-instance HTTP suites (`scripts/e2e-verification.py`,
-`scripts/e2e-bff-login.py`) and the backend unit tests, which cover
-different boundaries and remain green alongside this suite.
-Consent-request expiry bounds are asserted in
-`ConsentNegativeTests`/`VerificationNegativeTests`, not by waiting
-out a lifetime in the browser.
+## Limits
 
-## Observed behavior
+The current React verifier uses the native synthetic binding, not `kb+jwt` or encrypted OpenID4VP transport.
+The consent presentation endpoint returns the synthetic consent artifact, not an SD-JWT holder-custody interface.
+Backend protocol tests and independent JOSE fixtures exercise different boundaries and do not substitute for this missing browser flow.
+Expiry, cross-instance races, restart recovery and the issuer/revocation matrix remain covered by backend and HTTP suites.
+External wallet/conformance evidence remains open under [SOV-036](sov-036-protocol-assessment.md).
 
-After the Keycloak callback the browser lands on the saved request
-(`http://localhost:8080/api/bff/me?continue`) rather than `/`:
-same origin, live session, but raw JSON until the user returns to
-`/`. The suite asserts the origin and session, then navigates to
-`/` like the human demo. Changing the landing target is a UX
-decision left untouched by this stage.
+## Verification
+
+The rebuilt local stack passed the original 11-test suite on 2026-10-30 after the login correction, with no manual navigation after the callback.
+The expanded `pnpm --dir frontend run test:e2e` suite passed 13/13 on 2026-10-30, including signed-POST replay, signature tampering and wrong-holder rejection.
+The two new rejection cases also passed six repeated executions after a local stack restart.
+Earlier attempts included a local stack outage, browser timeouts and a view-transition race in the verification test helper.
+The helper now waits for the verification heading before filling fields shared with the consent screen.
+Failed attempts are not counted as passing evidence.
+The local checks do not establish hosted CI or public-deployment results.

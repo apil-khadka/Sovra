@@ -65,6 +65,28 @@ class IssuerKeyLifecycleTests extends SovraAppRoleBase {
     return tag + "-" + UUID.randomUUID().toString().substring(0, 8);
   }
 
+  @Test
+  void forbiddenKeyMutationsRetainDenialEvidence() throws Exception {
+    TestAccount member = TestAccounts.create(owner, "key-denied", Set.of("TENANT_MEMBER"));
+    var holder = IssuanceFixtures.generateHolder(mapper);
+    String key = keyId("denied");
+    assertThatThrownBy(() -> register(member,
+        registerBody(ROT_ISSUER, key, 1, mapper.convertValue(holder.jwk(), Map.class))))
+        .isInstanceOf(HttpClientErrorException.Forbidden.class);
+    assertThatThrownBy(() -> revoke(member, revokeBody(ROT_ISSUER, key, 1, "denied")))
+        .isInstanceOf(HttpClientErrorException.Forbidden.class);
+    for (String action : List.of("REGISTER_ISSUER_KEY", "REVOKE_ISSUER_KEY")) {
+      Integer count = owner.queryForObject(
+          "SELECT count(*) FROM audit_event WHERE actor_id = ? AND action = ?"
+              + " AND decision = 'DENY' AND reason_code = 'MISSING_ROLE'",
+          Integer.class, member.accountId().toString(), action);
+      assertThat(count).as("durable denial for %s", action).isEqualTo(1);
+    }
+    assertThat(owner.queryForObject(
+        "SELECT count(*) FROM issuer_signing_key WHERE issuer_id = ? AND key_id = ?",
+        Integer.class, ROT_ISSUER, key)).isZero();
+  }
+
   @SuppressWarnings("unchecked")
   private Map<String, Object> register(TestAccount admin, Map<String, Object> body) {
     return client

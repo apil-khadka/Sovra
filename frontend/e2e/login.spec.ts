@@ -18,7 +18,7 @@ test('member login lands with a session and logs out through the provider', asyn
   await page.locator('#password').fill(MEMBER.password)
   await page.locator('#kc-login').click()
   await page.waitForURL((url) => url.href.startsWith(base), { timeout: 20_000 })
-  await page.goto('/')
+  await expect(page).toHaveURL(`${base}/`)
   const bar = page.locator('.auth-bar')
   await expect(bar).toContainText('demo-member')
   await expect(bar).toContainText('TENANT_MEMBER')

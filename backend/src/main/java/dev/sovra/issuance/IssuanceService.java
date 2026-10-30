@@ -1,7 +1,7 @@
 package dev.sovra.issuance;
 
-import com.nimbusds.jose.util.Base64URL;
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -11,6 +11,7 @@ import dev.sovra.authz.ResourceRef;
 import dev.sovra.crypto.HolderProofException;
 import dev.sovra.crypto.HolderProofs;
 import dev.sovra.crypto.P256;
+import dev.sovra.openid.VciProofVerifier;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.trust.IssuerKeyService;
 import dev.sovra.trust.TrustSnapshotProvider;
@@ -159,12 +160,8 @@ public class IssuanceService {
       String vciNonce, Action authority) {
     ResourceRef resource =
         ResourceRef.tenantScoped("credential", "issuance", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), authority, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, authority, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        authority, resource);
     if (idempotencyKey == null || !idempotencyKey.matches("[A-Za-z0-9_-]{1,128}")) {
       throw new InvalidIssuanceException("idempotency key is malformed");
     }
@@ -303,7 +300,7 @@ public class IssuanceService {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("credentialId", credentialId.toString());
     body.put("artifact", artifact);
-    body.put("status", "VALID");
+    body.put("status", CredentialStatus.VALID.name());
     body.put("expiresAt", expiresAt.toString());
     body.put("trustSnapshot", snapshot);
     try {
@@ -361,7 +358,12 @@ public class IssuanceService {
     String thumbprint =
         P256.thumbprint(holderKey.getW().getAffineX(), holderKey.getW().getAffineY());
     if (vciNonce != null) {
-      verifyVciProof(holderKey, request, vciNonce, now);
+      try {
+        VciProofVerifier.verify(
+            request.holderProof(), holderKey, request.issuerId(), vciNonce, now, mapper);
+      } catch (HolderProofException e) {
+        throw new InvalidIssuanceException(e.getMessage());
+      }
     } else {
       verifyProof(
           holderKey, request.holderProof(), proofMessage(idempotencyKey, request, thumbprint));
@@ -400,66 +402,6 @@ public class IssuanceService {
     }
   }
 
-  /**
-   * OpenID4VCI {@code jwt} proof (SOV-036): ES256, {@code typ}
-   * {@code openid4vci-proof+jwt}, holder key in the {@code jwk} header
-   * matching the request key, {@code aud} naming this credential
-   * issuer, and {@code nonce} equal to the token's single-use
-   * {@code c_nonce}. Freshness comes from the single-use nonce; the
-   * {@code iat} must additionally sit inside the 5-minute skew window.
-   */
-  private void verifyVciProof(
-      ECPublicKey holderKey, IssueRequest request, String cNonce, Instant now) {
-    try {
-      String[] parts = request.holderProof().split("\\.", -1);
-      if (parts.length != 3) {
-        throw new InvalidIssuanceException("holder proof is malformed");
-      }
-      JsonNode header = mapper.readTree(Base64URL.from(parts[0]).decode());
-      if (!"ES256".equals(text(header, "alg"))
-          || !"openid4vci-proof+jwt".equals(text(header, "typ"))) {
-        throw new InvalidIssuanceException("holder proof must be an ES256 VCI proof JWT");
-      }
-      JsonNode proofJwk = header.get("jwk");
-      if (proofJwk == null || !proofJwk.isObject()) {
-        throw new InvalidIssuanceException("holder proof must carry its key");
-      }
-      ECPublicKey proofKey = holderKey(proofJwk);
-      if (!proofKey.getW().getAffineX().equals(holderKey.getW().getAffineX())
-          || !proofKey.getW().getAffineY().equals(holderKey.getW().getAffineY())) {
-        throw new InvalidIssuanceException("holder proof key does not match this request");
-      }
-      JsonNode body = mapper.readTree(Base64URL.from(parts[1]).decode());
-      if (!request.issuerId().equals(text(body, "aud"))) {
-        throw new InvalidIssuanceException("holder proof audience is wrong");
-      }
-      if (!MessageDigest.isEqual(
-          String.valueOf(text(body, "nonce")).getBytes(StandardCharsets.UTF_8),
-          cNonce.getBytes(StandardCharsets.UTF_8))) {
-        throw new InvalidIssuanceException("holder proof nonce is wrong");
-      }
-      JsonNode iat = body.get("iat");
-      if (iat == null || !iat.isNumber()
-          || Math.abs(now.getEpochSecond() - iat.asLong()) > 5 * 60) {
-        throw new InvalidIssuanceException("holder proof is stale");
-      }
-      // Field checks above are VCI-specific; the signature tail is
-      // the shared one. (A corrupt signature container surfaces as a
-      // signature failure, which is the accurate wording here.)
-      try {
-        HolderProofs.verifySignature(holderKey, request.holderProof());
-      } catch (HolderProofException e) {
-        throw new InvalidIssuanceException("holder proof signature is invalid");
-      }
-    } catch (InvalidIssuanceException e) {
-      throw e;
-    } catch (JacksonException e) {
-      throw new InvalidIssuanceException("holder proof is malformed");
-    } catch (Exception e) {
-      throw new InvalidIssuanceException("holder proof is invalid");
-    }
-  }
-
   /** Issuer, key, epoch, and type-scope checks against live trust state. */
   private IssuerAuthorization authorizeIssuer(
       dev.sovra.trust.TrustService.SnapshotView snapshot, IssueRequest request, Instant now) {
@@ -468,9 +410,7 @@ public class IssuanceService {
             .filter(i -> request.issuerId().equals(i.issuerId()))
             .findFirst()
             .orElseThrow(() -> new InvalidIssuanceException("issuer is not trusted"));
-    if (!"ACTIVE".equals(issuer.status())
-        || issuer.validFrom().isAfter(now)
-        || issuer.validThrough().isBefore(now)) {
+    if (!dev.sovra.trust.IssuerKeys.usable(issuer, now)) {
       throw new InvalidIssuanceException("issuer is not trusted");
     }
     if (!issuer.credentialTypes().contains(request.vct())) {
@@ -489,12 +429,8 @@ public class IssuanceService {
   public CredentialView get(ServiceAccountPrincipal caller, UUID credentialId) {
     ResourceRef resource = ResourceRef.tenantScoped("credential", credentialId.toString(),
         caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.READ_CREDENTIAL, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.READ_CREDENTIAL, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.READ_CREDENTIAL, resource);
     List<CredentialView> rows =
         tenant.query(
             "SELECT id, issuer_id, vct, key_ref, issued_at, expires_at, status,"
@@ -521,12 +457,8 @@ public class IssuanceService {
   public StatusView status(ServiceAccountPrincipal caller, UUID credentialId) {
     ResourceRef resource = ResourceRef.tenantScoped("credential", credentialId.toString(),
         caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.READ_CREDENTIAL, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.READ_CREDENTIAL, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.READ_CREDENTIAL, resource);
     var evidence = status.fetch(credentialId);
     return new StatusView(
         evidence.status().name(), evidence.version(), evidence.fetchedAt(),
@@ -538,12 +470,8 @@ public class IssuanceService {
   public StatusView revoke(ServiceAccountPrincipal caller, UUID credentialId) {
     ResourceRef resource = ResourceRef.tenantScoped("credential", credentialId.toString(),
         caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.ISSUE_CREDENTIAL, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.ISSUE_CREDENTIAL, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.ISSUE_CREDENTIAL, resource);
     List<String> rows =
         tenant.query(
             "SELECT status FROM credential_artifact WHERE id = ? AND tenant_id = ?",
@@ -553,14 +481,15 @@ public class IssuanceService {
     if (rows.isEmpty()) {
       throw new CredentialNotFoundException();
     }
-    if ("VALID".equals(rows.get(0))) {
+    if (CredentialStatus.from(rows.get(0)) == CredentialStatus.VALID) {
       // The status predicate makes concurrent revokes converge: only
       // the first flip bumps the version; losers re-read REVOKED.
       tenant.update(
-          "UPDATE credential_artifact SET status = 'REVOKED', status_updated_at = ?,"
+          "UPDATE credential_artifact SET status = ?, status_updated_at = ?,"
               + " status_version = status_version + 1"
-              + " WHERE id = ? AND tenant_id = ? AND status = 'VALID'",
-          java.sql.Timestamp.from(clock.instant()), credentialId, caller.tenantId());
+              + " WHERE id = ? AND tenant_id = ? AND status = ?",
+          CredentialStatus.REVOKED.name(), java.sql.Timestamp.from(clock.instant()),
+          credentialId, caller.tenantId(), CredentialStatus.VALID.name());
     }
     audit.record(caller, Action.ISSUE_CREDENTIAL, resource, decision, "",
         Map.of("credential", credentialId.toString(), "revoked", "true"));
@@ -589,9 +518,7 @@ public class IssuanceService {
                       snapshot.issuers().stream()
                           .filter(
                               issuer ->
-                                  "ACTIVE".equals(issuer.status())
-                                      && !issuer.validFrom().isAfter(now)
-                                      && !issuer.validThrough().isBefore(now)
+                                  dev.sovra.trust.IssuerKeys.usable(issuer, now)
                                       && !keyService.revoked(
                                           issuer.issuerId(),
                                           issuer.keyId(),

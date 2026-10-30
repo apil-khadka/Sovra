@@ -1,6 +1,7 @@
 package dev.sovra.trust;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -56,7 +57,7 @@ public class IssuerKeyService {
   public record RevokeRequest(String issuerId, String keyId, int keyVersion, String reason) {}
 
   public record KeyView(
-      String issuerId, String keyId, int keyVersion, String status, Instant revokedAt) {}
+      String issuerId, String keyId, int keyVersion, KeyStatus status, Instant revokedAt) {}
 
   /**
    * Public revocation truth for serving federation metadata: a
@@ -80,12 +81,8 @@ public class IssuerKeyService {
   @Transactional
   public KeyView register(ServiceAccountPrincipal caller, RegisterRequest request) {
     ResourceRef resource = resource(request.issuerId(), request.keyId(), request.keyVersion());
-    Decision decision = authz.authorize(Optional.of(caller), Action.REGISTER_ISSUER_KEY, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.REGISTER_ISSUER_KEY, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.REGISTER_ISSUER_KEY, resource);
     validateIdentity(request.issuerId(), request.keyId(), request.keyVersion());
     TrustProposalValidator.validateKey(request.keyId(), request.publicKeyJwk());
     String jwk = request.publicKeyJwk().toString();
@@ -117,12 +114,8 @@ public class IssuerKeyService {
   @Transactional
   public KeyView revoke(ServiceAccountPrincipal caller, RevokeRequest request) {
     ResourceRef resource = resource(request.issuerId(), request.keyId(), request.keyVersion());
-    Decision decision = authz.authorize(Optional.of(caller), Action.REVOKE_ISSUER_KEY, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.REVOKE_ISSUER_KEY, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.REVOKE_ISSUER_KEY, resource);
     validateIdentity(request.issuerId(), request.keyId(), request.keyVersion());
     if (request.reason() == null
         || request.reason().isBlank()
@@ -157,7 +150,7 @@ public class IssuerKeyService {
     detail.put("reason", request.reason());
     audit.record(caller, Action.REVOKE_ISSUER_KEY, resource, decision, "", detail);
     return new KeyView(
-        request.issuerId(), request.keyId(), request.keyVersion(), "REVOKED", revokedAt);
+        request.issuerId(), request.keyId(), request.keyVersion(), KeyStatus.REVOKED, revokedAt);
   }
 
   private KeyView view(String issuerId, String keyId, int keyVersion) {
@@ -168,9 +161,9 @@ public class IssuerKeyService {
             (rs, row) -> rs.getTimestamp(1).toInstant(),
             issuerId, keyId, keyVersion);
     if (!revoked.isEmpty()) {
-      return new KeyView(issuerId, keyId, keyVersion, "REVOKED", revoked.get(0));
+      return new KeyView(issuerId, keyId, keyVersion, KeyStatus.REVOKED, revoked.get(0));
     }
-    return new KeyView(issuerId, keyId, keyVersion, "ACTIVE", null);
+    return new KeyView(issuerId, keyId, keyVersion, KeyStatus.ACTIVE, null);
   }
 
   private static void validateIdentity(String issuerId, String keyId, int keyVersion) {

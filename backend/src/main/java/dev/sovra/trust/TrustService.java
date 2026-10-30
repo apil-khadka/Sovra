@@ -3,6 +3,7 @@ package dev.sovra.trust;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -87,7 +88,7 @@ public class TrustService {
                     readTree(rs.getString("public_key_jwk")),
                     rs.getTimestamp("valid_from").toInstant(),
                     rs.getTimestamp("valid_through").toInstant(),
-                    rs.getString("status")),
+                    IssuerStatus.from(rs.getString("status"))),
             version);
     List<PolicyView> policies =
         global.query(
@@ -138,14 +139,8 @@ public class TrustService {
   @Transactional(noRollbackFor = ForbiddenException.class)
   public ProposalResult propose(ServiceAccountPrincipal maker, ProposalInput input, String note) {
     ResourceRef resource = ResourceRef.global("trust-registry", "proposals");
-    Decision decision =
-        authz.authorize(Optional.of(maker), Action.PROPOSE_TRUST_CHANGE, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(
-          maker, Action.PROPOSE_TRUST_CHANGE, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, maker,
+        Action.PROPOSE_TRUST_CHANGE, resource);
     TrustProposalValidator.validate(input, clock.instant());
     ApprovalIdentity identity = ApprovalIdentity.of(maker);
     try {
@@ -186,14 +181,8 @@ public class TrustService {
   @Transactional(noRollbackFor = ForbiddenException.class)
   public boolean approve(ServiceAccountPrincipal checker, UUID proposalId) {
     ResourceRef resource = ResourceRef.global("trust-proposal", proposalId.toString());
-    Decision decision =
-        authz.authorize(Optional.of(checker), Action.APPROVE_TRUST_CHANGE, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(
-          checker, Action.APPROVE_TRUST_CHANGE, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, checker,
+        Action.APPROVE_TRUST_CHANGE, resource);
     if (alreadyDecided(proposalId)) {
       throw new AlreadyDecidedException();
     }
@@ -248,14 +237,8 @@ public class TrustService {
   @Transactional(noRollbackFor = ForbiddenException.class)
   public void activate(ServiceAccountPrincipal activator, long version) {
     ResourceRef resource = ResourceRef.global("trust-snapshot", String.valueOf(version));
-    Decision decision =
-        authz.authorize(Optional.of(activator), Action.ACTIVATE_TRUST_SNAPSHOT, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(
-          activator, Action.ACTIVATE_TRUST_SNAPSHOT, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, activator,
+        Action.ACTIVATE_TRUST_SNAPSHOT, resource);
     List<Long> approved =
         global.query(
             "SELECT p.snapshot_version FROM trust_change_proposal p"
@@ -423,7 +406,7 @@ public class TrustService {
       JsonNode publicKeyJwk,
       Instant validFrom,
       Instant validThrough,
-      String status) {}
+      IssuerStatus status) {}
 
   public record PolicyView(String rpId, String purpose, List<String> allowedTypes,
       String maxAssurance) {}

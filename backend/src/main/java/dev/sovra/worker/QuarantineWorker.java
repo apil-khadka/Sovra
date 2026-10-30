@@ -1,6 +1,7 @@
 package dev.sovra.worker;
 
 import dev.sovra.quarantine.QuarantineSniff;
+import dev.sovra.quarantine.QuarantineStatus;
 import dev.sovra.vault.VaultCrypto;
 import dev.sovra.vault.VaultEnvelope;
 import dev.sovra.vault.VaultKekProvider;
@@ -59,9 +60,12 @@ public class QuarantineWorker {
     // nothing, and retries for the next admission.
     for (int attempt = 0; attempt < 3; attempt++) {
       try (PreparedStatement claim = con.prepareStatement(
-          "UPDATE quarantine_admission SET status = 'SCANNING' WHERE id = (SELECT id"
-              + " FROM quarantine_admission WHERE status = 'QUARANTINED'"
-              + " ORDER BY created_at LIMIT 1) AND status = 'QUARANTINED' RETURNING id")) {
+          "UPDATE quarantine_admission SET status = ? WHERE id = (SELECT id"
+              + " FROM quarantine_admission WHERE status = ?"
+              + " ORDER BY created_at LIMIT 1) AND status = ? RETURNING id")) {
+        claim.setString(1, QuarantineStatus.SCANNING.name());
+        claim.setString(2, QuarantineStatus.QUARANTINED.name());
+        claim.setString(3, QuarantineStatus.QUARANTINED.name());
         try (ResultSet rs = claim.executeQuery()) {
           if (rs.next()) {
             return rs.getObject(1, UUID.class);
@@ -175,7 +179,8 @@ public class QuarantineWorker {
     try (PreparedStatement update = con.prepareStatement(
         "UPDATE quarantine_admission SET status = ?, verdict = ?, image_width = ?,"
             + " image_height = ?, scanned_at = now() WHERE id = ?")) {
-      update.setString(1, clean ? "CLEAN" : "REJECTED");
+      update.setString(
+          1, clean ? QuarantineStatus.CLEAN.name() : QuarantineStatus.REJECTED.name());
       update.setString(2, verdict);
       if (width == null) {
         update.setNull(3, java.sql.Types.INTEGER);

@@ -11,7 +11,6 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPrivateKeySpec;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
@@ -142,14 +141,14 @@ public class LocalDevSigner implements IssuerSigner {
     }
     // Exact field match, never substring: an embedded "issuer=<ours>"
     // inside another field must not satisfy the check (SOV-040).
-    Map<String, String> context = parseContext(aad);
-    if (!ISSUER_ID.equals(context.get("issuer"))) {
+    AadContext.Parsed context = AadContext.parse(aad);
+    if (!ISSUER_ID.equals(context.issuer())) {
       throw new SigningRefusedException("call context does not name this issuer");
     }
-    if (!keyRef.encode().equals(context.get("key"))) {
+    if (!keyRef.encode().equals(context.key())) {
       throw new SigningRefusedException("call context does not name this key");
     }
-    if (!"issuance".equals(context.get("purpose"))) {
+    if (!"issuance".equals(context.purpose())) {
       throw new SigningRefusedException("call context is not an issuance call");
     }
     if (!registryActive()) {
@@ -168,26 +167,6 @@ public class LocalDevSigner implements IssuerSigner {
     }
   }
 
-  /**
-   * Strict {@code k=v;k=v} parse. Any malformed segment voids the whole
-   * context: the encoders always emit well-formed AAD, so anything else
-   * is a confused or forged call.
-   */
-  private static Map<String, String> parseContext(String aad) {
-    Map<String, String> fields = new LinkedHashMap<>();
-    if (aad == null || aad.isBlank()) {
-      return fields;
-    }
-    for (String segment : aad.split(";", -1)) {
-      int eq = segment.indexOf('=');
-      if (eq <= 0 || eq == segment.length() - 1) {
-        return Map.of();
-      }
-      fields.put(segment.substring(0, eq), segment.substring(eq + 1));
-    }
-    return fields;
-  }
-
   private boolean registryActive() {
     return dev.sovra.trust.IssuerKeys.active(global, ISSUER_ID, KEY_ID, KEY_VERSION);
   }
@@ -204,9 +183,7 @@ public class LocalDevSigner implements IssuerSigner {
                             ISSUER_ID.equals(issuer.issuerId())
                                 && KEY_ID.equals(issuer.keyId())
                                 && KEY_VERSION == issuer.keyVersion()
-                                && "ACTIVE".equals(issuer.status())
-                                && !issuer.validFrom().isAfter(now)
-                                && !issuer.validThrough().isBefore(now)))
+                                && dev.sovra.trust.IssuerKeys.usable(issuer, now)))
         .orElse(false);
   }
 

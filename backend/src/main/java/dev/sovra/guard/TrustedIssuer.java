@@ -14,6 +14,6 @@ public record TrustedIssuer(
     List<String> allowedCredentialTypes,
     List<String> allowedClaims,
     List<String> keyIds,
-    String status,
+    dev.sovra.trust.IssuerStatus status,
     Instant validFrom,
     Instant validThrough) {}

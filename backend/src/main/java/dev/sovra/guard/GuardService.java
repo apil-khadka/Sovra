@@ -1,6 +1,7 @@
 package dev.sovra.guard;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -57,12 +58,8 @@ public class GuardService {
       ServiceAccountPrincipal caller, CandidatePlan plan, SelectedPolicy selected) {
     ResourceRef resource =
         ResourceRef.tenantScoped("guard", "validations", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.VALIDATE_PLAN, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.VALIDATE_PLAN, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.VALIDATE_PLAN, resource);
     var snapshot = snapshots.current().orElseThrow(TrustUnavailableException::new);
     GuardVerdict verdict =
         PlanGuard.validate(

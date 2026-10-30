@@ -1,5 +1,6 @@
 package dev.sovra.ops;
 
+import dev.sovra.trust.IssuerStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -47,7 +48,7 @@ public class TrustFreshnessCheck implements ReadinessCheck {
                   + " WHERE snapshot_version = ?",
               (rs, row) ->
                   new IssuerWindow(
-                      rs.getString("status"),
+                      IssuerStatus.from(rs.getString("status")),
                       rs.getTimestamp("valid_from").toInstant(),
                       rs.getTimestamp("valid_through").toInstant()),
               version);
@@ -57,7 +58,7 @@ public class TrustFreshnessCheck implements ReadinessCheck {
     }
   }
 
-  record IssuerWindow(String status, Instant validFrom, Instant validThrough) {}
+  record IssuerWindow(IssuerStatus status, Instant validFrom, Instant validThrough) {}
 
   /**
    * Pure evaluation over the live-fetched windows, so stale, expired, and
@@ -67,7 +68,7 @@ public class TrustFreshnessCheck implements ReadinessCheck {
       String name, long version, List<IssuerWindow> windows, Instant now, long durationMs) {
     long usable =
         windows.stream()
-            .filter(w -> "ACTIVE".equals(w.status()))
+            .filter(w -> w.status() == IssuerStatus.ACTIVE)
             .filter(w -> !w.validFrom().isAfter(now) && !w.validThrough().isBefore(now))
             .count();
     Map<String, Object> detail = Map.of("snapshotVersion", version, "usableIssuers", usable);

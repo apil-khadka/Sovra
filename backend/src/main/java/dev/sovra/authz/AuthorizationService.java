@@ -148,8 +148,10 @@ public class AuthorizationService {
   }
 
   /**
-   * Authorizes the action or throws {@link ForbiddenException} /
-   * {@link TenantMismatchException}. Returns the auditable decision.
+   * Authorizes the action, returning the auditable decision (never
+   * throwing for denials). Callers that refuse must record the denial;
+   * {@code dev.sovra.audit.AuditedAuthorizer} is the entry that does
+   * both, so silent denials are unrepresentable.
    */
   public Decision authorize(
       Optional<ServiceAccountPrincipal> caller, Action action, ResourceRef resource) {
@@ -185,19 +187,6 @@ public class AuthorizationService {
     Decision decision = decide(principal, action, policyVersion);
     cache.put(principal.id(), action, resource, policyVersion, decision);
     return decision;
-  }
-
-  /** Authorizes and throws the HTTP-mapped exception on denial. */
-  public void enforce(
-      Optional<ServiceAccountPrincipal> caller, Action action, ResourceRef resource) {
-    Decision decision = authorize(caller, action, resource);
-    if (decision.permitted()) {
-      return;
-    }
-    if (decision.reasonCode() == ReasonCode.WRONG_TENANT) {
-      throw new TenantMismatchException();
-    }
-    throw new ForbiddenException(decision.reasonCode());
   }
 
   private Decision decide(ServiceAccountPrincipal principal, Action action, long policyVersion) {

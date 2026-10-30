@@ -75,9 +75,26 @@ public final class PlanParser {
         strings(node, "allowed_credential_types"),
         strings(node, "allowed_claims"),
         strings(node, "key_ids"),
-        text(node, "status"),
+        standing(node),
         instant(node, "valid_from"),
         instant(node, "valid_through"));
+  }
+
+  /**
+   * Standing from context JSON. Unknown text is malformed input,
+   * not a standing verdict; a missing field stays null and refuses
+   * closed in the standing check.
+   */
+  private static dev.sovra.trust.IssuerStatus standing(JsonNode node) {
+    String status = text(node, "status");
+    if (status == null) {
+      return null;
+    }
+    try {
+      return dev.sovra.trust.IssuerStatus.from(status);
+    } catch (IllegalArgumentException e) {
+      throw new MalformedPlanException();
+    }
   }
 
   private static PolicyDocument parsePolicy(JsonNode node) {

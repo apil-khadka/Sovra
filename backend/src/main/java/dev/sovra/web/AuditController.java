@@ -3,6 +3,8 @@ package dev.sovra.web;
 import dev.sovra.auth.CurrentPrincipal;
 import dev.sovra.audit.AuditCursor;
 import dev.sovra.audit.AuditEventRepository;
+import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.ForbiddenException;
@@ -29,10 +31,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuditController {
 
   private final AuthorizationService authz;
+  private final AuditService audit;
   private final AuditEventRepository events;
 
-  public AuditController(AuthorizationService authz, AuditEventRepository events) {
+  public AuditController(
+      AuthorizationService authz, AuditService audit, AuditEventRepository events) {
     this.authz = authz;
+    this.audit = audit;
     this.events = events;
   }
 
@@ -42,8 +47,10 @@ public class AuditController {
       @RequestParam(required = false) String cursor) {
     var caller = CurrentPrincipal.get();
     var principal = caller.orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
-    authz.enforce(
-        caller,
+    AuditedAuthorizer.require(
+        authz,
+        audit,
+        principal,
         Action.READ_AUDIT,
         ResourceRef.tenantScoped("audit", "events", principal.tenantId()));
     AuditCursor position = cursor == null ? null : AuditCursor.decode(cursor);

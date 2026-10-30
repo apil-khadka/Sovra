@@ -1,6 +1,7 @@
 package dev.sovra.vault;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.HumanMembershipRepository;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.auth.ServiceAccountRepository;
@@ -89,7 +90,7 @@ public class VaultService {
       int version,
       List<String> purposes,
       int kekVersion,
-      String status,
+      VaultObjectStatus status,
       String contentSha256Hex,
       Instant createdAt) {}
 
@@ -121,7 +122,7 @@ public class VaultService {
       byte[] dekNonce,
       byte[] contentNonce,
       byte[] ciphertext,
-      String status) {}
+      VaultObjectStatus status) {}
 
   private record GrantRow(
       UUID id,
@@ -221,7 +222,7 @@ public class VaultService {
             rs.getInt("version"),
             VaultEnvelope.sortedPurposes(rs.getArray("authorized_purposes")),
             rs.getInt("kek_version"),
-            rs.getString("status"),
+            VaultObjectStatus.from(rs.getString("status")),
             HexFormat.of().formatHex(rs.getBytes("content_sha256")),
             rs.getTimestamp("created_at").toInstant()),
         objectId);
@@ -246,7 +247,7 @@ public class VaultService {
     Decision decision =
         require(caller, Action.VAULT_GRANT_ACCESS, "vault-grant", objectId.toString());
     StoredRow row = versionRow(objectId, version);
-    if (!"VALID".equals(row.status())) {
+    if (row.status() != VaultObjectStatus.VALID) {
       throw new VaultNotFoundException();
     }
     if (!"service_account".equals(principalType) && !"human_membership".equals(principalType)) {
@@ -311,7 +312,7 @@ public class VaultService {
     Decision decision =
         require(caller, Action.VAULT_READ_OBJECT, "vault-object", objectId.toString());
     StoredRow row = versionRow(objectId, version);
-    if (!"VALID".equals(row.status())) {
+    if (row.status() != VaultObjectStatus.VALID) {
       throw new VaultNotFoundException();
     }
     if (row.purposes().contains(VaultEnvelope.QUARANTINE_PURPOSE)) {
@@ -350,7 +351,7 @@ public class VaultService {
     Decision decision =
         require(caller, Action.VAULT_READ_OBJECT, "vault-object", objectId.toString());
     StoredRow row = versionRow(objectId, version);
-    if (!"VALID".equals(row.status())) {
+    if (row.status() != VaultObjectStatus.VALID) {
       throw new VaultNotFoundException();
     }
     if (!row.purposes().contains(VaultEnvelope.QUARANTINE_PURPOSE)) {
@@ -414,11 +415,11 @@ public class VaultService {
     Decision decision = require(caller, Action.VAULT_DELETE_VERSION, "vault-object",
         objectId.toString());
     StoredRow row = versionRow(objectId, version);
-    if ("VALID".equals(row.status())) {
+    if (row.status() == VaultObjectStatus.VALID) {
       tenant.update(
-          "UPDATE vault_object_version SET status = 'DELETED', status_updated_at = now()"
+          "UPDATE vault_object_version SET status = ?, status_updated_at = now()"
               + " WHERE object_id = ? AND version = ?",
-          objectId, version);
+          VaultObjectStatus.DELETED.name(), objectId, version);
     }
     audit.record(
         caller, Action.VAULT_DELETE_VERSION,
@@ -438,7 +439,7 @@ public class VaultService {
     byte[] dek = VaultCrypto.freshDek();
     byte[] contentNonce = VaultCrypto.freshNonce();
     StoredRow aad = new StoredRow(objectId, version, issuerId, purposes, sha, kekVersion,
-        new byte[0], new byte[0], contentNonce, new byte[0], "VALID");
+        new byte[0], new byte[0], contentNonce, new byte[0], VaultObjectStatus.VALID);
     byte[] ciphertext =
         VaultCrypto.seal(dek, contentNonce, content, contentAad(caller.tenantId(), aad));
     VaultKekProvider.WrappedDek wrapped =
@@ -456,8 +457,8 @@ public class VaultService {
   private int ensureActiveKek(UUID tenantId) {
     Integer max = tenant.queryForObject(
         "SELECT COALESCE(MAX(version), 0) FROM vault_kek"
-            + " WHERE tenant_id = ? AND status = 'ACTIVE'",
-        Integer.class, tenantId);
+            + " WHERE tenant_id = ? AND status = ?",
+        Integer.class, tenantId, KekStatus.ACTIVE.name());
     if (max != null && max > 0) {
       return max;
     }
@@ -466,8 +467,8 @@ public class VaultService {
         tenantId);
     Integer created = tenant.queryForObject(
         "SELECT COALESCE(MAX(version), 0) FROM vault_kek"
-            + " WHERE tenant_id = ? AND status = 'ACTIVE'",
-        Integer.class, tenantId);
+            + " WHERE tenant_id = ? AND status = ?",
+        Integer.class, tenantId, KekStatus.ACTIVE.name());
     if (created == null || created == 0) {
       throw new IllegalStateException("no active wrapping key for tenant");
     }
@@ -527,14 +528,8 @@ public class VaultService {
   }
 
   private Decision require(ServiceAccountPrincipal caller, Action action, String type, String id) {
-    Decision decision = authz.authorize(
-        Optional.of(caller), action, ResourceRef.tenantScoped(type, id, caller.tenantId()));
-    if (!decision.permitted()) {
-      audit.recordDenial(
-          caller, action, ResourceRef.tenantScoped(type, id, caller.tenantId()),
-          decision.reasonCode(), decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        action, ResourceRef.tenantScoped(type, id, caller.tenantId()));
     return decision;
   }
 
@@ -576,7 +571,7 @@ public class VaultService {
             rs.getBytes("dek_nonce"),
             rs.getBytes("content_nonce"),
             rs.getBytes("ciphertext"),
-            rs.getString("status")),
+            VaultObjectStatus.from(rs.getString("status"))),
         objectId, version);
     if (rows.isEmpty()) {
       throw new VaultNotFoundException();

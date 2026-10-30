@@ -2,6 +2,7 @@ package dev.sovra.openid;
 
 import com.nimbusds.jose.util.Base64URL;
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.auth.ServiceAccountRepository;
 import dev.sovra.authz.Action;
@@ -119,12 +120,8 @@ public class VpService {
   public String createRequest(ServiceAccountPrincipal caller, UUID proofRequestId) {
     ResourceRef resource =
         ResourceRef.tenantScoped("vp-session", "requests", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.VP_CREATE_REQUEST, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.VP_CREATE_REQUEST, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.VP_CREATE_REQUEST, resource);
     if (proofRequestId == null) {
       throw new InvalidOpenIdRequestException("proof request is missing");
     }
@@ -136,8 +133,8 @@ public class VpService {
     tenant.update(
         "INSERT INTO vp_session (id, tenant_id, proof_request_id, nonce, state,"
             + " expires_at, created_by, created_account)"
-            + " VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?)",
-        sessionId, caller.tenantId(), proofRequestId, nonce,
+            + " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        sessionId, caller.tenantId(), proofRequestId, nonce, VpSessionState.PENDING.name(),
         java.sql.Timestamp.from(now.plus(SESSION_TTL)), caller.name(), caller.id());
     audit.record(caller, Action.VP_CREATE_REQUEST,
         ResourceRef.tenantScoped("vp-session", sessionId.toString(), caller.tenantId()),
@@ -199,7 +196,7 @@ public class VpService {
     }
     Session session = findSession(sessionId).orElseThrow(OpenIdNotFoundException::new);
     ServiceAccountPrincipal creator = liveCreator(session.createdAccount());
-    if ("COMPLETED".equals(session.state())) {
+    if (session.state() == VpSessionState.COMPLETED) {
       // Idempotent replay: the stored decision returns verbatim,
       // whenever it is asked for. No re-decision, no new decision
       // row, no new audit rows — expiry cannot un-decide a session.
@@ -213,7 +210,7 @@ public class VpService {
     }
     // The completion UPDATE below re-checks PENDING so concurrent
     // submits cannot both win.
-    if (!"PENDING".equals(session.state())) {
+    if (session.state() != VpSessionState.PENDING) {
       throw new OpenIdProtocolException("invalid_request");
     }
     if (response != null && !response.isBlank()) {
@@ -302,9 +299,9 @@ public class VpService {
       UUID decisionId = decisionId(decision);
       int completed =
           tenant.update(
-              "UPDATE vp_session SET state = 'COMPLETED', decision_id = ?"
-                  + " WHERE id = ? AND state = 'PENDING'",
-              decisionId, session.id());
+              "UPDATE vp_session SET state = ?, decision_id = ? WHERE id = ? AND state = ?",
+              VpSessionState.COMPLETED.name(), decisionId, session.id(),
+              VpSessionState.PENDING.name());
       if (completed != 1) {
         throw new OpenIdProtocolException("invalid_request");
       }
@@ -352,7 +349,7 @@ public class VpService {
     }
   }
 
-  private record Session(UUID id, UUID proofRequestId, String nonce, String state,
+  private record Session(UUID id, UUID proofRequestId, String nonce, VpSessionState state,
       Instant expiresAt, UUID createdAccount, UUID decisionId) {}
 
   /**
@@ -390,7 +387,7 @@ public class VpService {
                     rs.getObject("id", UUID.class),
                     rs.getObject("proof_request_id", UUID.class),
                     rs.getString("nonce"),
-                    rs.getString("state"),
+                    VpSessionState.from(rs.getString("state")),
                     rs.getTimestamp("expires_at").toInstant(),
                     rs.getObject("created_account", UUID.class),
                     rs.getObject("decision_id", UUID.class)),
@@ -406,8 +403,8 @@ public class VpService {
     template.execute(
         ignored -> {
           tenant.update(
-              "UPDATE vp_session SET state = 'EXPIRED' WHERE id = ? AND state = 'PENDING'",
-              sessionId);
+              "UPDATE vp_session SET state = ? WHERE id = ? AND state = ?",
+              VpSessionState.EXPIRED.name(), sessionId, VpSessionState.PENDING.name());
           return null;
         });
     return null;

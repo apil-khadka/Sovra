@@ -2,6 +2,7 @@ package dev.sovra.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.sovra.trust.IssuerStatus;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ class TrustFreshnessEvaluationTests {
   private static final Instant NOW = Instant.parse("2026-06-01T12:00:00Z");
 
   private static TrustFreshnessCheck.IssuerWindow window(
-      String status, String from, String through) {
+      IssuerStatus status, String from, String through) {
     return new TrustFreshnessCheck.IssuerWindow(
         status, Instant.parse(from), Instant.parse(through));
   }
@@ -23,7 +24,7 @@ class TrustFreshnessEvaluationTests {
         TrustFreshnessCheck.evaluate(
             "trust_freshness",
             7,
-            List.of(window("ACTIVE", "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z")),
+            List.of(window(IssuerStatus.ACTIVE, "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z")),
             NOW,
             3);
 
@@ -48,7 +49,7 @@ class TrustFreshnessEvaluationTests {
         TrustFreshnessCheck.evaluate(
             "trust_freshness",
             7,
-            List.of(window("ACTIVE", "2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z")),
+            List.of(window(IssuerStatus.ACTIVE, "2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z")),
             NOW,
             3);
 
@@ -63,7 +64,7 @@ class TrustFreshnessEvaluationTests {
         TrustFreshnessCheck.evaluate(
             "trust_freshness",
             7,
-            List.of(window("REVOKED", "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z")),
+            List.of(window(IssuerStatus.REVOKED, "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z")),
             NOW,
             3);
 
@@ -78,8 +79,8 @@ class TrustFreshnessEvaluationTests {
             "trust_freshness",
             7,
             List.of(
-                window("ACTIVE", "2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z"),
-                window("ACTIVE", "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z")),
+                window(IssuerStatus.ACTIVE, "2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z"),
+                window(IssuerStatus.ACTIVE, "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z")),
             NOW,
             3);
 

@@ -11,12 +11,14 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 /**
  * Privacy-minimized decision evidence. Detail keys matching secret-like
  * names are dropped and values truncated before anything reaches the
- * database. Writes join the caller's transaction: if the audit row cannot
- * commit, the business write rolls back with it.
+ * database. Success evidence joins the caller's transaction: if the audit
+ * row cannot commit, the business write rolls back with it. Denial
+ * evidence commits independently so the refusal exception cannot erase it.
  */
 @Service
 public class AuditService {
@@ -71,7 +73,12 @@ public class AuditService {
     }
   }
 
-  /** Convenience overload for rejections without detail. */
+  /**
+   * Refusal evidence must survive the caller's rollback. This public
+   * proxy entry owns its transaction; the internal record call writes
+   * on that transaction's connection with the current tenant context.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void recordDenial(
       ServiceAccountPrincipal actor,
       Action action,

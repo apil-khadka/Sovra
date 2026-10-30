@@ -1,5 +1,7 @@
 package dev.sovra.ops;
 
+import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.ForbiddenException;
@@ -22,18 +24,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class AlertController {
 
   private final AuthorizationService authz;
+  private final AuditService audit;
   private final AlertService alerts;
 
-  public AlertController(AuthorizationService authz, AlertService alerts) {
+  public AlertController(AuthorizationService authz, AuditService audit, AlertService alerts) {
     this.authz = authz;
+    this.audit = audit;
     this.alerts = alerts;
   }
 
   @GetMapping
   public ResponseEntity<List<AlertService.Alert>> active() {
     var caller = CurrentPrincipal.get();
-    caller.orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
-    authz.enforce(caller, Action.READ_ALERTS, ResourceRef.global("ops", "alerts"));
+    var principal = caller.orElseThrow(() -> new ForbiddenException(ReasonCode.ANONYMOUS));
+    AuditedAuthorizer.require(
+        authz, audit, principal, Action.READ_ALERTS, ResourceRef.global("ops", "alerts"));
     return ResponseEntity.ok(alerts.active());
   }
 }

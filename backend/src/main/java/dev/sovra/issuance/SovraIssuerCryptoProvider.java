@@ -43,10 +43,10 @@ public final class SovraIssuerCryptoProvider implements JWTCryptoProvider {
     String signingInput =
         base64Url(headerJson) + "." + base64Url(payload.toString());
     String aad =
-        "issuer=" + keyRef.issuerId()
-            + ";key=" + keyRef.encode()
-            + ";credential=" + credentialId
-            + ";purpose=issuance;schema=" + WaltIdSdJwtVcEncoder.PROFILE;
+        AadContext.issuance(
+                keyRef.issuerId(), keyRef.encode(), credentialId.toString(),
+                WaltIdSdJwtVcEncoder.PROFILE)
+            .encode();
     byte[] signature =
         signer.sign(keyRef, signingInput.getBytes(StandardCharsets.US_ASCII), aad);
     return signingInput + "." + base64Url(signature);

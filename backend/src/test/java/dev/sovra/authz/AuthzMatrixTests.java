@@ -87,6 +87,15 @@ class AuthzMatrixTests extends SovraPostgresBase {
                     .retrieve()
                     .toBodilessEntity())
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
+    // Read-path denials are evidence too, not silent 403s.
+    Map<String, Object> denial =
+        owner.queryForMap(
+            "SELECT decision, reason_code FROM audit_event"
+                + " WHERE tenant_id = ? AND action = 'READ_AUDIT'"
+                + " ORDER BY occurred_at DESC LIMIT 1",
+            outsider.tenantId());
+    assertThat(denial.get("decision")).isEqualTo("DENY");
+    assertThat(denial.get("reason_code")).isEqualTo("MISSING_ROLE");
     assertThatThrownBy(
             () ->
                 client

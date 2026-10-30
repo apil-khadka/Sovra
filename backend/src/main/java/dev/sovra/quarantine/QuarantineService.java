@@ -1,6 +1,7 @@
 package dev.sovra.quarantine;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -55,12 +56,13 @@ public class QuarantineService {
   }
 
   public record Admitted(
-      UUID admissionId, UUID objectId, String status, String actualType, int sizeBytes) {}
+      UUID admissionId, UUID objectId, QuarantineStatus status, String actualType,
+      int sizeBytes) {}
 
   public record AdmissionView(
       UUID admissionId,
       UUID objectId,
-      String status,
+      QuarantineStatus status,
       String claimedType,
       String actualType,
       int sizeBytes,
@@ -109,7 +111,8 @@ public class QuarantineService {
         decision, "",
         Map.of("object", stored.objectId().toString(), "actual-type", actual,
             "bytes", String.valueOf(content.length)));
-    return new Admitted(admissionId, stored.objectId(), "QUARANTINED", actual, content.length);
+    return new Admitted(
+        admissionId, stored.objectId(), QuarantineStatus.QUARANTINED, actual, content.length);
   }
 
   @Transactional(noRollbackFor = ForbiddenException.class)
@@ -121,7 +124,7 @@ public class QuarantineService {
         caller, Action.QUARANTINE_READ,
         ResourceRef.tenantScoped("quarantine-admission", admissionId.toString(),
             caller.tenantId()),
-        decision, "", Map.of("status", view.status()));
+        decision, "", Map.of("status", view.status().name()));
     return view;
   }
 
@@ -137,7 +140,7 @@ public class QuarantineService {
     Decision decision = require(caller, Action.QUARANTINE_PROMOTE, "quarantine-admission",
         admissionId.toString());
     AdmissionView admission = load(admissionId);
-    if (!"CLEAN".equals(admission.status())) {
+    if (admission.status() != QuarantineStatus.CLEAN) {
       throw new QuarantineConflictException(
           "admission is " + admission.status() + "; only CLEAN admissions promote");
     }
@@ -159,8 +162,8 @@ public class QuarantineService {
     // retryable), while a second promote of the same admission
     // conflicts here and rolls its duplicate re-seal back.
     int marked = tenant.update(
-        "UPDATE quarantine_admission SET status = 'PROMOTED' WHERE id = ? AND status = 'CLEAN'",
-        admissionId);
+        "UPDATE quarantine_admission SET status = ? WHERE id = ? AND status = ?",
+        QuarantineStatus.PROMOTED.name(), admissionId, QuarantineStatus.CLEAN.name());
     if (marked == 0) {
       throw new QuarantineConflictException("admission was already promoted");
     }
@@ -182,7 +185,7 @@ public class QuarantineService {
         (rs, row) -> new AdmissionView(
             rs.getObject("id", UUID.class),
             rs.getObject("vault_object_id", UUID.class),
-            rs.getString("status"),
+            QuarantineStatus.from(rs.getString("status")),
             rs.getString("claimed_type"),
             rs.getString("actual_type"),
             rs.getInt("size_bytes"),
@@ -202,14 +205,8 @@ public class QuarantineService {
 
   private Decision require(
       ServiceAccountPrincipal caller, Action action, String type, String id) {
-    Decision decision = authz.authorize(
-        Optional.of(caller), action, ResourceRef.tenantScoped(type, id, caller.tenantId()));
-    if (!decision.permitted()) {
-      audit.recordDenial(
-          caller, action, ResourceRef.tenantScoped(type, id, caller.tenantId()),
-          decision.reasonCode(), decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        action, ResourceRef.tenantScoped(type, id, caller.tenantId()));
     return decision;
   }
 

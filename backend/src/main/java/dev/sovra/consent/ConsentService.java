@@ -1,6 +1,7 @@
 package dev.sovra.consent;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -17,6 +18,7 @@ import dev.sovra.guard.PlanParser;
 import dev.sovra.guard.SelectedPolicy;
 import dev.sovra.crypto.P256;
 import dev.sovra.trust.TrustSnapshotProvider;
+import dev.sovra.issuance.CredentialStatus;
 import dev.sovra.issuance.TrustUnavailableException;
 import dev.sovra.ops.TelemetryService;
 import dev.sovra.trust.AlreadyDecidedException;
@@ -152,12 +154,8 @@ public class ConsentService {
   private RequestView createInner(ServiceAccountPrincipal caller, CreateRequest request) {
     ResourceRef resource =
         ResourceRef.tenantScoped("proof-request", "requests", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.REQUEST_PROOF, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.REQUEST_PROOF, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.REQUEST_PROOF, resource);
     Instant now = clock.instant();
     Validated validated = validate(request, now);
     requireGuardAccepted(caller, request);
@@ -185,12 +183,8 @@ public class ConsentService {
   public RequestView get(ServiceAccountPrincipal caller, UUID requestId) {
     ResourceRef resource =
         ResourceRef.tenantScoped("proof-request", requestId.toString(), caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.READ_CONSENT, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.READ_CONSENT, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.READ_CONSENT, resource);
     return view(load(caller, requestId), clock.instant());
   }
 
@@ -214,14 +208,10 @@ public class ConsentService {
       ServiceAccountPrincipal caller, UUID requestId, DecisionRequest input) {
     ResourceRef resource =
         ResourceRef.tenantScoped("proof-request", requestId.toString(), caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.DECIDE_CONSENT, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.DECIDE_CONSENT, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.DECIDE_CONSENT, resource);
     Stored row = load(caller, requestId);
-    if (!"PENDING".equals(row.state())) {
+    if (row.state() != ConsentState.PENDING) {
       throw new AlreadyDecidedException();
     }
     if (input == null
@@ -240,11 +230,12 @@ public class ConsentService {
       throw new InvalidConsentException("consent proof is bound to another holder");
     }
     verifyConsentProof(holderKey, input.consentProof(), consentMessage(row, input.decision()));
-    String state = DECIDE_APPROVE.equals(input.decision()) ? "APPROVED" : "DENIED";
+    ConsentState state =
+        DECIDE_APPROVE.equals(input.decision()) ? ConsentState.APPROVED : ConsentState.DENIED;
     tenant.update(
         "UPDATE proof_request SET state = ?, decided_at = ?, consent_artifact = ?"
             + " WHERE id = ? AND tenant_id = ?",
-        state, java.sql.Timestamp.from(now), input.consentProof(),
+        state.name(), java.sql.Timestamp.from(now), input.consentProof(),
         requestId, caller.tenantId());
     audit.record(caller, Action.DECIDE_CONSENT, resource, decision, "",
         Map.of("request", requestId.toString(), "decision", input.decision()));
@@ -261,12 +252,8 @@ public class ConsentService {
   public PresentationView presentation(ServiceAccountPrincipal caller, UUID requestId) {
     ResourceRef resource =
         ResourceRef.tenantScoped("proof-request", requestId.toString(), caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.READ_CONSENT, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.READ_CONSENT, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.READ_CONSENT, resource);
     Stored row = load(caller, requestId);
     if (!isVerified(row, clock.instant())) {
       throw new ConsentNotFoundException();
@@ -302,7 +289,7 @@ public class ConsentService {
       String planHash,
       String challenge,
       String holderThumbprint,
-      String state,
+      ConsentState state,
       Instant createdAt,
       Instant expiresAt,
       String consentArtifact,
@@ -374,12 +361,13 @@ public class ConsentService {
     }
   }
 
-  private record Credential(String holderThumbprint, String status, Instant expiresAt) {}
+  private record Credential(
+      String holderThumbprint, CredentialStatus status, Instant expiresAt) {}
 
   private Credential requireUsableCredential(UUID credentialId) {
     Credential credential = credentialRow(credentialId)
         .orElseThrow(() -> new InvalidConsentException("credential is not usable for this request"));
-    if (!"VALID".equals(credential.status())
+    if (credential.status() != CredentialStatus.VALID
         || !credential.expiresAt().isAfter(clock.instant())) {
       throw new InvalidConsentException("credential is not usable for this request");
     }
@@ -394,7 +382,7 @@ public class ConsentService {
             (rs, row) ->
                 new Credential(
                     rs.getString("holder_thumbprint"),
-                    rs.getString("status"),
+                    CredentialStatus.from(rs.getString("status")),
                     rs.getTimestamp("expires_at").toInstant()),
             credentialId);
     return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
@@ -417,7 +405,7 @@ public class ConsentService {
                     rs.getString("plan_hash"),
                     rs.getString("challenge"),
                     rs.getString("holder_thumbprint"),
-                    rs.getString("state"),
+                    ConsentState.from(rs.getString("state")),
                     rs.getTimestamp("created_at").toInstant(),
                     rs.getTimestamp("expires_at").toInstant(),
                     rs.getString("consent_artifact"),
@@ -442,7 +430,7 @@ public class ConsentService {
   private record Derived(String state, String reason) {}
 
   private Derived derive(Stored row, Instant now) {
-    if ("DENIED".equals(row.state())) {
+    if (row.state() == ConsentState.DENIED) {
       return new Derived("DENIED", "holder refused this request");
     }
     if (!row.expiresAt().isAfter(now)) {
@@ -451,14 +439,14 @@ public class ConsentService {
     if (!credentialUsable(row.credentialId(), now)) {
       return new Derived("UNAVAILABLE", "credential is no longer usable");
     }
-    if ("APPROVED".equals(row.state())) {
+    if (row.state() == ConsentState.APPROVED) {
       return new Derived("VERIFIED", "consent verified; presentation authorized");
     }
     return new Derived("PENDING", "awaiting the holder's explicit decision");
   }
 
   private boolean isVerified(Stored row, Instant now) {
-    return "APPROVED".equals(row.state())
+    return row.state() == ConsentState.APPROVED
         && row.consentArtifact() != null
         && row.expiresAt().isAfter(now)
         && credentialUsable(row.credentialId(), now);
@@ -466,7 +454,7 @@ public class ConsentService {
 
   private boolean credentialUsable(UUID credentialId, Instant now) {
     return credentialRow(credentialId)
-        .map(row -> "VALID".equals(row.status()) && row.expiresAt().isAfter(now))
+        .map(row -> row.status() == CredentialStatus.VALID && row.expiresAt().isAfter(now))
         .orElse(false);
   }
 

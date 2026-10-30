@@ -1,6 +1,7 @@
 package dev.sovra.planning;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
@@ -84,12 +85,8 @@ public class PlanningService {
   public ProposalView propose(ServiceAccountPrincipal caller, PlanningIntent intent) {
     ResourceRef resource =
         ResourceRef.tenantScoped("planning", "proposals", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.PROPOSE_PLAN, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.PROPOSE_PLAN, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.PROPOSE_PLAN, resource);
     var snapshot = snapshots.current().orElseThrow(TrustUnavailableException::new);
     String toolHash = PlanningVersions.toolSchemaHash(tools.callbacks());
     PlanningResult result;
@@ -120,12 +117,8 @@ public class PlanningService {
   public StatusView status(ServiceAccountPrincipal caller) {
     ResourceRef resource =
         ResourceRef.tenantScoped("planning", "status", caller.tenantId());
-    Decision decision = authz.authorize(Optional.of(caller), Action.PROPOSE_PLAN, resource);
-    if (!decision.permitted()) {
-      audit.recordDenial(caller, Action.PROPOSE_PLAN, resource, decision.reasonCode(),
-          decision.policyVersion());
-      throw new ForbiddenException(decision.reasonCode());
-    }
+    Decision decision = AuditedAuthorizer.require(authz, audit, caller,
+        Action.PROPOSE_PLAN, resource);
     Map<String, String> detail = new LinkedHashMap<>();
     detail.put("mode", properties.liveReady() ? PlanningMode.LIVE.name() : PlanningMode.FIXTURE.name());
     audit.record(caller, Action.PROPOSE_PLAN, resource, decision, "", detail);

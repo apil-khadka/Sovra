@@ -1,9 +1,11 @@
 package dev.sovra.auth;
 
 import dev.sovra.audit.AuditService;
+import dev.sovra.audit.AuditedAuthorizer;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
+import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.PermissionCache;
 import dev.sovra.authz.ResourceRef;
 import dev.sovra.authz.Role;
@@ -77,13 +79,13 @@ public class ServiceAccountService {
     this.clock = clock;
   }
 
-  @Transactional
+  @Transactional(noRollbackFor = ForbiddenException.class)
   public CreatedAccount create(
       ServiceAccountPrincipal caller, String name, Set<String> roles, Instant expiresAt) {
-    Decision decision = authz.authorize(
-        Optional.of(caller), Action.CREATE_SERVICE_ACCOUNT,
+    Decision decision =
+        AuditedAuthorizer.require(authz, audit, caller,
+        Action.CREATE_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", "create", caller.tenantId()));
-    requirePermitted(decision);
     validateName(name);
     Set<Role> granted = validateRoles(roles);
     if (expiresAt != null && !expiresAt.isAfter(clock.instant())) {
@@ -109,14 +111,14 @@ public class ServiceAccountService {
     return new CreatedAccount(view, token);
   }
 
-  @Transactional
+  @Transactional(noRollbackFor = ForbiddenException.class)
   public CreatedAccount rotate(ServiceAccountPrincipal caller, UUID id, Instant expiresAt) {
     AccountView current = load(caller.tenantId(), id)
         .orElseThrow(ServiceAccountNotFoundException::new);
-    Decision decision = authz.authorize(
-        Optional.of(caller), Action.ROTATE_SERVICE_ACCOUNT,
+    Decision decision =
+        AuditedAuthorizer.require(authz, audit, caller,
+        Action.ROTATE_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()));
-    requirePermitted(decision);
     if (current.revoked()) {
       throw new ServiceAccountConflictException("revoked accounts stay revoked; create a new one");
     }
@@ -138,14 +140,14 @@ public class ServiceAccountService {
     return new CreatedAccount(load(caller.tenantId(), id).orElseThrow(), token);
   }
 
-  @Transactional
+  @Transactional(noRollbackFor = ForbiddenException.class)
   public AccountView revoke(ServiceAccountPrincipal caller, UUID id) {
     AccountView current = load(caller.tenantId(), id)
         .orElseThrow(ServiceAccountNotFoundException::new);
-    Decision decision = authz.authorize(
-        Optional.of(caller), Action.REVOKE_SERVICE_ACCOUNT,
+    Decision decision =
+        AuditedAuthorizer.require(authz, audit, caller,
+        Action.REVOKE_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()));
-    requirePermitted(decision);
     if (!current.revoked()) {
       tenant.update(
           "UPDATE service_account SET revoked = TRUE WHERE id = ? AND tenant_id = ?",
@@ -163,18 +165,18 @@ public class ServiceAccountService {
   public AccountView get(ServiceAccountPrincipal caller, UUID id) {
     AccountView current = load(caller.tenantId(), id)
         .orElseThrow(ServiceAccountNotFoundException::new);
-    Decision decision = authz.authorize(
-        Optional.of(caller), Action.READ_SERVICE_ACCOUNT,
+    Decision decision =
+        AuditedAuthorizer.require(authz, audit, caller,
+        Action.READ_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()));
-    requirePermitted(decision);
     return current;
   }
 
   public List<AccountView> list(ServiceAccountPrincipal caller) {
-    Decision decision = authz.authorize(
-        Optional.of(caller), Action.READ_SERVICE_ACCOUNT,
+    Decision decision =
+        AuditedAuthorizer.require(authz, audit, caller,
+        Action.READ_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", "list", caller.tenantId()));
-    requirePermitted(decision);
     return tenant.query(
         "SELECT id, name, roles, revoked, expires_at, created_at FROM service_account"
             + " WHERE tenant_id = ? ORDER BY created_at",
@@ -225,9 +227,4 @@ public class ServiceAccountService {
     return granted;
   }
 
-  private static void requirePermitted(Decision decision) {
-    if (!decision.permitted()) {
-      throw new dev.sovra.authz.ForbiddenException(decision.reasonCode());
-    }
-  }
 }

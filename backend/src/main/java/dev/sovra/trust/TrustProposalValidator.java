@@ -44,7 +44,8 @@ public final class TrustProposalValidator {
       if (!issuer.validThrough().isAfter(now)) {
         throw new InvalidProposalException("key already expired");
       }
-      if (!Set.of("ACTIVE", "SUSPENDED").contains(issuer.status())) {
+      if (!Set.of(IssuerStatus.ACTIVE.name(), IssuerStatus.SUSPENDED.name())
+          .contains(issuer.status())) {
         throw new InvalidProposalException("new keys must be ACTIVE or SUSPENDED");
       }
     }
