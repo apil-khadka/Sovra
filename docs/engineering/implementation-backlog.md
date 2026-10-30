@@ -76,7 +76,7 @@ All 41 remote issues were observed open during this audit.
 | [SOV-018](#sov-018) | Implement local extraction, protected digests and provenance revisions | G2 | demo_implemented | SOV-002, SOV-003, SOV-015, SOV-016, SOV-017 | [Issue](https://github.com/apil-khadka/Sovra/issues/23) |
 | [SOV-019](#sov-019) | Implement enrollment review, corrections and claim eligibility | G2 | demo_implemented | SOV-001, SOV-002, SOV-005, SOV-007, SOV-008, SOV-015, SOV-018, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/24) |
 | [SOV-020](#sov-020) | Implement holder credential custody and secure recovery | G2 | demo_implemented | SOV-001, SOV-002, SOV-004, SOV-005, SOV-006, SOV-010, SOV-012, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/25) |
-| [SOV-021](#sov-021) | Ship tested Java and TypeScript SDKs | G3 | not_started | SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/26) |
+| [SOV-021](#sov-021) | Ship tested Java and TypeScript SDKs | G3 | demo_implemented | SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/26) |
 | [SOV-022](#sov-022) | Build developer portal, sandbox and integration onboarding | G3 | not_started | SOV-005, SOV-006, SOV-015, SOV-021 | [Issue](https://github.com/apil-khadka/Sovra/issues/27) |
 | [SOV-023](#sov-023) | Build issuer information-management dashboard | G3 | not_started | SOV-005, SOV-006, SOV-007, SOV-012, SOV-015, SOV-016, SOV-019 | [Issue](https://github.com/apil-khadka/Sovra/issues/28) |
 | [SOV-024](#sov-024) | Build holder enrollment, consent and credential dashboard | G3 | partial | SOV-005, SOV-010, SOV-015, SOV-019, SOV-020 | [Issue](https://github.com/apil-khadka/Sovra/issues/29) |
@@ -651,8 +651,8 @@ Required closure evidence:
 
 Owner role: SDK engineering.
 Gate: G3; proposed priority: p1; triage: needs-triage.
-Progress: not_started (reviewed 2026-10-29).
-Remaining/evidence scope: No released Java/TypeScript SDK or SDK consumer tests found; frontend fetch helpers are not SDK releases.
+Progress: demo_implemented (reviewed 2026-10-30).
+Remaining/evidence scope: Java (sdk/java) and TypeScript (sdk/typescript) SDKs at contract 0.13.0 with 13 live-stack tests each, sdk-live CI job, READMEs and sdk/RELEASE.md; independent review remains.
 Dependencies: SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/26).
 Requirements: FR-46, IF-13, NFR-09, NFR-13.

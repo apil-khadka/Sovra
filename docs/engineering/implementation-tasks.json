@@ -1200,9 +1200,9 @@
       "acceptance_cases": [
         "AC-13"
       ],
-      "implementation_progress": "not_started",
-      "implementation_observation": "No released Java/TypeScript SDK or SDK consumer tests found; frontend fetch helpers are not SDK releases.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Java (sdk/java, Jackson-only runtime dep) and TypeScript (sdk/typescript, zero runtime deps) SDKs cover the machine chain at contract 0.13.0 with typed errors, origin validation, idempotency keys, ETag precondition reads and no write auto-retry; 13 live-stack tests each plus quickstart/negative coverage, sdk-live CI job, READMEs and sdk/RELEASE.md provenance. Independent review remains.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {

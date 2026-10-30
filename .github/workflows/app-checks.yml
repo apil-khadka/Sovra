@@ -59,6 +59,57 @@ jobs:
       - name: Lint
         run: pnpm --dir frontend run lint
 
+  sdk-live:
+    name: SDK live-stack suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SOVRA_AI_LIVE_ENABLED: 'false'
+      SOVRA_AI_API_KEY: ''
+      SOVRA_AI_BASE_URL: ''
+      SOVRA_AI_MODEL: ''
+      SOVRA_PROFILE: synthetic
+      SOVRA_SDK_BASE: http://localhost:8080
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up JDK 25
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sdk/typescript/package-lock.json
+      - name: Start disposable compose stack
+        run: docker compose up --build -d
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/api/health/ready | grep -q '"status":"READY"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "stack never became ready" >&2
+          exit 1
+      - name: Run Java SDK suite
+        run: JAVA_HOME=$JAVA_HOME ./backend/mvnw -f sdk/java/pom.xml test
+      - name: Run TypeScript SDK suite
+        run: npm --prefix sdk/typescript ci --no-audit --no-fund && npm --prefix sdk/typescript test
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs app-a keycloak db-seed
+      - name: Tear down disposable stack
+        if: always()
+        run: docker compose down -v
+
   browser-e2e:
     name: Browser journey (${{ matrix.profile }})
     runs-on: ubuntu-latest
