@@ -485,8 +485,8 @@ Required closure evidence:
 
 Owner role: API architecture.
 Gate: G1; proposed priority: p1; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Implemented API 0.6.0 and contract tests cover current routes; remaining product APIs, compatibility and profile contracts remain.
+Progress: partial (reviewed 2026-10-30).
+Remaining/evidence scope: Implemented API 0.16.0 with served/documented parity gate covers machine and BFF routes; remaining product APIs, compatibility and profile contracts remain.
 Dependencies: SOV-001, SOV-002, SOV-003, SOV-004.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/17).
 Requirements: IF-01, IF-02, IF-03, IF-07, IF-09, IF-10, IF-11, IF-12, NFR-09.
@@ -511,7 +511,7 @@ Required closure evidence:
 
 Owner role: Document backend and key operations.
 Gate: G2; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
+Progress: partial (reviewed 2026-10-30).
 Remaining/evidence scope: Software-key vault/grants, purpose-bound BFF review-view and two-phase retention purge (V28 SECURITY DEFINER zeroing, tombstones) with HTTP evidence exist; KMS/attestation, key retirement/rewrap and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-007, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/20).
@@ -540,7 +540,7 @@ Required closure evidence:
 
 Owner role: Document processing and platform security.
 Gate: G2; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
+Progress: partial (reviewed 2026-10-30).
 Remaining/evidence scope: Isolated PNG/JPEG quarantine worker, admission queue and verdict metrics with HTTP evidence exist; deeper scanning/review, production custody and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-016, SOV-027.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/22).
@@ -652,7 +652,7 @@ Required closure evidence:
 Owner role: SDK engineering.
 Gate: G3; proposed priority: p1; triage: needs-triage.
 Progress: demo_implemented (reviewed 2026-10-30).
-Remaining/evidence scope: Java (sdk/java) and TypeScript (sdk/typescript) SDKs at contract 0.15.0 with 13 live-stack tests each, sdk-live CI job, READMEs and sdk/RELEASE.md; independent review remains.
+Remaining/evidence scope: Java (sdk/java) and TypeScript (sdk/typescript) SDKs at contract 0.16.0 with 13 live-stack tests each, sdk-live CI job, READMEs and sdk/RELEASE.md; independent review remains.
 Dependencies: SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/26).
 Requirements: FR-46, IF-13, NFR-09, NFR-13.
@@ -839,7 +839,7 @@ Required closure evidence:
 
 Owner role: Build and platform security.
 Gate: G2; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
+Progress: partial (reviewed 2026-10-30).
 Remaining/evidence scope: Pinned builds, CycloneDX SBOM and CI supply-chain job (pnpm audit high+, OSV-Scanner v2.7.0, zero findings 2026-10-30) exist; signed provenance, deployment admission enforcement and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-027.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/33).
@@ -892,7 +892,7 @@ Required closure evidence:
 
 Owner role: Product, performance and operations.
 Gate: G2; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
+Progress: partial (reviewed 2026-10-30).
 Remaining/evidence scope: Finite request/tool/token/worker budgets and aggregate live-grant budget (64/version, 409 recovery) with HTTP evidence exist; measured staging capacity, approved recovery/service targets and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-015, SOV-027, SOV-029.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/34).
@@ -945,7 +945,7 @@ Required closure evidence:
 
 Owner role: Security validation.
 Gate: G3; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
+Progress: partial (reviewed 2026-10-30).
 Remaining/evidence scope: SEC-01..44 demo evidence map (30 covered, 13 partial, 1 gap) plus an executed mutation proof exist; full ASVS L3 mapping, property/fuzz/mutation suites and independent review remain.
 Dependencies: SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-036, SOV-038, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/36).
@@ -971,7 +971,7 @@ Required closure evidence:
 
 Owner role: Security exercise and operations.
 Gate: G3; proposed priority: p0; triage: needs-triage.
-Progress: deferred_production (reviewed 2026-10-29).
+Progress: deferred_production (reviewed 2026-10-30).
 Remaining/evidence scope: Representative deployed MC attack/load/failover exercises have not been established; not a paid-infrastructure blocker for local synthetic work.
 Dependencies: SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-032.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/37).
@@ -998,7 +998,7 @@ Required closure evidence:
 
 Owner role: Independent security reviewer and release authority.
 Gate: G3; proposed priority: p0; triage: needs-triage.
-Progress: deferred_production (reviewed 2026-10-29).
+Progress: deferred_production (reviewed 2026-10-30).
 Remaining/evidence scope: Independent production release approval is not complete; do not infer it from passing demo tests.
 Dependencies: SOV-032, SOV-033, SOV-035, SOV-036, SOV-037, SOV-038, SOV-039, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/39).
@@ -1026,7 +1026,7 @@ Required closure evidence:
 
 Owner role: Backend integration and E2E.
 Gate: G1; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
+Progress: partial (reviewed 2026-10-30).
 Remaining/evidence scope: Demo UI, prior clean-checkout proof and live smoke exist; reproducible packaged browser journey, protocol qualification and zero-charge public release evidence remain.
 Dependencies: SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029, SOV-036, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/38).
@@ -1057,7 +1057,7 @@ Required closure evidence:
 
 Owner role: Credential interoperability.
 Gate: G1; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
+Progress: partial (reviewed 2026-10-30).
 Remaining/evidence scope: SD-JWT artifact adapters, kb+jwt binding, VCI/VP/DCQL/encrypted-response flows, and the independent-wallet adversarial corpus exist with both-profile HTTP evidence; external conformance suites, walt-id session-handler adoption, strong digest pinning, and SOV-037 review remain. Keep issue 40 open.
 Dependencies: SOV-001, SOV-003, SOV-004, SOV-009, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/40).
@@ -1086,7 +1086,7 @@ Required closure evidence:
 
 Owner role: Independent security/privacy assessor and issuer authority.
 Gate: G0; proposed priority: p0; triage: needs-triage.
-Progress: deferred_production (reviewed 2026-10-29).
+Progress: deferred_production (reviewed 2026-10-30).
 Remaining/evidence scope: No named independent assessor/date or accepted independent design/privacy report is recorded.
 Dependencies: SOV-001, SOV-002, SOV-004, SOV-039.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/42).
@@ -1112,7 +1112,7 @@ Required closure evidence:
 
 Owner role: Confidential platform, key and security engineering.
 Gate: G2; proposed priority: p0; triage: needs-triage.
-Progress: deferred_production (reviewed 2026-10-29).
+Progress: deferred_production (reviewed 2026-10-30).
 Remaining/evidence scope: KMS sign/unwrap paths remain fail-closed placeholders; no deployed attestation/key/input-channel qualification established.
 Dependencies: SOV-004, SOV-006, SOV-016, SOV-027, SOV-028, SOV-040.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/44).
@@ -1143,7 +1143,7 @@ Required closure evidence:
 
 Owner role: Issuer authority, privacy and platform architecture.
 Gate: G0; proposed priority: p0; triage: needs-triage.
-Progress: deferred_production (reviewed 2026-10-29).
+Progress: deferred_production (reviewed 2026-10-30).
 Remaining/evidence scope: No actual real-data issuer/jurisdiction/provider capability approval recorded; demo hosting is a separate zero-charge qualification.
 Dependencies: SOV-002, SOV-004.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/41).
@@ -1198,7 +1198,7 @@ Required closure evidence:
 
 Owner role: Integration and security E2E engineering.
 Gate: G1; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
+Progress: partial (reviewed 2026-10-30).
 Remaining/evidence scope: Both artifact-profile HTTP E2E suites exist, the packaged same-origin SPA/BFF delivery is implemented with HTTP evidence, and a pinned Playwright/Chromium suite proves DOM/JS login, holder consent, verification, and the SD-JWT wallet journeys (pre-authorized and authorization-code with browser-owned PKCE) with a CI job; full external selected-profile flow evidence remains. Keep issue 45 open.
 Dependencies: SOV-010, SOV-011, SOV-012, SOV-015, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/45).

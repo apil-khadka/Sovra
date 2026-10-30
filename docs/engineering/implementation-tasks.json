@@ -840,7 +840,7 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/17",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "Implemented API 0.9.0 and served/documented parity tests cover current machine and BFF routes; remaining product APIs and full profile contracts remain.",
+      "implementation_observation": "Implemented API 0.16.0 with served/documented parity gate (every route documented with x-sovra-scopes, version pinned) covering machine and BFF routes; remaining product APIs and full profile contracts remain.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
@@ -1201,7 +1201,7 @@
         "AC-13"
       ],
       "implementation_progress": "demo_implemented",
-      "implementation_observation": "Java (sdk/java, Jackson-only runtime dep) and TypeScript (sdk/typescript, zero runtime deps) SDKs cover the machine chain at contract 0.15.0 with typed errors, origin validation, idempotency keys, ETag precondition reads and no write auto-retry; 13 live-stack tests each plus quickstart/negative coverage, sdk-live CI job, READMEs and sdk/RELEASE.md provenance. Independent review remains.",
+      "implementation_observation": "Java (sdk/java, Jackson-only runtime dep) and TypeScript (sdk/typescript, zero runtime deps) SDKs cover the machine chain at contract 0.16.0 with typed errors, origin validation, idempotency keys, ETag precondition reads and no write auto-retry; 13 live-stack tests each plus quickstart/negative coverage, sdk-live CI job, READMEs and sdk/RELEASE.md provenance. Independent review remains.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
@@ -1967,8 +1967,8 @@
         "AC-17"
       ],
       "implementation_progress": "deferred_production",
-      "implementation_observation": "Representative deployed MC attack/load/failover exercises have not been established; not a paid-infrastructure blocker for local synthetic work.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Blocked: no representative deployed staging exists, so no MC attack/load/failover/rollback exercise from the security validation plan has run. Local synthetic suites (578 backend, 34+35 browser, SDKs) do not substitute. Unblocks on provisioned staging plus approved load drivers.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -2059,8 +2059,8 @@
         "AC-17"
       ],
       "implementation_progress": "deferred_production",
-      "implementation_observation": "Independent production release approval is not complete; do not infer it from passing demo tests.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Blocked: no independent assessor is named, no review date is set, and no production release report exists. 578 green backend tests plus browser/SDK evidence do not constitute independent review. Unblocks on assessor engagement.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -2138,7 +2138,7 @@
         "AC-08"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Packaged native and SD-JWT browser journeys, including pre-authorized VCI and encrypted VP, are implemented; full external conformance and zero-charge public release evidence remain.",
+      "implementation_observation": "Packaged native and SD-JWT browser journeys, including pre-authorized and authorization-code VCI (browser-owned PKCE) plus encrypted VP, are implemented; full external conformance and zero-charge public release evidence remain.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/engineering/first-vertical-slice.md",
@@ -2191,7 +2191,7 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/40",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "SD-JWT/kb+jwt, VCI/VP/DCQL/encrypted responses and an in-memory browser wallet with pre-authorized issuance/consent/encrypted presentation exist; external conformance, authorization-code browser coverage, strong artifact pinning and independent review remain. Keep issue 40 open.",
+      "implementation_observation": "SD-JWT/kb+jwt, VCI/VP/DCQL/encrypted responses and an in-memory browser wallet with pre-authorized and authorization-code issuance/consent/encrypted presentation exist; external conformance, strong artifact pinning and independent review remain. Keep issue 40 open.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/architecture/decisions/SOV-001-proof-profile.md",
@@ -2253,8 +2253,8 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/42",
       "acceptance_cases": [],
       "implementation_progress": "deferred_production",
-      "implementation_observation": "No named independent assessor/date or accepted independent design/privacy report is recorded.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Blocked: no named independent assessor/date and no accepted independent G0 architecture, privacy, or custody report is recorded. Unblocks on assessor engagement.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -2327,8 +2327,8 @@
         "AC-17"
       ],
       "implementation_progress": "deferred_production",
-      "implementation_observation": "KMS sign/unwrap paths remain fail-closed placeholders; no deployed attestation/key/input-channel qualification established.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Blocked: KMS sign/unwrap paths are fail-closed placeholders (KmsVaultKekProvider answers kms_unavailable; ProductionValidator refuses live mode without KMS). No HSM, attestation, or confidential-input hardware is deployed or qualified. Unblocks on approved hardware plus provider capability proof.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -2380,8 +2380,8 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/41",
       "acceptance_cases": [],
       "implementation_progress": "deferred_production",
-      "implementation_observation": "No actual real-data issuer/jurisdiction/provider capability approval recorded; demo hosting is a separate zero-charge qualification.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Blocked: no real-data issuer, jurisdiction, or provider capability approval is recorded; the demo runs synthetic fixtures only with no paid services. Unblocks on first-issuer approval (legal, retention, residency) per SOV-002/SOV-004.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
