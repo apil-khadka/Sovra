@@ -30,7 +30,10 @@ The suite drives real Keycloak login, direct SPA landing, holder consent, signed
 Issuer/RP setup uses the disposable machine account; holder consent and verification proofs use WebCrypto in the page.
 
 Overrides are `SOVRA_BROWSER_BASE` (default `http://localhost:8080`), `SOVRA_E2E_DB_CONTAINER` (default `sovra-db-1`) and `SOVRA_DB_ADMIN_PASSWORD`.
-The current verifier UI implements the native synthetic binding.
-The SD-JWT/OpenID selected-profile browser journey is still pending; setting `SOVRA_PROFILE=sdjwt-vc` does not add it.
-The CI `browser-e2e` job explicitly uses synthetic fixture mode with live provider access disabled.
+The native verifier screen implements the synthetic binding.
+The OpenID demo wallet implements the SD-JWT pre-authorized issuance/consent/encrypted-presentation journey with in-memory holder custody.
+For that journey, start Compose with `SOVRA_PROFILE=sdjwt-vc` and pass the same variable to the browser command.
+Both application instances must use the selected profile; keep live AI disabled as above.
+CI runs both profiles separately with live provider access disabled.
+See [wallet scope and limitations](../docs/engineering/sov-041-browser-wallet.md).
 See [browser evidence](../docs/engineering/sov-041-browser-e2e.md) and the [continuation guide](../docs/engineering/continuation-guide.md).

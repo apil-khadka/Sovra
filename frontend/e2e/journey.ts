@@ -104,7 +104,7 @@ export async function decideViaBrowser(
     .click()
   if (decision === 'approve') {
     await expect(page.getByText('Verified — synthetic consent proof')).toBeVisible()
-    expect(await fieldValue(page, 'Profile')).toBe(expectedProfile())
+    expect(await fieldValue(page, 'Profile')).toBe('sovra-g1-synthetic/0.2')
     expect((await fieldValue(page, 'Presentation')).split('.')).toHaveLength(3)
   } else {
     await expect(page.getByText('Denied — nothing was shared')).toBeVisible()

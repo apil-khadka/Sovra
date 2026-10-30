@@ -112,7 +112,7 @@ function derToRaw(der: Buffer): Buffer {
   return Buffer.concat([take(), take()])
 }
 
-async function api(
+export async function api(
   base: string,
   token: string,
   method: string,

@@ -10,6 +10,7 @@ import type { EcJwk } from './sovra'
 import { browserHolder, decideViaBrowser, expectedProfile } from './journey'
 
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] })
+test.skip(process.env.SOVRA_PROFILE === 'sdjwt-vc', 'Native verifier UI uses the synthetic binding; selected-profile coverage is in wallet.spec.ts.')
 
 async function submitVerification(
   page: Page,

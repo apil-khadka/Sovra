@@ -1,7 +1,7 @@
 # SOV-041 real-browser E2E evidence
 
 **Updated:** 2026-10-30.
-**Scope:** packaged native synthetic journey, not full selected-profile acceptance.
+**Scope:** packaged native synthetic journey plus the [G1 OpenID browser wallet](sov-041-browser-wallet.md), not full external conformance acceptance.
 SOV-041 remains open for the complete SD-JWT/OpenID browser flow and its other acceptance requirements.
 
 ## Harness
@@ -44,9 +44,10 @@ Both the login regression and shared journey helper require direct landing at th
 
 ## Limits
 
-The current React verifier uses the native synthetic binding, not `kb+jwt` or encrypted OpenID4VP transport.
-The consent presentation endpoint returns the synthetic consent artifact, not an SD-JWT holder-custody interface.
-Backend protocol tests and independent JOSE fixtures exercise different boundaries and do not substitute for this missing browser flow.
+The native React verifier uses the synthetic binding.
+The separate OpenID demo wallet receives its credential directly through VCI and implements `kb+jwt` with encrypted OpenID4VP transport.
+It does not treat the consent presentation endpoint's synthetic consent artifact as a credential.
+The wallet is an in-memory synthetic demonstration, with separate evidence and remaining scope recorded in its assessment.
 Expiry, cross-instance races, restart recovery and the issuer/revocation matrix remain covered by backend and HTTP suites.
 External wallet/conformance evidence remains open under [SOV-036](sov-036-protocol-assessment.md).
 
@@ -59,3 +60,9 @@ Earlier attempts included a local stack outage, browser timeouts and a view-tran
 The helper now waits for the verification heading before filling fields shared with the consent screen.
 Failed attempts are not counted as passing evidence.
 The local checks do not establish hosted CI or public-deployment results.
+
+
+The final profile-matrix local runs on 2026-10-30 passed 14 applicable cases per profile, with four cases for the other binding path explicitly skipped.
+The shared cases include login-before-key creation to prevent login navigation from discarding a new in-memory wallet key.
+The selected-profile run includes the full browser wallet acceptance circle and its request/ciphertext tampering and denial cases.
+Hosted CI results remain unobserved in this session.

@@ -2,19 +2,21 @@ import { useEffect, useState } from 'react'
 import ConsentView from './ConsentView'
 import DemoView from './DemoView'
 import VerifyView from './VerifyView'
+import OpenIdWalletView from './OpenIdWalletView'
 import ReadinessPanel from './components/ReadinessPanel'
 import Field from './components/Field'
 import { useAsync } from './hooks/useAsync'
 import { fetchSession, login, logout } from './auth'
 import { fetchHealth, fetchReadiness } from './ops'
 
-type ViewName = 'status' | 'demo' | 'consent' | 'verify'
+type ViewName = 'status' | 'demo' | 'consent' | 'verify' | 'wallet'
 
 const VIEW_TITLES: Record<ViewName, string> = {
   status: 'Sovra — Status',
   demo: 'Sovra — Public demo',
   consent: 'Sovra — Holder consent',
   verify: 'Sovra — Verify presentation',
+  wallet: 'Sovra - OpenID demo wallet',
 }
 
 const NAV: Array<{ view: ViewName; label: string }> = [
@@ -22,6 +24,7 @@ const NAV: Array<{ view: ViewName; label: string }> = [
   { view: 'demo', label: 'Demo' },
   { view: 'consent', label: 'Holder consent' },
   { view: 'verify', label: 'Verify presentation' },
+  { view: 'wallet', label: 'OpenID demo wallet' },
 ]
 
 function viewFromHash(): ViewName {
@@ -134,6 +137,7 @@ export default function App() {
         {view === 'demo' && <DemoView />}
         {view === 'consent' && <ConsentView session={sessionInfo} />}
         {view === 'verify' && <VerifyView session={sessionInfo} />}
+        {view === 'wallet' && <OpenIdWalletView session={sessionInfo} />}
       </main>
     </>
   )

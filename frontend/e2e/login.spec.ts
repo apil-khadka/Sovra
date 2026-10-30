@@ -68,3 +68,9 @@ test('anonymous and machine-token BFF reads are rejected', async ({ page, reques
   })
   expect(res.status()).toBe(401)
 })
+
+test('wallet asks for login before creating an in-memory holder key', async ({ page }) => {
+  await page.goto('/#/wallet')
+  await expect(page.getByRole('heading', { name: 'OpenID demo wallet', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create wallet key', exact: true })).toBeDisabled()
+})

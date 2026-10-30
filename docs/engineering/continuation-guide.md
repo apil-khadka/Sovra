@@ -19,8 +19,9 @@ See [browser evidence](sov-041-browser-e2e.md) and [packaging](sov-041-same-orig
 
 The protocol implementation includes SD-JWT artifacts and `kb+jwt`, synthetic OpenID4VCI grants, signed OpenID4VP requests, DCQL and encrypted `direct_post.jwt` responses.
 Separate JOSE wallet fixtures and backend adversarial suites exercise those adapters.
-External wallet/conformance evidence and the complete selected-profile browser journey remain open; see [SOV-036](sov-036-protocol-assessment.md).
-The current React verifier signs the native synthetic binding, so changing `SOVRA_PROFILE` alone does not qualify the browser journey for SD-JWT.
+The [OpenID demo wallet](sov-041-browser-wallet.md) adds in-memory browser VCI pre-authorized issuance, explicit consent, signed-request checks, encrypted VP submission and replay.
+The native verifier screen retains its synthetic binding.
+Authorization-code/PKCE browser coverage, external wallet/conformance evidence and full qualification remain open; see [SOV-036](sov-036-protocol-assessment.md).
 
 Vault and quarantine service entry points reject caller ingestion when `SOVRA_DEMO_SYNTHETIC_ONLY=true`.
 The public-demo Compose overlay forces this boundary and disables live planning on both application instances.
@@ -40,7 +41,8 @@ Use the [live integration record](../ai/live-integration.md) for the remaining e
 The clean 2026-10-30 Java 25 build passed 498 tests with zero failures/errors/skips, including durable-denial and nested tenant-pin regressions.
 An earlier 501-test report does not match that clean baseline; do not reuse retained report totals as new evidence.
 Frontend typecheck/build/lint and repository checks passed.
-The expanded Playwright suite passed 13/13, including tampering, wrong-holder and signed-POST replay checks.
+The final Playwright runs passed 14 applicable cases in each of the synthetic and SD-JWT profiles, including profile-appropriate tampering and replay checks.
+Each run explicitly skips the four cases for the other binding path.
 Subsequent change-specific results belong in their dated assessments and must state the actual command, profile and deployment scope.
 No live provider call is needed for the offline checks.
 
@@ -82,9 +84,9 @@ The HTTP suites also rebuild/restart services, so qualify isolation, ports, orig
 1. Preserve and review the complete working tree, including untracked Java classes and migrations.
    Keep the continuation records consistent with implemented behavior and fresh evidence.
    Exclude `.intel` and secrets before any authorized commit or push.
-2. Complete SOV-036/041 selected-profile browser evidence.
-   Add the holder's VCI issuance and encrypted VP journey while preserving consent, trust/status freshness, RLS, audit and durable replay.
-   The native React verifier still needs the selected profile's binding and artifact-delivery path.
+2. Complete the remaining SOV-036/041 qualification.
+   Extend the implemented pre-authorized browser wallet to the authorization-code/PKCE grant and remaining profile cases.
+   Preserve consent, trust/status freshness, RLS, audit and durable replay through the adapters.
    Add browser-visible tampering, expiry and wrong-holder/audience failures alongside the existing HTTP concurrency/restart tests.
    Qualify external wallet/conformance compatibility and record exact library adoption or incompatibilities.
    Keep SOV-036/041 open until their complete criteria pass.

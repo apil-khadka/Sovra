@@ -152,3 +152,12 @@ Open:
   walt-id VCI/VP session modules is unconfirmed.
 - SOV-037 independent review stays the gate before
   real-data provisioning/processing.
+
+
+## 2026-10-30 browser implementation
+
+The [OpenID demo wallet](sov-041-browser-wallet.md) now performs pre-authorized VCI issuance, BFF consent review/decision, local-JWKS request verification, `kb+jwt` generation and encrypted `direct_post.jwt` submission through actual React controls.
+The selected-profile Playwright run passed 14 tests, including login-before-key creation, the complete acceptance circle, ciphertext replay, denial and tampering cases; four native-binding cases are explicitly skipped in that profile.
+Holder keys and credential bytes stay in memory and are discarded on reset/view exit.
+This closes the missing pre-authorized browser journey, not external conformance, production custody, authorization-code/PKCE browser coverage or third-party wallet qualification.
+Backend protocol handlers and their library-adoption limitations remain unchanged.

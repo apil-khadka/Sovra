@@ -1147,8 +1147,8 @@
         "AC-16"
       ],
       "implementation_progress": "not_started",
-      "implementation_observation": "Demo holder proof helpers do not implement device custody, encrypted backup recovery or loss/theft/reissuance.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "An in-memory synthetic OpenID browser wallet now receives and presents SD-JWT credentials; production device custody, encrypted backup/recovery, loss/theft and reissuance remain unimplemented.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
@@ -1351,9 +1351,11 @@
         "AC-14"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Holder consent/verification views exist; full enrollment/documents/history/recovery dashboard and accessibility evidence remain.",
-      "progress_reviewed_on": "2026-10-29",
-      "progress_evidence": []
+      "implementation_observation": "Packaged native consent/verification plus an in-memory OpenID wallet implement browser consent and selected-profile pre-authorized issuance/encrypted presentation; full enrollment/documents/history/recovery dashboard remains.",
+      "progress_reviewed_on": "2026-10-30",
+      "progress_evidence": [
+        "docs/engineering/sov-041-browser-wallet.md"
+      ]
     },
     {
       "id": "SOV-025",
@@ -2125,10 +2127,11 @@
         "AC-08"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Packaged same-origin browser journey and prior live smoke exist; full selected-profile browser qualification and zero-charge public release evidence remain.",
+      "implementation_observation": "Packaged native and SD-JWT browser journeys, including pre-authorized VCI and encrypted VP, are implemented; full external conformance and zero-charge public release evidence remain.",
       "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
-        "docs/engineering/first-vertical-slice.md"
+        "docs/engineering/first-vertical-slice.md",
+        "docs/engineering/sov-041-browser-wallet.md"
       ]
     },
     {
@@ -2177,11 +2180,12 @@
       "issue_url": "https://github.com/apil-khadka/Sovra/issues/40",
       "acceptance_cases": [],
       "implementation_progress": "partial",
-      "implementation_observation": "SD-JWT artifact adapters, kb+jwt binding, VCI/VP/DCQL/encrypted-response flows, and the independent-wallet adversarial corpus exist with both-profile HTTP evidence; external conformance suites, walt-id session-handler adoption, strong digest pinning, and SOV-037 review remain. Keep issue 40 open.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "SD-JWT/kb+jwt, VCI/VP/DCQL/encrypted responses and an in-memory browser wallet with pre-authorized issuance/consent/encrypted presentation exist; external conformance, authorization-code browser coverage, strong artifact pinning and independent review remain. Keep issue 40 open.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/architecture/decisions/SOV-001-proof-profile.md",
-        "docs/engineering/sov-036-protocol-assessment.md"
+        "docs/engineering/sov-036-protocol-assessment.md",
+        "docs/engineering/sov-041-browser-wallet.md"
       ]
     },
     {
@@ -2510,14 +2514,15 @@
         "AC-08"
       ],
       "implementation_progress": "partial",
-      "implementation_observation": "Both artifact-profile HTTP E2E suites exist, the packaged same-origin SPA/BFF delivery is implemented with HTTP evidence, and a pinned Playwright/Chromium suite proves DOM/JS login, holder consent, and verification with a CI job; full external selected-profile flow evidence remains. Keep issue 45 open.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_observation": "Same-origin SPA/BFF and browser profile matrix cover native synthetic and SD-JWT wallet journeys, replay, denial and tampering. External conformance, remaining selected-profile criteria and full two-instance qualification remain. Keep issue 45 open.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": [
         "docs/engineering/sov-041-holder-browser-assessment.md",
         "docs/engineering/sov-041-same-origin-packaging.md",
         "docs/engineering/sov-041-browser-e2e.md",
         "scripts/e2e-verification.py",
-        "scripts/e2e-bff-login.py"
+        "scripts/e2e-bff-login.py",
+        "docs/engineering/sov-041-browser-wallet.md"
       ]
     }
   ],

@@ -60,15 +60,19 @@ jobs:
         run: pnpm --dir frontend run lint
 
   browser-e2e:
-    name: Real-browser login/consent/verification
+    name: Browser journey (${{ matrix.profile }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [synthetic, sdjwt-vc]
     env:
       SOVRA_AI_LIVE_ENABLED: 'false'
       SOVRA_AI_API_KEY: ''
       SOVRA_AI_BASE_URL: ''
       SOVRA_AI_MODEL: ''
-      SOVRA_PROFILE: synthetic
+      SOVRA_PROFILE: ${{ matrix.profile }}
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
