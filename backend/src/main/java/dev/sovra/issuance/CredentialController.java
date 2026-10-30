@@ -44,7 +44,8 @@ public class CredentialController {
             caller,
             new IssuanceService.IssueRequest(
                 request.issuerId(), request.vct(), request.holderJwk(),
-                request.holderProof(), request.claims(), request.expiresAt()),
+                request.holderProof(), request.claims(), request.expiresAt(),
+                request.enrollmentId()),
             idempotencyKey);
     // Verbatim body: idempotent replays are byte-identical by construction.
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -86,5 +87,6 @@ public class CredentialController {
       @NotNull JsonNode holderJwk,
       @NotNull String holderProof,
       @NotNull Map<String, Object> claims,
-      @NotNull Instant expiresAt) {}
+      @NotNull Instant expiresAt,
+      UUID enrollmentId) {}
 }

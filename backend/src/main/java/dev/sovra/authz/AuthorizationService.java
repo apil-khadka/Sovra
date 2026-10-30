@@ -93,6 +93,16 @@ public class AuthorizationService {
           Map.entry(
               Action.EXTRACTION_READ,
               EnumSet.of(Role.ISSUER_OPS, Role.AUDIT_READER, Role.TRUST_ADMIN)),
+          // Enrollment (SOV-019, OD-14): operators run the case
+          // lifecycle; reads follow the extraction read set.
+          // Maker/checker separation is enforced by identity
+          // comparison in the service, not by role.
+          Map.entry(Action.ENROLLMENT_CREATE, EnumSet.of(Role.ISSUER_OPS)),
+          Map.entry(Action.ENROLLMENT_SUBMIT, EnumSet.of(Role.ISSUER_OPS)),
+          Map.entry(Action.ENROLLMENT_DECIDE, EnumSet.of(Role.ISSUER_OPS)),
+          Map.entry(
+              Action.ENROLLMENT_READ,
+              EnumSet.of(Role.ISSUER_OPS, Role.AUDIT_READER, Role.TRUST_ADMIN)),
           // OpenID4VCI (SOV-036): issuer operators publish offers; the
           // holder's tenant agent drives the synthetic authorization
           // server. Wallet token/credential calls carry no service

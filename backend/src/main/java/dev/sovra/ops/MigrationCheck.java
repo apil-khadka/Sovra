@@ -43,7 +43,9 @@ public class MigrationCheck implements ReadinessCheck {
           "vci_token",
           "vp_session",
           "extraction_record",
-          "extraction_revision");
+          "extraction_revision",
+          "enrollment",
+          "enrollment_review");
 
   private final JdbcTemplate global;
 

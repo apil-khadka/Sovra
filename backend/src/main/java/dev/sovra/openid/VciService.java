@@ -334,7 +334,7 @@ public class VciService {
                     token.creator(),
                     new IssuanceService.IssueRequest(
                         token.issuerId(), token.vct(), holderJwk, proof.get("jwt").asString(),
-                        Map.of("adultOver18", Boolean.TRUE), now.plus(CREDENTIAL_VALIDITY)),
+                        Map.of("adultOver18", Boolean.TRUE), now.plus(CREDENTIAL_VALIDITY), null),
                     "vci-" + token.id().toString().replace("-", ""),
                     cNonce,
                     authority);

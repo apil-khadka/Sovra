@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.10.0
+  version: 0.11.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -604,6 +604,119 @@ paths:
         '403': { description: Lacks ISSUER_OPS }
         '404': { description: Unknown record }
         '409': { description: Revision is superseded by a correction }
+  /api/enrollments:
+    post:
+      operationId: createEnrollment
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Open an enrollment case (SOV-019, OD-14): binds one approved
+        extraction revision to a fresh opaque subject reference and
+        one holder P-256 key. The source must already carry an
+        extraction approval; unreviewed sources conflict.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vaultObjectId, extractionRecordId, holderJwk]
+              properties:
+                vaultObjectId: { type: string, format: uuid }
+                extractionRecordId: { type: string, format: uuid }
+                holderJwk:
+                  type: object
+                  description: P-256 public JWK (kty EC, crv P-256, x, y)
+      responses:
+        '201': { description: '{enrollmentId, subjectRef, state PENDING}' }
+        '400': { description: Source/record mismatch, malformed holder key, or malformed shape }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown extraction record }
+        '409': { description: Extraction revision is not approved }
+  /api/enrollments/{id}/submit:
+    post:
+      operationId: submitEnrollment
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Submit a case for checker review (SOV-019). Pending cases
+        enter review; approved cases re-enter only when the source
+        moved on (explicit refresh). Current approvals stay put.
+      responses:
+        '200': { description: '{enrollmentId, state IN_REVIEW}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown enrollment }
+        '409': { description: Case is not submittable, or approval is current }
+  /api/enrollments/{id}/decision:
+    post:
+      operationId: decideEnrollment
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Decide a case in review (SOV-019, OD-14): the decider must
+        differ from the creator (maker/checker), the revision must
+        be the current approved extraction head, and approvals
+        require a holder binding proof over the enrollment and
+        revision. Decisions append to the review history.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, decision]
+              properties:
+                revision: { type: integer, minimum: 1 }
+                decision: { type: string, description: approve or reject }
+                bindingProof:
+                  type: string
+                  description: >-
+                    Required for approvals: ES256 JWS by the enrolled
+                    holder key over enrollment-binding, the enrollment
+                    id, and the revision
+      responses:
+        '200': { description: '{enrollmentId, state, boundRevision}' }
+        '400': { description: Bad decision value, or missing/invalid binding proof }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown enrollment }
+        '409': { description: Self-approval, wrong state, or stale revision }
+  /api/enrollments/{id}:
+    get:
+      operationId: readEnrollment
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Read an enrollment case (SOV-019): subject and source
+        references, bound revision, lifecycle state, maker/checker
+        attribution, computed eligibility, and the review history.
+      parameters:
+        - name: If-None-Match
+          in: header
+          schema: { type: string }
+          description: Strong ETag from a previous read; matches answer 304
+      responses:
+        '200':
+          description: >-
+            {enrollmentId, subjectRef, vaultObjectId,
+            extractionRecordId, boundRevision, state, createdBy,
+            decidedBy, eligible, eligibilityReason, reviews[]}
+        '304': { description: Caller holds the current representation }
+        '401': { description: Anonymous }
+        '403': { description: Lacks an enrollment-reading role }
+        '404': { description: Unknown enrollment }
+  /api/enrollments/{id}/eligibility:
+    get:
+      operationId: readEnrollmentEligibility
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Read issuance eligibility (SOV-019, FR-39): eligible only
+        while APPROVED on the current extraction head. Claims are
+        the reviewed normalized fields plus the derived adult
+        status; caller-supplied values never appear here.
+      responses:
+        '200': { description: '{enrollmentId, eligible, reason, claims}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks an enrollment-reading role }
+        '404': { description: Unknown enrollment }
   /api/audit/events:
     get:
       operationId: listAuditEvents
@@ -795,9 +908,17 @@ paths:
                   type: string
                   format: date-time
                   description: More than 1 minute out, at most 366 days
+                enrollmentId:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Optional enrollment binding (SOV-019): the enrollment
+                    must be APPROVED on the current extraction head, the
+                    issuance holder key must equal the enrolled key, and
+                    every claim must equal its reviewed value
       responses:
         '201': { description: credentialId, artifact (compact JWS), status, expiresAt, trustSnapshot }
-        '400': { description: Invalid request, scope, proof, or validity }
+        '400': { description: Invalid request, scope, proof, validity, or enrollment binding }
         '401': { description: Anonymous }
         '403': { description: Lacks ISSUER_OPS }
         '409': { description: Same key, different request }

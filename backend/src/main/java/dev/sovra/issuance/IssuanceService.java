@@ -63,6 +63,7 @@ public class IssuanceService {
   private final Clock clock;
   private final ObjectMapper mapper;
   private final TelemetryService telemetry;
+  private final dev.sovra.enrollment.EnrollmentService enrollment;
 
   public IssuanceService(
       AuthorizationService authz,
@@ -74,7 +75,8 @@ public class IssuanceService {
       JdbcTemplate tenantJdbcTemplate,
       Clock clock,
       ObjectMapper mapper,
-      TelemetryService telemetry) {
+      TelemetryService telemetry,
+      dev.sovra.enrollment.EnrollmentService enrollment) {
     this.authz = authz;
     this.audit = audit;
     this.snapshots = snapshots;
@@ -85,6 +87,7 @@ public class IssuanceService {
     this.clock = clock;
     this.mapper = mapper;
     this.telemetry = telemetry;
+    this.enrollment = enrollment;
   }
 
   public record IssueRequest(
@@ -93,7 +96,8 @@ public class IssuanceService {
       JsonNode holderJwk,
       String holderProof,
       Map<String, Object> claims,
-      Instant expiresAt) {}
+      Instant expiresAt,
+      UUID enrollmentId) {}
 
   public record CredentialView(
       UUID credentialId,
@@ -165,6 +169,7 @@ public class IssuanceService {
     if (idempotencyKey == null || !idempotencyKey.matches("[A-Za-z0-9_-]{1,128}")) {
       throw new InvalidIssuanceException("idempotency key is malformed");
     }
+    gateEnrollment(caller, request);
     Instant now = clock.instant();
     Validated validated = validate(request, idempotencyKey, now, vciNonce);
     String hash = requestHash(request, validated.holderKey());
@@ -337,6 +342,38 @@ public class IssuanceService {
 
   private record Validated(ECPublicKey holderKey, String thumbprint) {}
   private record IssuerAuthorization(KeyRef keyRef) {}
+
+  /**
+   * Enrollment provenance gate (SOV-019, FR-39). When the caller
+   * binds an enrollment, issuance requires it to be currently
+   * eligible and every requested claim to equal its reviewed
+   * value — obsolete approvals and caller-supplied unreviewed
+   * values terminate here, before validation and signing.
+   */
+  private void gateEnrollment(ServiceAccountPrincipal caller, IssueRequest request) {
+    if (request.enrollmentId() == null) {
+      return;
+    }
+    if (request.holderJwk() == null || request.claims() == null) {
+      throw new InvalidIssuanceException("issuance request is incomplete");
+    }
+    Map<String, String> reviewed;
+    try {
+      reviewed =
+          enrollment.issuanceClaims(caller, request.enrollmentId(), request.holderJwk());
+    } catch (dev.sovra.enrollment.EnrollmentNotFoundException e) {
+      throw new InvalidIssuanceException("enrollment is unknown");
+    } catch (dev.sovra.enrollment.EnrollmentConflictException
+        | dev.sovra.enrollment.EnrollmentInvalidException e) {
+      throw new InvalidIssuanceException("enrollment does not authorize these claims");
+    }
+    for (Map.Entry<String, Object> claim : request.claims().entrySet()) {
+      String approved = reviewed.get(claim.getKey());
+      if (approved == null || !approved.equals(String.valueOf(claim.getValue()))) {
+        throw new InvalidIssuanceException("claims are not reviewed");
+      }
+    }
+  }
 
   /** Shape, allowlist, holder-key, proof-of-possession, and validity checks. */
   private Validated validate(

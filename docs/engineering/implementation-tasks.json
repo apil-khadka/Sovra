@@ -1087,9 +1087,9 @@
         "AC-10",
         "AC-11"
       ],
-      "implementation_progress": "not_started",
-      "implementation_observation": "No enrollment/source-review/correction/claim-eligibility workflow found; build on extraction and vault with explicit maker/checker rules.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Enrollment cases with opaque subject refs, maker/checker decisions, holder binding proofs, revision-bound approvals, stale-source re-review and an issuance gate (enrollmentId, reviewed claims, bound holder key) exist with 14 tests. Production evidence policy, legal authority and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {
