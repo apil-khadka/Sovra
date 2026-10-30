@@ -168,6 +168,10 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/issuance/jwks.json")
                     .permitAll()
+                    // Developer portal discovery (SOV-022): static
+                    // posture only, no identity data, no auth.
+                    .requestMatchers(HttpMethod.GET, "/api/discovery")
+                    .permitAll()
                     // OpenID4VCI/OpenID4VP wallet calls (SOV-036): public
                     // metadata and grant/token/nonce/response endpoints.
                     // The services bind every call to its single-use

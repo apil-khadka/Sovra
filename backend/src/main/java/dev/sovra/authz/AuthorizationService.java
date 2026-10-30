@@ -23,7 +23,7 @@ import org.springframework.stereotype.Service;
 public class AuthorizationService {
 
   /** Bump to invalidate every cached decision on rule changes. */
-  static final long RULES_VERSION = 11;
+  static final long RULES_VERSION = 12;
 
   private static final Map<Action, Set<Role>> REQUIRED_ROLES =
       Map.ofEntries(
@@ -123,6 +123,17 @@ public class AuthorizationService {
           // session unlock — never a caller parameter — selects
           // the thumbprint, so no person-search oracle exists.
           Map.entry(Action.HOLDER_READ_SELF, EnumSet.of(Role.TENANT_MEMBER)),
+          // Developer portal and RP dashboard (SOV-022/SOV-025):
+          // members mint fixed-shape sandbox credentials (demo
+          // profiles only; the service refuses production); only
+          // members manage RP-scoped credentials, so one relying
+          // party can never rotate or revoke a sibling app. Reads
+          // mirror the verification read set, narrowed to the
+          // caller's own relying party below the agent line.
+          Map.entry(Action.CREATE_SANDBOX_ACCOUNT, EnumSet.of(Role.TENANT_MEMBER)),
+          Map.entry(Action.MANAGE_RP_CREDENTIALS, EnumSet.of(Role.TENANT_MEMBER)),
+          Map.entry(Action.READ_RP_REQUESTS, EnumSet.of(Role.TENANT_MEMBER, Role.RP_CLIENT)),
+          Map.entry(Action.READ_RP_METRICS, EnumSet.of(Role.TENANT_MEMBER, Role.RP_CLIENT)),
           // OpenID4VCI (SOV-036): issuer operators publish offers; the
           // holder's tenant agent drives the synthetic authorization
           // server. Wallet token/credential calls carry no service

@@ -91,24 +91,34 @@ public class ServiceAccountService {
     if (expiresAt != null && !expiresAt.isAfter(clock.instant())) {
       throw new InvalidServiceAccountException("expiry must be in the future");
     }
+    CreatedAccount created = insertAccount(caller.tenantId(), name.trim(), granted, expiresAt);
+    Map<String, String> detail = new LinkedHashMap<>();
+    detail.put("account_id", created.account().id().toString());
+    detail.put(
+        "roles", String.join(",", granted.stream().map(Role::name).sorted().toList()));
+    audit.record(
+        caller, Action.CREATE_SERVICE_ACCOUNT,
+        ResourceRef.tenantScoped(
+            "service-account", created.account().id().toString(), caller.tenantId()),
+        Decision.permit(authz.policyVersion()), "", detail);
+    return created;
+  }
+
+  /**
+   * Token mint without authority checks, for the sibling services
+   * in this package that authorize first (sandbox onboarding,
+   * RP-scoped rotation). Callers audit their own action.
+   */
+  CreatedAccount insertAccount(UUID tenantId, String name, Set<Role> granted, Instant expiresAt) {
     String token = TokenHasher.generate();
     UUID id = UUID.randomUUID();
     tenant.update(
         "INSERT INTO service_account (id, tenant_id, name, token_prefix, token_hash, roles,"
             + " expires_at) VALUES (?, ?, ?, ?, ?, ?::text[], ?)",
-        id, caller.tenantId(), name.trim(), TokenHasher.prefix(token), TokenHasher.hash(token),
+        id, tenantId, name, TokenHasher.prefix(token), TokenHasher.hash(token),
         granted.stream().map(Role::name).toArray(String[]::new), expiresAt == null ? null
             : java.sql.Timestamp.from(expiresAt));
-    AccountView view = load(caller.tenantId(), id).orElseThrow();
-    Map<String, String> detail = new LinkedHashMap<>();
-    detail.put("account_id", id.toString());
-    detail.put(
-        "roles", String.join(",", granted.stream().map(Role::name).sorted().toList()));
-    audit.record(
-        caller, Action.CREATE_SERVICE_ACCOUNT,
-        ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()),
-        Decision.permit(authz.policyVersion()), "", detail);
-    return new CreatedAccount(view, token);
+    return new CreatedAccount(load(tenantId, id).orElseThrow(), token);
   }
 
   @Transactional(noRollbackFor = ForbiddenException.class)
@@ -119,25 +129,31 @@ public class ServiceAccountService {
         AuditedAuthorizer.require(authz, audit, caller,
         Action.ROTATE_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()));
-    if (current.revoked()) {
-      throw new ServiceAccountConflictException("revoked accounts stay revoked; create a new one");
-    }
     if (expiresAt != null && !expiresAt.isAfter(clock.instant())) {
       throw new InvalidServiceAccountException("expiry must be in the future");
+    }
+    CreatedAccount rotated = rotateToken(caller.tenantId(), id, current, expiresAt);
+    audit.record(
+        caller, Action.ROTATE_SERVICE_ACCOUNT,
+        ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()),
+        Decision.permit(authz.policyVersion()), "",
+        Map.of("account_id", id.toString()));
+    return rotated;
+  }
+
+  /** Rotation without authority checks; siblings authorize and audit first. */
+  CreatedAccount rotateToken(UUID tenantId, UUID id, AccountView current, Instant expiresAt) {
+    if (current.revoked()) {
+      throw new ServiceAccountConflictException("revoked accounts stay revoked; create a new one");
     }
     String token = TokenHasher.generate();
     tenant.update(
         "UPDATE service_account SET token_prefix = ?, token_hash = ?, expires_at = ?"
             + " WHERE id = ? AND tenant_id = ?",
         TokenHasher.prefix(token), TokenHasher.hash(token),
-        expiresAt == null ? null : java.sql.Timestamp.from(expiresAt), id, caller.tenantId());
+        expiresAt == null ? null : java.sql.Timestamp.from(expiresAt), id, tenantId);
     cache.invalidatePrincipal(id);
-    audit.record(
-        caller, Action.ROTATE_SERVICE_ACCOUNT,
-        ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()),
-        Decision.permit(authz.policyVersion()), "",
-        Map.of("account_id", id.toString()));
-    return new CreatedAccount(load(caller.tenantId(), id).orElseThrow(), token);
+    return new CreatedAccount(load(tenantId, id).orElseThrow(), token);
   }
 
   @Transactional(noRollbackFor = ForbiddenException.class)
@@ -148,18 +164,24 @@ public class ServiceAccountService {
         AuditedAuthorizer.require(authz, audit, caller,
         Action.REVOKE_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()));
-    if (!current.revoked()) {
-      tenant.update(
-          "UPDATE service_account SET revoked = TRUE WHERE id = ? AND tenant_id = ?",
-          id, caller.tenantId());
-      cache.invalidatePrincipal(id);
-    }
+    AccountView revoked = revokeToken(caller.tenantId(), id, current);
     audit.record(
         caller, Action.REVOKE_SERVICE_ACCOUNT,
         ResourceRef.tenantScoped("service-account", id.toString(), caller.tenantId()),
         Decision.permit(authz.policyVersion()), "",
         Map.of("account_id", id.toString()));
-    return load(caller.tenantId(), id).orElseThrow();
+    return revoked;
+  }
+
+  /** Terminal revocation without authority checks; siblings authorize and audit first. */
+  AccountView revokeToken(UUID tenantId, UUID id, AccountView current) {
+    if (!current.revoked()) {
+      tenant.update(
+          "UPDATE service_account SET revoked = TRUE WHERE id = ? AND tenant_id = ?",
+          id, tenantId);
+      cache.invalidatePrincipal(id);
+    }
+    return load(tenantId, id).orElseThrow();
   }
 
   public AccountView get(ServiceAccountPrincipal caller, UUID id) {
@@ -184,7 +206,7 @@ public class ServiceAccountService {
         caller.tenantId());
   }
 
-  private Optional<AccountView> load(UUID tenantId, UUID id) {
+  Optional<AccountView> load(UUID tenantId, UUID id) {
     List<AccountView> rows = tenant.query(
         "SELECT id, name, roles, revoked, expires_at, created_at FROM service_account"
             + " WHERE id = ? AND tenant_id = ?",
@@ -193,7 +215,7 @@ public class ServiceAccountService {
     return rows.stream().findFirst();
   }
 
-  private AccountView mapRow(ResultSet rs, int row) throws SQLException {
+  AccountView mapRow(ResultSet rs, int row) throws SQLException {
     Array rolesArray = rs.getArray("roles");
     String[] roles = rolesArray == null ? new String[0] : (String[]) rolesArray.getArray();
     java.sql.Timestamp expires = rs.getTimestamp("expires_at");

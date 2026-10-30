@@ -1,6 +1,6 @@
 {
   "name": "@sovra/sdk",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Typed client for the Sovra machine API (contract 0.13.0). Zero runtime dependencies.",
   "type": "module",
   "main": "./dist/index.js",

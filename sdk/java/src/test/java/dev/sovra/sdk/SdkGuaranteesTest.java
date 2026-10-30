@@ -29,7 +29,7 @@ class SdkGuaranteesTest extends SdkLiveBase {
     try (SovraClient loopback = new SovraClient("http://localhost:8080/", "t");
         SovraClient loopbackIp = new SovraClient("http://127.0.0.1:8080", "t");
         SovraClient tls = new SovraClient("https://sovra.example", "t")) {
-      assertThat(SovraClient.SUPPORTED_CONTRACT).isEqualTo("0.15.0");
+      assertThat(SovraClient.SUPPORTED_CONTRACT).isEqualTo("0.16.0");
     }
   }
 

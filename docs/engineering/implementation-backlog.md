@@ -678,8 +678,8 @@ Required closure evidence:
 
 Owner role: Developer experience.
 Gate: G3; proposed priority: p1; triage: needs-triage.
-Progress: not_started (reviewed 2026-10-29).
-Remaining/evidence scope: No complete developer portal/sandbox/onboarding implementation found.
+Progress: demo_implemented (reviewed 2026-10-30).
+Remaining/evidence scope: Developer portal over fixed-shape sandbox onboarding (RP_CLIENT-only, 24h, demo profiles only) plus public capability discovery, 9 machine-chain + 2 BFF session tests, contract 0.16.0; production accreditation and independent review remain.
 Dependencies: SOV-005, SOV-006, SOV-015, SOV-021.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/27).
 Requirements: FR-45, FR-47, IF-11, UX-08, NFR-13.
@@ -758,8 +758,8 @@ Required closure evidence:
 
 Owner role: RP frontend.
 Gate: G3; proposed priority: p1; triage: needs-triage.
-Progress: not_started (reviewed 2026-10-29).
-Remaining/evidence scope: No complete RP/organization application-management dashboard found.
+Progress: demo_implemented (reviewed 2026-10-30).
+Remaining/evidence scope: RP dashboard over RP-subset credential desk (member-only rotate/revoke), audience-scoped outcomes and metrics, portal + dashboard React views, 4 browser tests (onboarding, rotate/revoke drill, seeded outcomes, role gates); dedicated accessibility audit and independent review remain.
 Dependencies: SOV-005, SOV-006, SOV-015, SOV-021, SOV-022.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/30).
 Requirements: FR-43, UX-07, UX-08, IF-13.

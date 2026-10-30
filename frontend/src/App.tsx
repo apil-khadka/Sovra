@@ -4,6 +4,8 @@ import DemoView from './DemoView'
 import FederationView from './FederationView'
 import IssuerDeskView from './IssuerDeskView'
 import HolderDeskView from './HolderDeskView'
+import DevPortalView from './DevPortalView'
+import RpDashboardView from './RpDashboardView'
 import SecOpsView from './SecOpsView'
 import VerifyView from './VerifyView'
 import OpenIdWalletView from './OpenIdWalletView'
@@ -13,7 +15,7 @@ import { useAsync } from './hooks/useAsync'
 import { fetchSession, login, logout } from './auth'
 import { fetchHealth, fetchReadiness } from './ops'
 
-type ViewName = 'status' | 'demo' | 'consent' | 'verify' | 'wallet' | 'federation' | 'secops' | 'issuer' | 'holder'
+type ViewName = 'status' | 'demo' | 'consent' | 'verify' | 'wallet' | 'federation' | 'secops' | 'issuer' | 'holder' | 'portal' | 'rpdash'
 
 const VIEW_TITLES: Record<ViewName, string> = {
   status: 'Sovra — Status',
@@ -25,6 +27,8 @@ const VIEW_TITLES: Record<ViewName, string> = {
   secops: 'Sovra — Security operations',
   issuer: 'Sovra — Issuer desk',
   holder: 'Sovra — Holder dashboard',
+  portal: 'Sovra — Developer portal',
+  rpdash: 'Sovra — Relying-party dashboard',
 }
 
 const NAV: Array<{ view: ViewName; label: string }> = [
@@ -37,6 +41,8 @@ const NAV: Array<{ view: ViewName; label: string }> = [
   { view: 'secops', label: 'Security operations' },
   { view: 'issuer', label: 'Issuer desk' },
   { view: 'holder', label: 'Holder dashboard' },
+  { view: 'portal', label: 'Developer portal' },
+  { view: 'rpdash', label: 'Relying-party dashboard' },
 ]
 
 function viewFromHash(): ViewName {
@@ -154,6 +160,8 @@ export default function App() {
         {view === 'secops' && <SecOpsView session={sessionInfo} />}
         {view === 'issuer' && <IssuerDeskView session={sessionInfo} />}
         {view === 'holder' && <HolderDeskView session={sessionInfo} />}
+        {view === 'portal' && <DevPortalView session={sessionInfo} />}
+        {view === 'rpdash' && <RpDashboardView session={sessionInfo} />}
       </main>
     </>
   )

@@ -1,5 +1,14 @@
 # SDK release record (SOV-021)
 
+## 0.16.0 — 2026-10-30
+
+Targets API contract `0.16.0`. No SDK surface change: the
+contract adds the SOV-022/SOV-025 developer-portal and RP
+routes, which integrators reach after out-of-band member
+provisioning, plus the public discovery document the portal
+UI renders. SDK coverage of the onboarding flow stays a
+follow-up; the version pin keeps both SDKs honest.
+
 ## 0.15.0 — 2026-10-30
 
 Targets API contract `0.15.0`. No SDK surface change: the

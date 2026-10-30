@@ -51,7 +51,7 @@ export interface Tagged<T> {
  */
 export class SovraClient {
   /** API contract version this SDK targets. */
-  static readonly SUPPORTED_CONTRACT = "0.15.0";
+  static readonly SUPPORTED_CONTRACT = "0.16.0";
 
   private static readonly MAX_READ_ATTEMPTS = 3;
 

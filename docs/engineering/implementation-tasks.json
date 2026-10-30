@@ -1247,10 +1247,12 @@
       "acceptance_cases": [
         "AC-13"
       ],
-      "implementation_progress": "not_started",
-      "implementation_observation": "No complete developer portal/sandbox/onboarding implementation found.",
-      "progress_reviewed_on": "2026-10-29",
-      "progress_evidence": []
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Developer portal over fixed-shape sandbox onboarding (RP_CLIENT-only, 24h expiry, sandbox-* names, demo profiles only with 403 SANDBOX_DEMO_ONLY) plus public capability discovery (profile, contract, sandbox rules, SDK compat, RP boundaries); 2 machine + 8 BFF portal endpoints with member-only minting. Covered by 9 machine-chain tests and 2 BFF session tests; contract 0.16.0. Production accreditation and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
+      "progress_evidence": [
+        "docs/engineering/developer-portal.md"
+      ]
     },
     {
       "id": "SOV-023",
@@ -1406,10 +1408,12 @@
         "AC-13",
         "AC-14"
       ],
-      "implementation_progress": "not_started",
-      "implementation_observation": "No complete RP/organization application-management dashboard found.",
-      "progress_reviewed_on": "2026-10-29",
-      "progress_evidence": []
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "RP dashboard over audience-scoped verification reads: RP-subset credential desk (RP_CLIENT-bearing accounts only, out-of-subset 404s, member-only rotate/revoke with one-time tokens), outcomes narrowed to own submitted decisions via server-set submitter, and safe outcome-count metrics with no decision bytes. Portal + dashboard React views with 4 browser tests (onboarding, rotate/revoke drill, seeded outcomes, role gates). Dedicated accessibility audit and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
+      "progress_evidence": [
+        "docs/engineering/developer-portal.md"
+      ]
     },
     {
       "id": "SOV-026",

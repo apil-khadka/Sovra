@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.15.0
+  version: 0.16.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -2370,6 +2370,236 @@ paths:
         '200': { description: '{keyId?, thumbprint, status, recoveries[{recoveryId, reason, state, newThumbprint, createdAt}]}' }
         '401': { description: No live session }
         '403': { description: Lacks TENANT_MEMBER, or key not unlocked (HOLDER_LOCKED) }
+  /api/discovery:
+    get:
+      operationId: discovery
+      x-sovra-scopes: []
+      summary: >-
+        Public capability discovery (SOV-022): profile, contract
+        version, sandbox rules, SDK compatibility, and the RP read
+        boundary. Static posture only; no identity data, no auth.
+      security: []
+      responses:
+        '200': { description: '{service, version, profile, contractVersion, auth[], sandbox{}, sdks{}, rp{}}' }
+  /api/sandbox/accounts:
+    get:
+      operationId: listSandboxAccounts
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Sandbox-prefixed accounts in this tenant (SOV-022);
+        metadata only, token material never reads back.
+      responses:
+        '200': { description: '[{id, name, roles, revoked, expiresAt, createdAt}]' }
+        '401': { description: Invalid or missing token }
+        '403': { description: Lacks TENANT_MEMBER }
+    post:
+      operationId: createSandboxAccount
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Onboard a fixed-shape sandbox credential (SOV-022):
+        always RP_CLIENT, always expiring in 24 hours, demo
+        profiles only. The token returns once in the 201 body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, description: 'sandbox-<app>, lowercase alphanumerics and dashes' }
+      responses:
+        '201': { description: '{id, name, roles[RP_CLIENT], revoked, expiresAt, createdAt, token}' }
+        '400': { description: Name outside the sandbox shape }
+        '401': { description: Invalid or missing token }
+        '403': { description: Lacks TENANT_MEMBER, or production profile (SANDBOX_DEMO_ONLY) }
+  /api/rp/apps:
+    get:
+      operationId: listRpApps
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Authorized RP apps in this tenant (SOV-025): accounts
+        bearing RP_CLIENT inside the RP subset. Trust, issuer,
+        auditor, and member accounts never appear.
+      responses:
+        '200': { description: '[{id, name, roles, revoked, expiresAt, createdAt}]' }
+        '401': { description: Invalid or missing token }
+        '403': { description: Lacks TENANT_MEMBER }
+  /api/rp/credentials/{id}/rotate:
+    post:
+      operationId: rotateRpCredential
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: >-
+        Rotate one RP app credential (SOV-025); the new token
+        returns once. Out-of-subset ids 404 like unknown ones.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresAt: { type: string, format: date-time, description: Future expiry, or null to keep none }
+      responses:
+        '200': { description: '{id, name, roles, revoked, expiresAt, createdAt, token}' }
+        '401': { description: Invalid or missing token }
+        '403': { description: Lacks TENANT_MEMBER }
+        '404': { description: Unknown id or outside the RP subset }
+        '409': { description: Revoked accounts stay revoked; create a new one }
+  /api/rp/credentials/{id}/revoke:
+    post:
+      operationId: revokeRpCredential
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Terminal revocation for one RP app credential (SOV-025).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{id, name, roles, revoked true, expiresAt, createdAt}' }
+        '401': { description: Invalid or missing token }
+        '403': { description: Lacks TENANT_MEMBER }
+        '404': { description: Unknown id or outside the RP subset }
+  /api/rp/outcomes:
+    get:
+      operationId: listRpOutcomes
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
+      summary: >-
+        Recent verification outcomes (SOV-025): decision id,
+        request, outcome, and reason — never decision bytes.
+        Pure relying parties see only decisions their own
+        credential submitted; members see the tenant's.
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200': { description: '[{decisionId, requestId, rpId, outcome, reasonCode, decidedAt}]' }
+        '401': { description: Invalid or missing token }
+        '403': { description: 'Lacks TENANT_MEMBER or RP_CLIENT' }
+  /api/rp/metrics:
+    get:
+      operationId: readRpMetrics
+      x-sovra-scopes: [TENANT_MEMBER, RP_CLIENT]
+      summary: >-
+        Safe verification usage metrics (SOV-025): outcome
+        counts with the same audience scoping as listRpOutcomes.
+      responses:
+        '200': { description: '{total, accepted, rejected, unknown}' }
+        '401': { description: Invalid or missing token }
+        '403': { description: 'Lacks TENANT_MEMBER or RP_CLIENT' }
+  /api/bff/portal/discovery:
+    get:
+      operationId: bffPortalDiscovery
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Capability discovery for the developer portal; same shape as discovery
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{service, version, profile, contractVersion, auth[], sandbox{}, sdks{}, rp{}}' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER }
+  /api/bff/portal/sandbox/accounts:
+    get:
+      operationId: bffPortalListSandbox
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Sandbox accounts for the developer portal; same shape as listSandboxAccounts
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '[{id, name, roles, revoked, expiresAt, createdAt}]' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER }
+    post:
+      operationId: bffPortalCreateSandbox
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Onboard a sandbox credential from the portal; same rules as createSandboxAccount
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        '201': { description: '{id, name, roles[RP_CLIENT], revoked, expiresAt, createdAt, token}' }
+        '400': { description: Name outside the sandbox shape }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER, or production profile (SANDBOX_DEMO_ONLY) }
+  /api/bff/portal/rp/apps:
+    get:
+      operationId: bffPortalRpApps
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Authorized RP apps for the dashboard; same shape as listRpApps
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '[{id, name, roles, revoked, expiresAt, createdAt}]' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER }
+  /api/bff/portal/rp/credentials/{id}/rotate:
+    post:
+      operationId: bffPortalRotateRp
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Rotate one RP app credential from the dashboard; same rules as rotateRpCredential
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{id, name, roles, revoked, expiresAt, createdAt, token}' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER }
+        '404': { description: Unknown id or outside the RP subset }
+        '409': { description: Revoked accounts stay revoked; create a new one }
+  /api/bff/portal/rp/credentials/{id}/revoke:
+    post:
+      operationId: bffPortalRevokeRp
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Revoke one RP app credential from the dashboard; same rules as revokeRpCredential
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{id, name, roles, revoked true, expiresAt, createdAt}' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER }
+        '404': { description: Unknown id or outside the RP subset }
+  /api/bff/portal/rp/outcomes:
+    get:
+      operationId: bffPortalRpOutcomes
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Recent verification outcomes for the dashboard; same shape as listRpOutcomes
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200': { description: '[{decisionId, requestId, rpId, outcome, reasonCode, decidedAt}]' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER }
+  /api/bff/portal/rp/metrics:
+    get:
+      operationId: bffPortalRpMetrics
+      x-sovra-scopes: [TENANT_MEMBER]
+      summary: Verification usage metrics for the dashboard; same shape as readRpMetrics
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{total, accepted, rejected, unknown}' }
+        '401': { description: No live session }
+        '403': { description: Lacks TENANT_MEMBER }
 components:
   securitySchemes:
     bearerAuth:

@@ -1,6 +1,6 @@
 # Sovra Java SDK
 
-Typed client for the Sovra machine API (contract `0.15.0`, see
+Typed client for the Sovra machine API (contract `0.16.0`, see
 `docs/engineering/implemented-api.openapi.yaml`). Covers the
 machine chain only: ops, trust, auth, issuance, consent,
 verification, vault, quarantine, extraction, enrollment, custody.

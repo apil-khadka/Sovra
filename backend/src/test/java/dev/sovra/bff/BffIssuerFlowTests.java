@@ -281,6 +281,45 @@ class BffIssuerFlowTests extends SovraAppRoleBase {
     assertThat(anonymous.statusCode()).isEqualTo(401);
   }
 
+  @Test
+  void membersOnboardSandboxThroughPortalSessions() throws Exception {
+    BffTestSessions.Session member = login(List.of("sovra-members"));
+    HttpResponse<String> created = postJson(
+        "/api/bff/portal/sandbox/accounts", member, Map.of("name", "sandbox-desk-" + suffix()));
+    assertThat(created.statusCode()).isEqualTo(201);
+    assertThat(created.body()).contains("RP_CLIENT").contains("token");
+
+    HttpResponse<String> listed =
+        sessionGet("/api/bff/portal/sandbox/accounts", member, Map.of());
+    assertThat(listed.statusCode()).isEqualTo(200);
+    assertThat(listed.body()).contains("sandbox-desk-").doesNotContain("token");
+
+    HttpResponse<String> metrics = sessionGet("/api/bff/portal/rp/metrics", member, Map.of());
+    assertThat(metrics.statusCode()).isEqualTo(200);
+    assertThat(metrics.body()).contains("total");
+  }
+
+  @Test
+  void portalSessionsKeepIssuerAndStrangersOut() throws Exception {
+    TestAccount admin = TestAccounts.createInTenant(
+        owner, demoTenant, "portal-hidden-" + suffix(), Set.of("TRUST_ADMIN"));
+    BffTestSessions.Session reviewer = login(List.of("sovra-ops"));
+    assertThat(postJson("/api/bff/portal/sandbox/accounts", reviewer,
+        Map.of("name", "sandbox-nope")).statusCode()).isEqualTo(403);
+
+    // Members manage RP credentials only: the trust admin 404s like unknown.
+    BffTestSessions.Session member = login(List.of("sovra-members"));
+    assertThat(postJson(
+        "/api/bff/portal/rp/credentials/" + admin.accountId() + "/rotate", member, Map.of())
+        .statusCode()).isEqualTo(404);
+
+    HttpResponse<String> anonymous =
+        http.send(HttpRequest.newBuilder(URI.create(BASE + "/api/bff/portal/rp/apps"))
+            .timeout(Duration.ofSeconds(30)).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(anonymous.statusCode()).isEqualTo(401);
+  }
+
   private String suffix() {
     return UUID.randomUUID().toString().substring(0, 8);
   }
