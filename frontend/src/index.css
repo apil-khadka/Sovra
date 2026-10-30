@@ -210,6 +210,18 @@ main {
   color: var(--ink);
 }
 
+.consent-form textarea {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+}
+
 .nonce-field {
   display: flex;
   flex-direction: column;
@@ -319,6 +331,7 @@ label.consent-session input {
 
 button:focus-visible,
 input:focus-visible,
+textarea:focus-visible,
 summary:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--primary);

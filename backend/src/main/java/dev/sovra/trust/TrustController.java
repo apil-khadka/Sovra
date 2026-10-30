@@ -39,6 +39,13 @@ public class TrustController {
         .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
   }
 
+  @GetMapping("/proposals")
+  public ResponseEntity<List<TrustService.ProposalSummary>> proposals() {
+    var caller =
+        CurrentPrincipal.require();
+    return ResponseEntity.ok(trust.listProposals(caller));
+  }
+
   @PostMapping("/proposals")
   public ResponseEntity<Map<String, String>> propose(@Valid @RequestBody ProposalRequest request) {
     var maker =
@@ -123,7 +130,7 @@ public class TrustController {
       @NotNull Instant validThrough,
       @NotEmpty String status) {
 
-    TrustService.IssuerInput toInput() {
+    public TrustService.IssuerInput toInput() {
       return new TrustService.IssuerInput(
           issuerId, displayName, scope, credentialTypes, keyId,
           keyVersion == null ? 1 : keyVersion, publicKeyJwk, validFrom,
@@ -137,7 +144,7 @@ public class TrustController {
       @NotEmpty List<String> allowedTypes,
       @NotEmpty String maxAssurance) {
 
-    TrustService.PolicyInput toInput() {
+    public TrustService.PolicyInput toInput() {
       return new TrustService.PolicyInput(rpId, purpose, allowedTypes, maxAssurance);
     }
   }

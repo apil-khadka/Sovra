@@ -1456,9 +1456,9 @@
       "acceptance_cases": [
         "AC-14"
       ],
-      "implementation_progress": "not_started",
-      "implementation_observation": "Operational APIs exist, but no governed federation/security operations dashboard found.",
-      "progress_reviewed_on": "2026-10-29",
+      "implementation_progress": "demo_implemented",
+      "implementation_observation": "Federation desk (proposal queue, onboarding, approve/activate) and security-operations desk (alerts, readiness, audit tail) exist over 7 session-only BFF endpoints plus a machine proposal queue, with 4 backend BFF tests and 5 browser role-gating tests; maker/checker and admin-only rules enforced server-side. Production accreditation authority, metadata lifecycle and independent review remain.",
+      "progress_reviewed_on": "2026-10-30",
       "progress_evidence": []
     },
     {

@@ -136,6 +136,52 @@ public class TrustService {
   // Denials must survive as evidence: every ForbiddenException below is
   // thrown before any business write, so committing the denial audit is
   // safe (the production quorum refusal is pre-computed for this reason).
+  /**
+   * Review queue (SOV-026): pending and decided proposals newest
+   * first, with derived state. Checkers read the queue they
+   * decide; the two-person rule itself stays in the database.
+   */
+  @Transactional(noRollbackFor = ForbiddenException.class)
+  public List<ProposalSummary> listProposals(ServiceAccountPrincipal caller) {
+    Decision decision =
+        AuditedAuthorizer.require(
+            authz,
+            audit,
+            caller,
+            Action.APPROVE_TRUST_CHANGE,
+            ResourceRef.global("trust-registry", "proposals"));
+    List<ProposalSummary> proposals =
+        global.query(
+            "SELECT p.id, p.snapshot_version, p.proposed_by, p.created_at,"
+                + " d.approved_by, a.snapshot_version AS activated"
+                + " FROM trust_change_proposal p"
+                + " LEFT JOIN trust_proposal_decision d ON d.proposal_id = p.id"
+                + " LEFT JOIN trust_snapshot_activation a"
+                + " ON a.snapshot_version = p.snapshot_version"
+                + " ORDER BY p.snapshot_version DESC LIMIT 100",
+            (rs, row) -> {
+              String state =
+                  rs.getObject("activated") != null
+                      ? "ACTIVATED"
+                      : rs.getString("approved_by") != null ? "APPROVED" : "PENDING";
+              return new ProposalSummary(
+                  rs.getObject("id", UUID.class),
+                  rs.getLong("snapshot_version"),
+                  state,
+                  rs.getString("proposed_by"),
+                  rs.getString("approved_by"),
+                  rs.getTimestamp("created_at").toInstant().toString());
+            });
+    audit.record(
+        caller,
+        Action.APPROVE_TRUST_CHANGE,
+        ResourceRef.global("trust-registry", "proposals"),
+        decision,
+        "",
+        Map.of("proposals", String.valueOf(proposals.size())));
+    return proposals;
+  }
+
   @Transactional(noRollbackFor = ForbiddenException.class)
   public ProposalResult propose(ServiceAccountPrincipal maker, ProposalInput input, String note) {
     ResourceRef resource = ResourceRef.global("trust-registry", "proposals");
@@ -393,6 +439,14 @@ public class TrustService {
       String rpId, String purpose, List<String> allowedTypes, String maxAssurance) {}
 
   public record ProposalResult(long version, UUID proposalId) {}
+
+  public record ProposalSummary(
+      UUID proposalId,
+      long version,
+      String state,
+      String proposedBy,
+      String approvedBy,
+      String createdAt) {}
 
   public record SnapshotView(long version, List<IssuerView> issuers, List<PolicyView> policies) {}
 

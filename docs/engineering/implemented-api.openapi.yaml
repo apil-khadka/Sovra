@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sovra implemented control-plane API (G1)
-  version: 0.12.0
+  version: 0.13.0
   description: >-
     Exact contract of the implemented backend (SOV-005 through SOV-015, SOV-029).
     Compatibility rules (versioning, origins, audiences, scopes,
@@ -830,6 +830,16 @@ paths:
         '200': { description: Active snapshot with version }
         '404': { description: No active snapshot (empty body) }
   /api/trust/proposals:
+    get:
+      operationId: listTrustProposals
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Review queue (SOV-026): pending and decided proposals newest
+        first with derived state (PENDING, APPROVED, ACTIVATED)
+      responses:
+        '200': { description: '[{proposalId, version, state, proposedBy, approvedBy, createdAt}]' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
     post:
       operationId: proposeTrustChange
       x-sovra-scopes: [TRUST_ADMIN]
@@ -1829,6 +1839,108 @@ paths:
         '401': { description: No live session }
         '403': { description: Lacks TRUST_ADMIN, or missing/invalid CSRF token }
         '404': { description: Unknown or other-tenant account (empty body) }
+  /api/bff/trust/snapshots/current:
+    get:
+      operationId: bffCurrentTrustSnapshot
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Active trust snapshot for the federation desk; same shape as the machine chain
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{version, issuers[], policies[]}' }
+        '401': { description: No live session }
+        '404': { description: No activated snapshot }
+  /api/bff/trust/proposals:
+    get:
+      operationId: bffListTrustProposals
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Review queue for the federation desk; same shape as listTrustProposals
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '[{proposalId, version, state, proposedBy, approvedBy, createdAt}]' }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN }
+    post:
+      operationId: bffProposeTrustChange
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Maker step for the federation desk; same rules as proposeTrustChange
+      security: [{ bffSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuers, policies]
+              properties:
+                issuers: { type: array, items: { type: object } }
+                policies: { type: array, items: { type: object } }
+                note: { type: string }
+      responses:
+        '201': { description: version + proposalId }
+        '400': { description: Profile validation failure }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN, or missing/invalid CSRF token }
+  /api/bff/trust/proposals/{id}/approve:
+    post:
+      operationId: bffApproveTrustChange
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Checker step for the federation desk; the two-person rule refuses self-approval
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{proposalId, personVerified}' }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN, self-approval, or missing/invalid CSRF token }
+        '404': { description: Unknown proposal (empty body) }
+        '409': { description: Already decided }
+  /api/bff/trust/snapshots/{version}/activate:
+    post:
+      operationId: bffActivateTrustSnapshot
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Activate an approved version for the federation desk
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: version
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: '{version}' }
+        '400': { description: Version has no approved proposal }
+        '401': { description: No live session }
+        '403': { description: Lacks TRUST_ADMIN, or missing/invalid CSRF token }
+  /api/bff/audit/events:
+    get:
+      operationId: bffListAuditEvents
+      x-sovra-scopes: [AUDIT_READER, TRUST_ADMIN]
+      summary: Audit tail for the security-operations desk; same page shape as listAuditEvents
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: Audit rows for the session tenant }
+        '400': { description: Malformed cursor }
+        '401': { description: No live session }
+        '403': { description: Lacks AUDIT_READER/TRUST_ADMIN }
+  /api/bff/alerts:
+    get:
+      operationId: bffListAlerts
+      x-sovra-scopes: [AUDIT_READER, TRUST_ADMIN]
+      summary: Active alerts for the security-operations desk
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '[{alert, severity, status, code, check, firstObservedAt, observedAt}]' }
+        '401': { description: No live session }
+        '403': { description: Lacks AUDIT_READER/TRUST_ADMIN }
 components:
   securitySchemes:
     bearerAuth:

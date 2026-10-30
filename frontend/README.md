@@ -1,6 +1,6 @@
 # Sovra frontend
 
-React, TypeScript and Vite provide synthetic demo, holder consent and verification screens.
+React, TypeScript and Vite provide synthetic demo, holder consent, verification, wallet, and trust-admin desk screens.
 The backend container packages the production bundle, so SPA, BFF session, authorization callback and logout share `http://localhost:8080` locally.
 The Vite server on port 5173 is for asset development; use the packaged origin for login E2E.
 
@@ -31,6 +31,7 @@ Issuer/RP setup uses the disposable machine account; holder consent and verifica
 
 Overrides are `SOVRA_BROWSER_BASE` (default `http://localhost:8080`), `SOVRA_E2E_DB_CONTAINER` (default `sovra-db-1`) and `SOVRA_DB_ADMIN_PASSWORD`.
 The native verifier screen implements the synthetic binding.
+The federation and security-operations desks are session-only trust-admin screens over BFF endpoints; browser E2E covers their role gating, backend BFF tests cover the admin flows.
 The OpenID demo wallet implements the SD-JWT pre-authorized issuance/consent/encrypted-presentation journey with in-memory holder custody.
 For that journey, start Compose with `SOVRA_PROFILE=sdjwt-vc` and pass the same variable to the browser command.
 Both application instances must use the selected profile; keep live AI disabled as above.
