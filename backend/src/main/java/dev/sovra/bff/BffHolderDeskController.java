@@ -46,12 +46,14 @@ public class BffHolderDeskController {
     this.desk = desk;
   }
 
-  public record UnlockRequest(JsonNode holderJwk, String proof) {}
+  public record UnlockRequest(JsonNode holderJwk, String proof, String challenge) {}
 
   @GetMapping("/challenge")
   public ResponseEntity<Map<String, String>> challenge(HttpServletRequest request) {
-    CurrentPrincipal.require();
-    Challenge issued = unlock.challenge(request.getSession(true));
+    // PROD-003: the client echoes the challenge value on unlock, so
+    // the challenge is consumable from any replica — it is no longer
+    // pinned to the issuing replica's session memory.
+    Challenge issued = unlock.challenge(CurrentPrincipal.require().id());
     return ResponseEntity.ok(
         Map.of("challenge", issued.value(), "expiresAt", issued.expiresAt().toString()));
   }
@@ -59,16 +61,17 @@ public class BffHolderDeskController {
   @PostMapping("/unlock")
   public ResponseEntity<Map<String, String>> unlock(
       HttpServletRequest request, @Valid @RequestBody UnlockRequest body) {
-    CurrentPrincipal.require();
-    Unlock bound = unlock.unlock(request.getSession(true), body.holderJwk(), body.proof());
+    UUID membershipId = CurrentPrincipal.require().id();
+    Unlock bound = unlock.unlock(
+        membershipId, body.challenge(), body.holderJwk(), body.proof(),
+        request.getSession(true));
     return ResponseEntity.ok(
         Map.of("thumbprint", bound.thumbprint(), "expiresAt", bound.expiresAt().toString()));
   }
 
   @PostMapping("/lock")
   public ResponseEntity<Map<String, String>> lock(HttpServletRequest request) {
-    CurrentPrincipal.require();
-    unlock.lock(request.getSession(true));
+    unlock.lock(CurrentPrincipal.require().id(), request.getSession(true));
     return ResponseEntity.ok(Map.of("locked", "true"));
   }
 

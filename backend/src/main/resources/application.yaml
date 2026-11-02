@@ -6,6 +6,9 @@ server:
       cookie:
         # Localhost counts as trustworthy for Secure cookies, so these
         # hold for local Keycloak development and production alike.
+        # PROD-003: Spring Session owns the session cookie once the
+        # JDBC store below is active; SessionSharingConfig repeats
+        # this exact posture (JSESSIONID, Secure, HttpOnly, Lax) there.
         secure: true
         http-only: true
         same-site: lax
@@ -20,13 +23,25 @@ spring:
     hikari:
       maximum-pool-size: 10
       connection-timeout: 5000
+      # PROD-007: every statement carries a server-side deadline, so
+      # a runaway query is cancelled instead of wedging a pool slot.
+      # Migrations share this budget (see jdbc-budgets.md); any
+      # migration whose statements exceed it must run out of band.
+      connection-init-sql: SET statement_timeout = '25s'
+      # Client-side backstop behind the server deadline (seconds).
+      data-source-properties:
+        socketTimeout: 30
   flyway:
-    enabled: true
+    # PROD-002: demo boots migrate in-process; production sets
+    # SOVRA_MIGRATE_ON_BOOT=false and runs the dedicated migration
+    # job instead, so the serving runtime holds no owner credential.
+    # With migration disabled, SchemaValidationGuard fails boot
+    # unless the job already brought the schema current.
+    enabled: ${SOVRA_MIGRATE_ON_BOOT:true}
     locations: classpath:db/migration
     validate-on-migrate: true
     # Migrations run as the schema owner; the app itself connects as the
-    # least-privilege role. Splitting migrate from serve into separate
-    # jobs is SOV-027 platform work; the roles already differ here.
+    # least-privilege role.
     user: ${SOVRA_DB_ADMIN_USER:sovra}
     password: ${SOVRA_DB_ADMIN_PASSWORD:changeme}
   jackson:
@@ -36,6 +51,14 @@ spring:
   threads:
     virtual:
       enabled: true
+  # PROD-007: transactions that outlive their deadline roll back
+  # instead of holding pool slots and row locks (seconds).
+  transaction:
+    default-timeout: 25
+  # PROD-003: BFF sessions live in PostgreSQL (SessionSharingConfig
+  # enables the JDBC store explicitly — Boot 4 has no session
+  # auto-configuration). Flyway owns the session DDL (see V29). The
+  # machine chain stays stateless and never touches the store.
   # SOV-006 BFF login against issuer-local Keycloak. Disabled unless
   # sovra.bff.enabled is true; values must match the sovra.bff trust
   # registry exactly or startup fails (see BffConfigValidator).
@@ -56,20 +79,44 @@ spring:
             issuer-uri: ${SOVRA_BFF_ISSUER_URI:http://localhost:18080/realms/sovra}
 
 management:
+  # PROD-011: scrape/health port for the fleet monitor. Disabled by
+  # default (-1); the deployment sets SOVRA_MANAGEMENT_PORT=8081 on a
+  # private interface that ingress never publishes. Actuator paths
+  # are permitAll in SecurityConfig, so this port must stay private.
+  server:
+    port: ${SOVRA_MANAGEMENT_PORT:-1}
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: never
   info:
+    # Never enabled: the env contributor would print process
+    # environment (including secret-bearing SOVRA_* variables) on an
+    # unauthenticated endpoint.
     env:
-      enabled: true
+      enabled: false
+  metrics:
+    tags:
+      instance: ${sovra.instance-id}
 
 sovra:
   # Injected from the Maven build; see pom.xml resource filtering.
   version: "@project.version@"
+  # PROD-011 fleet identity: names the answering replica on health
+  # payloads and metric tags. Container hostnames are unique per
+  # replica, so the default needs no per-instance configuration.
+  instance-id: ${SOVRA_INSTANCE_ID:${HOSTNAME:localhost}}
+  # PROD-005 attested KMS identity: the workload, binary digest,
+  # and location every production key call presents to the
+  # provider. Blank by default; production requires all three
+  # (the entry gate refuses unattested kms mode).
+  kms:
+    workload: ${SOVRA_KMS_WORKLOAD:}
+    image-digest: ${SOVRA_KMS_IMAGE_DIGEST:}
+    location: ${SOVRA_KMS_LOCATION:}
   # Signing backend: local-dev (G1 synthetic double, needs both arming
   # flags below) or kms (production; arrives with the G2 provider pick).
   signer: ${SOVRA_SIGNER:local-dev}
@@ -90,6 +137,29 @@ sovra:
   synthetic-issuers:
     enabled: ${SOVRA_SYNTHETIC_ISSUERS_ENABLED:false}
     acknowledge-non-production: ${SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION:false}
+  # PROD-010 tenant storage budgets. Object count bounds rows; bytes
+  # derive from count times the 16 MB object cap. 0 = unlimited
+  # (demo default); production sets the approved quota.
+  quotas:
+    vault-objects-per-tenant: ${SOVRA_QUOTAS_VAULT_OBJECTS_PER_TENANT:0}
+  # PROD-012 fleet live-AI budgets. All zero by default: live
+  # spending is disarmed until the operator arms the flag AND
+  # funds the budget. Day rows snapshot these limits at creation.
+  ai-budget:
+    daily-requests: ${SOVRA_AI_BUDGET_DAILY_REQUESTS:0}
+    daily-tokens: ${SOVRA_AI_BUDGET_DAILY_TOKENS:0}
+    max-concurrency: ${SOVRA_AI_BUDGET_MAX_CONCURRENCY:0}
+    lease-seconds: ${SOVRA_AI_BUDGET_LEASE_SECONDS:120}
+  # PROD-005 verifier keys: synthetic (deterministic G1 fixture,
+  # demo only) or file (mounted versioned PEM keypairs,
+  # production). Production requires file; the entry gate refuses
+  # anything else.
+  openid:
+    keys: ${SOVRA_OPENID_KEYS:synthetic}
+    signing-key-path: ${SOVRA_OPENID_SIGNING_KEY_PATH:}
+    signing-kid: ${SOVRA_OPENID_SIGNING_KID:}
+    decryption-key-paths: ${SOVRA_OPENID_DECRYPTION_KEY_PATHS:}
+    decryption-kids: ${SOVRA_OPENID_DECRYPTION_KIDS:}
   vault:
     # Wrapping keys: software (SOV-016 synthetic double, needs the seed
     # plus acknowledgement below) or kms (production; G2 provider pick).

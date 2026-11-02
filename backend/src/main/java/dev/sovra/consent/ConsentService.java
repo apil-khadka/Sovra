@@ -156,6 +156,7 @@ public class ConsentService {
         ResourceRef.tenantScoped("proof-request", "requests", caller.tenantId());
     Decision decision = AuditedAuthorizer.require(authz, audit, caller,
         Action.REQUEST_PROOF, resource);
+    requireAccreditedAudience(caller, request);
     Instant now = clock.instant();
     Validated validated = validate(request, now);
     requireGuardAccepted(caller, request);
@@ -177,6 +178,40 @@ public class ConsentService {
         decision, "",
         detail(requestId, request, validated.holderThumbprint(), snapshot.version()));
     return view(load(caller, requestId), now);
+  }
+
+  /**
+   * Accredited-audience binding (PROD-015). Bearer credentials minted
+   * through accreditation carry an exact audience list; requests
+   * outside it are refused before validation. Human callers carry no
+   * bearer credential, so the binding does not apply to them;
+   * unconstrained legacy/sandbox accounts (NULL list) are unaffected.
+   */
+  private void requireAccreditedAudience(
+      ServiceAccountPrincipal caller, CreateRequest request) {
+    if (caller.issuer() != null || caller.subject() != null) {
+      return;
+    }
+    List<String[]> rows =
+        tenant.query(
+            "SELECT allowed_audiences FROM service_account WHERE id = ? AND tenant_id = ?",
+            (rs, n) -> {
+              java.sql.Array array = rs.getArray("allowed_audiences");
+              return array == null ? null : (String[]) array.getArray();
+            },
+            caller.id(), caller.tenantId());
+    if (rows.isEmpty() || rows.get(0) == null) {
+      if (rows.isEmpty()) {
+        throw new InvalidConsentException("credential is unknown");
+      }
+      return;
+    }
+    for (String allowed : rows.get(0)) {
+      if (allowed.equals(request.audience())) {
+        return;
+      }
+    }
+    throw new InvalidConsentException("audience is not accredited for this credential");
   }
 
   /** Holder review: the exact bound values plus the derived consent state. */
@@ -232,11 +267,17 @@ public class ConsentService {
     verifyConsentProof(holderKey, input.consentProof(), consentMessage(row, input.decision()));
     ConsentState state =
         DECIDE_APPROVE.equals(input.decision()) ? ConsentState.APPROVED : ConsentState.DENIED;
-    tenant.update(
+    // State predicate closes the approve/deny race: concurrent
+    // deciders both pass the PENDING read-check, but only one UPDATE
+    // matches a row, so the loser sees zero rows and conflicts.
+    int updated = tenant.update(
         "UPDATE proof_request SET state = ?, decided_at = ?, consent_artifact = ?"
-            + " WHERE id = ? AND tenant_id = ?",
+            + " WHERE id = ? AND tenant_id = ? AND state = 'PENDING'",
         state.name(), java.sql.Timestamp.from(now), input.consentProof(),
         requestId, caller.tenantId());
+    if (updated != 1) {
+      throw new AlreadyDecidedException();
+    }
     audit.record(caller, Action.DECIDE_CONSENT, resource, decision, "",
         Map.of("request", requestId.toString(), "decision", input.decision()));
     return view(load(caller, requestId), now);

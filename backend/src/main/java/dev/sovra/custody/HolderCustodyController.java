@@ -43,7 +43,10 @@ public class HolderCustodyController {
   public record ReportRequest(@NotBlank String thumbprint, @NotBlank String reason) {}
 
   public record RecoverRequest(
-      @NotNull UUID recoveryId, @NotNull JsonNode newHolderJwk, String newKeyProof) {}
+      @NotNull UUID recoveryId,
+      @NotNull JsonNode newHolderJwk,
+      String newKeyProof,
+      String deviceLabel) {}
 
   @PostMapping("/report")
   public ResponseEntity<Map<String, Object>> report(@Valid @RequestBody ReportRequest request) {
@@ -60,7 +63,11 @@ public class HolderCustodyController {
   public ResponseEntity<Map<String, Object>> recover(@Valid @RequestBody RecoverRequest request) {
     var caller = CurrentPrincipal.require();
     Recovered recovered = custody.recover(
-        caller, request.recoveryId(), request.newHolderJwk(), request.newKeyProof());
+        caller,
+        request.recoveryId(),
+        request.newHolderJwk(),
+        request.newKeyProof(),
+        request.deviceLabel());
     return ResponseEntity.ok(Map.of(
         "recoveryId", recovered.recoveryId().toString(),
         "newThumbprint", recovered.newThumbprint()));

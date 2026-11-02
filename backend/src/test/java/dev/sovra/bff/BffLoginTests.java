@@ -50,6 +50,9 @@ import tools.jackson.databind.ObjectMapper;
     webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
     properties = {
       "server.port=18082",
+      // PROD-002: forwarded headers are honored here (hostile
+      // condition), yet the login redirect stays config-derived.
+      "server.forward-headers-strategy=framework",
       "sovra.bff.enabled=true",
       "sovra.bff.require-https-issuer=false",
       "sovra.bff.redirect-uri=http://localhost:18082/login/oauth2/code/sovra",
@@ -162,6 +165,26 @@ class BffLoginTests extends SovraAppRoleBase {
     assertThat(audit.get("decision")).isEqualTo("PERMIT");
     assertThat(audit.get("actor_id").toString()).isEqualTo(stored.id().toString());
     assertThat(audit.get("detail").toString()).contains(subject);
+  }
+
+  @Test
+  void forwardedHeadersCannotHijackLoginRedirect() throws Exception {
+    // PROD-002 trusted-proxy: behind ingress the app honors
+    // X-Forwarded-*, but the authorization redirect_uri is the
+    // configured absolute URL, never derived from request headers.
+    HttpResponse<String> start =
+        get(
+            BASE + "/oauth2/authorization/sovra",
+            Map.of(
+                "X-Forwarded-Host", "evil.example",
+                "X-Forwarded-Proto", "https",
+                "X-Forwarded-Port", "443",
+                "Forwarded", "host=evil.example;proto=https"));
+    assertThat(start.statusCode()).isEqualTo(302);
+    String target = location(start);
+    assertThat(target)
+        .contains("redirect_uri=http://localhost:18082/login/oauth2/code/sovra");
+    assertThat(target).doesNotContain("evil.example");
   }
 
   @Test

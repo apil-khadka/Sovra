@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ApiError } from './api'
+import { login } from './auth'
 import type { SessionInfo } from './auth'
 import { fetchAlerts, fetchAudit } from './federation'
 import type { AuditEvent, OpsAlert } from './federation'
@@ -51,6 +52,13 @@ export default function SecOpsView({ session }: { session: SessionInfo | null })
               ? 'Log in first — alerts and audit evidence are visible to trust admins only.'
               : 'This session lacks the trust admin role, so operational evidence stays hidden.'}
           </p>
+          {session === null && (
+            <p>
+              <button type="button" className="primary" onClick={login}>
+                Log in with Keycloak
+              </button>
+            </p>
+          )}
         </StateCard>
       </section>
     )

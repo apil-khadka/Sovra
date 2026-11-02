@@ -79,7 +79,7 @@ public class VpService {
   private final AuditService audit;
   private final ServiceAccountRepository accounts;
   private final VerificationService verification;
-  private final OpenIdKeys keys;
+  private final VerifierKeys keys;
   private final JdbcTemplate tenant;
   private final JdbcTemplate global;
   private final Clock clock;
@@ -93,7 +93,7 @@ public class VpService {
       AuditService audit,
       ServiceAccountRepository accounts,
       VerificationService verification,
-      OpenIdKeys keys,
+      VerifierKeys keys,
       @Qualifier("tenantJdbcTemplate") JdbcTemplate tenant,
       DataSource globalDataSource,
       Clock clock,

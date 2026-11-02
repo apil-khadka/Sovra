@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError } from './api'
+import { login } from './auth'
 import type { SessionInfo } from './auth'
 import {
   approveExtraction,
@@ -30,6 +31,7 @@ import type {
 } from './issuer'
 import Field from './components/Field'
 import StateCard from './components/StateCard'
+import { jsonBlocked, jsonError } from './jsoncheck'
 
 // Issuer information-management desk (SOV-023). Operators review
 // extraction and enrollment queues, correct and approve revisions,
@@ -82,6 +84,7 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
   const [credential, setCredential] = useState<CredentialDetail | undefined>(undefined)
   const [credentialStatus, setCredentialStatus] = useState<CredentialStatus | undefined>(undefined)
   const [revokeArmed, setRevokeArmed] = useState(false)
+  const [rejectArmed, setRejectArmed] = useState(false)
 
   const [events, setEvents] = useState<DeskAuditEvent[] | undefined>(undefined)
 
@@ -274,6 +277,7 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
         decision === 'approve' ? bindingProof.trim() : undefined,
       )
       setBindingProof('')
+      setRejectArmed(false)
       setNotice(decision === 'approve' ? 'Case approved.' : 'Case rejected.')
       await openCase(caseDetail.enrollmentId)
       await loadEnrollments()
@@ -335,6 +339,13 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
               ? 'Log in first — the review queues are visible to issuer operators only.'
               : 'This session lacks the issuer operator role, so the queues stay hidden.'}
           </p>
+          {session === null && (
+            <p>
+              <button type="button" className="primary" onClick={login}>
+                Log in with Keycloak
+              </button>
+            </p>
+          )}
         </StateCard>
       </section>
     )
@@ -343,7 +354,7 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
   return (
     <section className="consent" aria-label="Issuer desk">
       <h1 className="view-title">Issuer desk</h1>
-      <nav className="app-nav" aria-label="Desk areas">
+      <div className="app-nav" role="group" aria-label="Desk areas">
         {(['extraction', 'enrollment', 'credentials', 'audit'] as const).map((area) => (
           <button
             key={area}
@@ -351,8 +362,10 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
             onClick={() => {
               setTab(area)
               setNotice('')
+              setRejectArmed(false)
+              setRevokeArmed(false)
             }}
-            aria-current={tab === area ? 'page' : undefined}
+            aria-pressed={tab === area}
           >
             {area === 'extraction'
               ? 'Extraction'
@@ -363,7 +376,7 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
                   : 'Audit'}
           </button>
         ))}
-      </nav>
+      </div>
       {notice !== '' && <p role="alert">{notice}</p>}
       {tab === 'extraction' && (
         <>
@@ -420,13 +433,13 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
                     {revision.supersedes !== null ? ` · supersedes ${revision.supersedes}` : ''}
                     {' '}· confidence {revision.confidence} · by {revision.createdBy}
                   </p>
-                  <h3>Observed fields</h3>
+                  <h2>Observed fields</h2>
                   <dl className="health-list">
                     {Object.entries(revision.observed).map(([name, value]) => (
                       <Field key={name} label={name} value={value} />
                     ))}
                   </dl>
-                  <h3>Normalized fields</h3>
+                  <h2>Normalized fields</h2>
                   <dl className="health-list">
                     {Object.entries(revision.normalized).map(([name, value]) => (
                       <Field key={name} label={name} value={value} />
@@ -470,13 +483,17 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
                       onChange={(e) => setCorrectFields(e.target.value)}
                       rows={4}
                       placeholder='{"name": "Ana Fixed"}'
+                      aria-invalid={jsonError(correctFields) !== null}
                     />
                   </label>
+                  {jsonError(correctFields) !== null && (
+                    <p role="alert">{jsonError(correctFields)}</p>
+                  )}
                   <p>
                     <button
                       type="button"
                       className="primary"
-                      disabled={busy !== ''}
+                      disabled={busy !== '' || jsonBlocked(correctFields)}
                       onClick={() => void onCorrect()}
                     >
                       {busy === 'correct' ? 'Storing…' : 'Store correction'}
@@ -549,13 +566,15 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
                   onChange={(e) => setIntakeJwk(e.target.value)}
                   rows={3}
                   placeholder='{"kty":"EC","crv":"P-256","x":"…","y":"…"}'
+                  aria-invalid={jsonError(intakeJwk) !== null}
                 />
               </label>
+              {jsonError(intakeJwk) !== null && <p role="alert">{jsonError(intakeJwk)}</p>}
               <p>
                 <button
                   type="button"
                   className="primary"
-                  disabled={busy !== ''}
+                  disabled={busy !== '' || jsonBlocked(intakeJwk)}
                   onClick={() => void onIntake()}
                 >
                   {busy === 'intake' ? 'Opening…' : 'Open case'}
@@ -657,13 +676,28 @@ export default function IssuerDeskView({ session }: { session: SessionInfo | nul
                     >
                       {busy === 'decide-approve' ? 'Approving…' : 'Approve case'}
                     </button>{' '}
-                    <button
-                      type="button"
-                      disabled={busy !== ''}
-                      onClick={() => void onDecide('reject')}
-                    >
-                      {busy === 'decide-reject' ? 'Rejecting…' : 'Reject'}
-                    </button>
+                    {!rejectArmed ? (
+                      <button
+                        type="button"
+                        disabled={busy !== ''}
+                        onClick={() => setRejectArmed(true)}
+                      >
+                        Reject…
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy !== ''}
+                          onClick={() => void onDecide('reject')}
+                        >
+                          {busy === 'decide-reject' ? 'Rejecting…' : 'Confirm reject'}
+                        </button>{' '}
+                        <button type="button" onClick={() => setRejectArmed(false)}>
+                          Keep case
+                        </button>
+                      </>
+                    )}
                   </p>
                 </>
               )}

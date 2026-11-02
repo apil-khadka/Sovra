@@ -26,10 +26,16 @@ public class QuarantineWorker {
 
   private final DataSource dataSource;
   private final VaultKekProvider kek;
+  private final String workerId;
 
   public QuarantineWorker(DataSource dataSource, VaultKekProvider kek) {
+    this(dataSource, kek, "worker");
+  }
+
+  public QuarantineWorker(DataSource dataSource, VaultKekProvider kek, String workerId) {
     this.dataSource = dataSource;
     this.kek = kek;
+    this.workerId = workerId;
   }
 
   /** Claims and scans one admission; empty when the queue is idle. */
@@ -52,20 +58,55 @@ public class QuarantineWorker {
     }
   }
 
+  /**
+   * Requeues scans orphaned by a dead worker: SCANNING rows whose
+   * lease expired return to QUARANTINED with their claim cleared.
+   * Returns the number of rows requeued.
+   */
+  public int requeueStale(java.time.Duration lease) throws Exception {
+    try (Connection con = dataSource.getConnection();
+        PreparedStatement sweep = con.prepareStatement(
+            "UPDATE quarantine_admission SET status = ?, claimed_at = NULL,"
+                + " claimed_by = '', verdict = ? WHERE status = ?"
+                + " AND (claimed_at IS NULL OR claimed_at < now() - ?::interval)"
+                + " RETURNING id")) {
+      sweep.setString(1, QuarantineStatus.QUARANTINED.name());
+      sweep.setString(2, "requeued-after-lease");
+      sweep.setString(3, QuarantineStatus.SCANNING.name());
+      sweep.setString(4, lease.toSeconds() + " seconds");
+      int requeued = 0;
+      try (ResultSet rs = sweep.executeQuery()) {
+        while (rs.next()) {
+          requeued++;
+        }
+      }
+      return requeued;
+    }
+  }
+
   private UUID claim(Connection con) throws Exception {
     // Single-statement atomic claim: SELECT ... FOR UPDATE would need
     // table-level UPDATE, which the worker deliberately lacks (its
-    // UPDATE grant is verdict-columns-only). Racing workers serialize
-    // on the row lock; the loser re-reads a claimed row, matches
-    // nothing, and retries for the next admission.
+    // UPDATE grant is verdict-columns-only). Instead the subselect
+    // takes a transaction-scoped advisory lock per candidate row, so
+    // racing workers skip each other's rows instead of blocking on
+    // row locks; the lock releases at commit or rollback. The outer
+    // status predicate keeps the claim atomic even if two workers
+    // evaluate the subselect concurrently: the loser's UPDATE matches
+    // nothing and it retries for the next admission. The claim stamps
+    // a lease (claimed_at/claimed_by) that requeueStale() uses to
+    // rescue rows orphaned by a crashed worker.
     for (int attempt = 0; attempt < 3; attempt++) {
       try (PreparedStatement claim = con.prepareStatement(
-          "UPDATE quarantine_admission SET status = ? WHERE id = (SELECT id"
+          "UPDATE quarantine_admission SET status = ?, claimed_at = now(),"
+              + " claimed_by = ? WHERE id = (SELECT id"
               + " FROM quarantine_admission WHERE status = ?"
-              + " ORDER BY created_at LIMIT 1) AND status = ? RETURNING id")) {
+              + " AND pg_try_advisory_xact_lock(hashtext(id::text))"
+              + " ORDER BY created_at, id LIMIT 1) AND status = ? RETURNING id")) {
         claim.setString(1, QuarantineStatus.SCANNING.name());
-        claim.setString(2, QuarantineStatus.QUARANTINED.name());
+        claim.setString(2, workerId);
         claim.setString(3, QuarantineStatus.QUARANTINED.name());
+        claim.setString(4, QuarantineStatus.QUARANTINED.name());
         try (ResultSet rs = claim.executeQuery()) {
           if (rs.next()) {
             return rs.getObject(1, UUID.class);

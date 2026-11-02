@@ -63,4 +63,30 @@ public abstract class SovraAppRoleBase {
     }
     return ownerPool;
   }
+
+  /**
+   * Container coordinates for subclasses that boot additional
+   * application instances against this same database (PROD-003
+   * replica tests). Package members stay hidden; these cross the
+   * package boundary explicitly.
+   */
+  protected static String containerJdbcUrl() {
+    return POSTGRES.getJdbcUrl();
+  }
+
+  protected static String containerUsername() {
+    return POSTGRES.getUsername();
+  }
+
+  protected static String containerPassword() {
+    return POSTGRES.getPassword();
+  }
+
+  protected static String appRoleName() {
+    return SovraPostgresBase.APP_ROLE;
+  }
+
+  protected static String appRolePassword() {
+    return SovraPostgresBase.APP_ROLE_PASSWORD;
+  }
 }

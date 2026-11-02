@@ -1,16 +1,22 @@
 package dev.sovra.config;
 
+import dev.sovra.admission.AdmissionFilter;
+import dev.sovra.admission.AdmissionProperties;
+import dev.sovra.admission.InFlightGuard;
+import dev.sovra.admission.JdbcRateLimiter;
 import dev.sovra.auth.ApiKeyAuthFilter;
 import dev.sovra.auth.HumanMembershipRepository;
 import dev.sovra.bff.BffCsrfCookieFilter;
 import dev.sovra.bff.BffLoginHandlers;
 import dev.sovra.bff.BffLoginService;
+import dev.sovra.bff.BffSecurityContextRepository;
 import dev.sovra.bff.BffSessionFilter;
 import dev.sovra.bff.PkceAuthorizationRequestResolver;
 import dev.sovra.web.SpaRoutes;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -57,7 +63,10 @@ public class SecurityConfig {
       HttpSecurity http,
       ClientRegistrationRepository clients,
       BffLoginService logins,
-      HumanMembershipRepository memberships)
+      HumanMembershipRepository memberships,
+      JdbcRateLimiter limiter,
+      AdmissionProperties admission,
+      InFlightGuard guard)
       throws Exception {
     http.securityMatcher("/oauth2/**", "/login/**", "/api/bff/**")
         // The SPA probes /api/bff/me before login. Saving that 401
@@ -82,6 +91,19 @@ public class SecurityConfig {
                 sessions
                     .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                     .sessionFixation(fixation -> fixation.migrateSession()))
+        // PROD-003: the session holds a marker, not the framework
+        // context object (see BffSecurityContextRepository):
+        // BffSessionFilter rebuilds the effective authentication from
+        // the membership row on every request, so persisting the
+        // OIDC object graph would only bloat the shared row. The
+        // marker is what stops SessionManagementFilter from
+        // re-running fixation on every call. Explicit-save mode keeps
+        // the per-request rebuild out of the store.
+        .securityContext(
+            context ->
+                context
+                    .requireExplicitSave(true)
+                    .securityContextRepository(new BffSecurityContextRepository()))
         .oauth2Login(
             oauth ->
                 oauth
@@ -114,6 +136,12 @@ public class SecurityConfig {
         .addFilterAfter(
             new BffCsrfCookieFilter(),
             org.springframework.security.web.csrf.CsrfFilter.class)
+        // PROD-006: admission runs after authorization, so denied
+        // requests cost no budget and admitted requests never skip
+        // authorization or audit.
+        .addFilterAfter(
+            new AdmissionFilter(limiter, admission, guard),
+            org.springframework.security.web.access.intercept.AuthorizationFilter.class)
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers("/oauth2/**", "/login/**")
@@ -150,7 +178,13 @@ public class SecurityConfig {
 
   @Bean
   @Order(2)
-  SecurityFilterChain filterChain(HttpSecurity http, ApiKeyAuthFilter apiKeyAuthFilter)
+  SecurityFilterChain filterChain(
+      HttpSecurity http,
+      ApiKeyAuthFilter apiKeyAuthFilter,
+      JdbcRateLimiter limiter,
+      AdmissionProperties admission,
+      InFlightGuard guard,
+      @Value("${management.server.port:-1}") int managementPort)
       throws Exception {
     http
         // Stateless token API with no cookies or sessions.
@@ -158,11 +192,22 @@ public class SecurityConfig {
         .sessionManagement(
             sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class)
+        // PROD-006: admission after authorization (see the BFF chain
+        // comment for why this position matters).
+        .addFilterAfter(
+            new AdmissionFilter(limiter, admission, guard),
+            org.springframework.security.web.access.intercept.AuthorizationFilter.class)
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(HttpMethod.GET, "/api/health")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/health/ready")
+                    .permitAll()
+                    // PROD-011: fleet scrape/health, reachable only on
+                    // the private management port (SOVRA_MANAGEMENT_PORT;
+                    // never published by ingress) and never on the
+                    // public application port. See the matcher below.
+                    .requestMatchers(new ManagementPortActuatorMatcher(managementPort))
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/trust/snapshots/current")
                     .permitAll()
@@ -223,6 +268,36 @@ public class SecurityConfig {
         return false;
       }
       return SpaRoutes.isPublicStaticPath(request.getRequestURI());
+    }
+  }
+
+  /**
+   * PROD-011: actuator reads are public only on the management port.
+   * The match is on the socket local port, not on Host headers, so it
+   * cannot be spoofed; when management is disabled (-1) or random
+   * (0) nothing matches and actuator stays behind authentication.
+   */
+  static final class ManagementPortActuatorMatcher
+      implements org.springframework.security.web.util.matcher.RequestMatcher {
+
+    private static final java.util.Set<String> PATHS =
+        java.util.Set.of("/actuator/health", "/actuator/info", "/actuator/prometheus");
+
+    private final int managementPort;
+
+    ManagementPortActuatorMatcher(int managementPort) {
+      this.managementPort = managementPort;
+    }
+
+    @Override
+    public boolean matches(HttpServletRequest request) {
+      if (managementPort <= 0 || !"GET".equals(request.getMethod())) {
+        return false;
+      }
+      if (request.getLocalPort() != managementPort) {
+        return false;
+      }
+      return PATHS.contains(request.getRequestURI());
     }
   }
 }

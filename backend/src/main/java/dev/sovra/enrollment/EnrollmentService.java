@@ -342,14 +342,28 @@ public class EnrollmentService {
               enrollmentId,
               dev.sovra.custody.HolderKeyStatus.ACTIVE.name());
       if (live == null || live == 0) {
+        // PROD-015: the case key lives on the enrollment's primary
+        // device. Pre-authorization enrollment carries no device
+        // facts, so the first approval mints the primary handle and
+        // binds the key; later devices arrive through recovery.
+        tenant.update(
+            "INSERT INTO holder_device (tenant_id, enrollment_id, label)"
+                + " VALUES (?, ?, 'primary') ON CONFLICT DO NOTHING",
+            caller.tenantId(), enrollmentId);
+        UUID deviceId =
+            tenant.queryForObject(
+                "SELECT id FROM holder_device WHERE tenant_id = ? AND enrollment_id = ?"
+                    + " AND label = 'primary'",
+                UUID.class, caller.tenantId(), enrollmentId);
         try {
           tenant.update(
-              "INSERT INTO holder_key (tenant_id, enrollment_id, thumbprint, jwk, created_by)"
-                  + " VALUES (?, ?, ?, ?::jsonb, ?)",
+              "INSERT INTO holder_key (tenant_id, enrollment_id, thumbprint, jwk, device_id,"
+                  + " created_by) VALUES (?, ?, ?, ?::jsonb, ?, ?)",
               caller.tenantId(),
               enrollmentId,
               activatedThumbprint,
               row.holderJwk,
+              deviceId,
               caller.name());
         } catch (org.springframework.dao.DuplicateKeyException e) {
           throw new EnrollmentConflictException("holder key is already registered");

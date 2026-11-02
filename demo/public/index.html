@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sovra RP demos: synthetic</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="banner">Synthetic demo: no real identity data, no real accounts</div>
+    <main>
+      <p class="brand">Sovra integration demos</p>
+      <h1>Two mock apps, one proof request</h1>
+      <p class="lede">
+        Both apps are verifiers. They request one fact (over 18) and never see
+        documents, birth dates, or source profiles. Every credential, holder, and
+        issuer below is synthetic.
+      </p>
+      <div class="card">
+        <h2>NovaBank · demo account opening</h2>
+        <p>Prove age eligibility to reserve a demo bank account. Nothing is a real account.</p>
+        <p class="actions"><a class="button" href="/novabank">Open NovaBank demo</a></p>
+      </div>
+      <div class="card">
+        <h2>CornerCellar · age-gated checkout</h2>
+        <p>Clear the age gate to check out a demo basket. Nothing is really for sale.</p>
+        <p class="actions"><a class="button" href="/cornercellar">Open CornerCellar demo</a></p>
+      </div>
+      <div class="card">
+        <h2>Minimal RP · copy-paste starting point</h2>
+        <p>One page plus one zero-dependency server: the smallest honest integration.</p>
+        <p class="actions"><a class="button" id="minimal-link" href="http://localhost:5175">Open minimal RP</a></p>
+        <p class="fine">Source: demo/minimal — needs its own server first: pnpm --dir demo run minimal.</p>
+      </div>
+      <footer><span id="discovery">Connecting…</span></footer>
+    </main>
+    <script type="module">
+      import { fetchDiscovery } from '/shared.js'
+      // The minimal RP runs on :5175 of whatever host serves this hub.
+      document.getElementById('minimal-link').href =
+        `${location.protocol}//${location.hostname}:5175`
+      try {
+        const d = await fetchDiscovery()
+        document.getElementById('discovery').textContent =
+          `Sovra ${d.service} ${d.version} · profile ${d.profile} · contract ${d.contractVersion}`
+      } catch {
+        document.getElementById('discovery').textContent = 'Sovra backend unreachable.'
+      }
+    </script>
+  </body>
+</html>

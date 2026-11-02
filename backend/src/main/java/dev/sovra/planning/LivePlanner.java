@@ -33,15 +33,21 @@ public class LivePlanner {
   private final PlanningTools tools;
   private final Clock clock;
   private final ObjectMapper mapper;
+  private final AiBudgetService budgets;
 
   private volatile OpenAiChatModel cached;
 
   public LivePlanner(
-      PlanningProperties properties, PlanningTools tools, Clock clock, ObjectMapper mapper) {
+      PlanningProperties properties,
+      PlanningTools tools,
+      Clock clock,
+      ObjectMapper mapper,
+      AiBudgetService budgets) {
     this.properties = properties;
     this.tools = tools;
     this.clock = clock;
     this.mapper = mapper;
+    this.budgets = budgets;
   }
 
   /**
@@ -79,7 +85,11 @@ public class LivePlanner {
    * Runs one live planning call with the bounded read-only tools. The
    * caller must have installed a {@link PlanningInvocation}; the raw
    * model output is strictly parsed and bounded (SEC-18) before it
-   * becomes a candidate.
+   * becomes a candidate. The provider call runs inside a fleet-wide
+   * budget reservation (PROD-012): failures before the reserve spend
+   * nothing; anything after it — including pre-HTTP validation
+   * inside the call, which cannot prove no charge — burns the
+   * estimate as uncertain.
    */
   public PlanningResult plan(PlanningIntent intent, String toolHash) {
     if (!properties.liveReady()) {
@@ -94,6 +104,43 @@ public class LivePlanner {
         PlanningInvocation.current()
             .orElseThrow(
                 () -> new IllegalStateException("live planning outside an authorized invocation"));
+    // Conservative estimate: full completion cap plus the prompt
+    // ceiling at four chars per token. The settle step replaces it
+    // with provider-reported usage when present.
+    long estimatedTokens =
+        (long) properties.maxTokens() + properties.maxPromptChars() / 4;
+    try {
+      return budgets.execute(
+          invocation.caller().tenantId(),
+          estimatedTokens,
+          new AiBudgetService.AiCall<PlanningResult>() {
+            @Override
+            public PlanningResult invoke() {
+              return doPlan(intent, toolHash, invocation, system, user);
+            }
+
+            @Override
+            public long usageOf(PlanningResult result) {
+              return result.usageTokens() == null ? -1 : result.usageTokens();
+            }
+          });
+    } catch (AiBudgetExhaustedException e) {
+      log.warn("live planning denied by budget: {}", e.getMessage());
+      throw new PlanningUnavailableException("live-AI budget exhausted");
+    } catch (PlanningUnavailableException | ForbiddenException
+        | InvalidPlanningException | TrustUnavailableException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new PlanningUnavailableException("model provider did not return a candidate", e);
+    }
+  }
+
+  private PlanningResult doPlan(
+      PlanningIntent intent,
+      String toolHash,
+      PlanningInvocation invocation,
+      String system,
+      String user) {
     long started = clock.millis();
     try {
       ChatClient client = ChatClient.create(chatModel());

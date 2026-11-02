@@ -6,6 +6,7 @@ import dev.sovra.auth.ServiceAccountPrincipal;
 import dev.sovra.authz.Action;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.web.CorrelationIds;
 import dev.sovra.authz.ReasonCode;
 import java.util.Map;
 import java.util.UUID;
@@ -56,8 +57,21 @@ public class AuditService {
         decisionText,
         decision.reasonCode(),
         decision.policyVersion(),
-        correlationId == null ? "" : correlationId,
+        orRequestId(correlationId),
         toJson(sanitize(detail)));
+  }
+
+  /**
+   * PROD-011: an explicit domain correlation wins, but callers that
+   * pass none get the current request id instead of an empty value,
+   * so every audit row joins to its request logs. Outside a request
+   * (jobs, tests) the value stays empty.
+   */
+  private static String orRequestId(String correlationId) {
+    if (correlationId != null && !correlationId.isBlank()) {
+      return correlationId;
+    }
+    return CorrelationIds.currentOrEmpty();
   }
 
   /** Drops secret-like keys and truncates values; never throws on content. */
@@ -120,7 +134,7 @@ public class AuditService {
         decisionText,
         decision.reasonCode(),
         decision.policyVersion(),
-        correlationId == null ? "" : correlationId,
+        orRequestId(correlationId),
         toJson(sanitize(detail)));
   }
 }

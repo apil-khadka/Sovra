@@ -71,6 +71,7 @@ public class VaultService {
   private final JdbcTemplate tenant;
   private final Clock clock;
   private final DemoProperties demo;
+  private final long maxObjectsPerTenant;
 
   public VaultService(
       AuthorizationService authz,
@@ -80,7 +81,10 @@ public class VaultService {
       VaultKekProvider kek,
       JdbcTemplate tenantJdbcTemplate,
       Clock clock,
-      DemoProperties demo) {
+      DemoProperties demo,
+      @org.springframework.beans.factory.annotation.Value(
+              "${sovra.quotas.vault-objects-per-tenant:0}")
+          long maxObjectsPerTenant) {
     this.authz = authz;
     this.audit = audit;
     this.accounts = accounts;
@@ -89,6 +93,7 @@ public class VaultService {
     this.tenant = tenantJdbcTemplate;
     this.clock = clock;
     this.demo = demo;
+    this.maxObjectsPerTenant = maxObjectsPerTenant;
   }
 
   public record StoredVersion(UUID objectId, int version) {}
@@ -155,6 +160,22 @@ public class VaultService {
     Decision decision = require(caller, Action.VAULT_STORE_OBJECT, "vault-object", "store");
     if (source == IngestionSource.CALLER) {
       requireCallerIngestion();
+    }
+    // PROD-010 tenant object quota (0 = unlimited). Count-then-act
+    // is approximate under concurrency — racing stores can
+    // overshoot by the race window — which is acceptable for a
+    // storage budget (unlike the grant cap, which guards live
+    // bearer grants and holds a row lock).
+    if (maxObjectsPerTenant > 0) {
+      Long used =
+          tenant.queryForObject(
+              "SELECT COUNT(*) FROM vault_object WHERE tenant_id = ?",
+              Long.class,
+              caller.tenantId());
+      if (used != null && used >= maxObjectsPerTenant) {
+        throw new VaultQuotaExceededException(
+            "tenant vault-object quota exhausted (" + used + "/" + maxObjectsPerTenant + ")");
+      }
     }
     List<String> authorized = validatedPurposes(purposes);
     byte[] bytes = validatedContent(content, expectedSha256Hex);
@@ -440,6 +461,7 @@ public class VaultService {
     Decision decision = require(caller, Action.VAULT_DELETE_VERSION, "vault-object",
         objectId.toString());
     StoredRow row = versionRow(objectId, version);
+    requireNoLegalHold(objectId, version);
     if (row.status() == VaultObjectStatus.VALID) {
       throw new VaultConflictException("delete before purge");
     }
@@ -464,6 +486,7 @@ public class VaultService {
     Decision decision = require(caller, Action.VAULT_DELETE_VERSION, "vault-object",
         objectId.toString());
     StoredRow row = versionRow(objectId, version);
+    requireNoLegalHold(objectId, version);
     if (row.status() == VaultObjectStatus.VALID) {
       tenant.update(
           "UPDATE vault_object_version SET status = ?, status_updated_at = now()"
@@ -474,6 +497,24 @@ public class VaultService {
         caller, Action.VAULT_DELETE_VERSION,
         ResourceRef.tenantScoped("vault-object", objectId.toString(), caller.tenantId()),
         decision, "", Map.of("version", String.valueOf(version)));
+  }
+
+  /**
+   * Legal-hold gate (PROD-010): held tenants' versions neither
+   * tombstone nor purge. The row is already loaded through RLS, so
+   * this only resolves its tenant's hold flag.
+   */
+  private void requireNoLegalHold(UUID objectId, int version) {
+    Boolean held =
+        tenant.queryForObject(
+            "SELECT t.legal_hold FROM tenant t JOIN vault_object_version v"
+                + " ON v.tenant_id = t.id WHERE v.object_id = ? AND v.version = ?",
+            Boolean.class,
+            objectId,
+            version);
+    if (Boolean.TRUE.equals(held)) {
+      throw new VaultLegalHoldException("tenant is under legal hold");
+    }
   }
 
   private void sealVersion(

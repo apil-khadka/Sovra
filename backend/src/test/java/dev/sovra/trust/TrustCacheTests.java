@@ -23,9 +23,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Trust-snapshot cache bounds: version-keyed, 60-minute max age, 4
- * entries, emergency bypass. The mocked TrustService always answers for
- * the live activation version, so invocation counts prove hits/misses.
+ * Trust-snapshot cache bounds: version-checked, 60-minute max age,
+ * single live entry, emergency bypass. The mocked TrustService
+ * always answers for the live activation version, so invocation
+ * counts prove hits/misses.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class TrustCacheTests extends SovraPostgresBase {
@@ -136,19 +137,16 @@ class TrustCacheTests extends SovraPostgresBase {
   }
 
   @Test
-  void fourthEntryEvictsTheEldest() {
+  void rolledBackVersionsReload() {
     TrustService mock = answeringMock();
     CachingTrustSnapshotProvider provider =
         provider(mock, Clock.fixed(Instant.now(), ZoneId.of("UTC")));
-    // Load five distinct versions; the cache holds four.
     provider.current();
-    for (int i = 0; i < 4; i++) {
-      long version = activateFresh();
-      assertThat(provider.current().get().version()).isEqualTo(version);
-    }
-    verify(mock, times(5)).currentSnapshot();
+    long next = activateFresh();
+    assertThat(provider.current().get().version()).isEqualTo(next);
+    verify(mock, times(2)).currentSnapshot();
 
-    // Back to the first version: evicted means a reload, not a hit.
+    // Back to the first version: a version change always reloads.
     owner.update(
         "DELETE FROM trust_proposal_decision WHERE proposal_id IN"
             + " (SELECT id FROM trust_change_proposal WHERE snapshot_version > ?)",
@@ -161,7 +159,45 @@ class TrustCacheTests extends SovraPostgresBase {
         baseVersion);
     owner.update("DELETE FROM trust_snapshot WHERE version > ?", baseVersion);
     assertThat(provider.current().get().version()).isEqualTo(baseVersion);
-    verify(mock, times(6)).currentSnapshot();
+    verify(mock, times(3)).currentSnapshot();
+  }
+
+  @Test
+  void concurrentRefreshersLoadOnce() throws Exception {
+    // PROD-008: readers never block each other, and a stampede on a
+    // cold cache issues exactly one snapshot load.
+    TrustService slow = mock(TrustService.class);
+    when(slow.currentSnapshot())
+        .thenAnswer(
+            invocation -> {
+              Thread.sleep(300);
+              return Optional.of(
+                  new TrustService.SnapshotView(currentMax(), List.of(), List.of()));
+            });
+    CachingTrustSnapshotProvider provider =
+        provider(slow, Clock.fixed(Instant.now(), ZoneId.of("UTC")));
+    int readers = 16;
+    java.util.concurrent.ExecutorService pool =
+        java.util.concurrent.Executors.newFixedThreadPool(readers);
+    try {
+      var barrier = new java.util.concurrent.CountDownLatch(1);
+      var futures = new java.util.ArrayList<java.util.concurrent.Future<Optional<TrustService.SnapshotView>>>();
+      for (int i = 0; i < readers; i++) {
+        futures.add(
+            pool.submit(
+                () -> {
+                  barrier.await();
+                  return provider.current();
+                }));
+      }
+      barrier.countDown();
+      for (var future : futures) {
+        assertThat(future.get().get().version()).isEqualTo(baseVersion);
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+    verify(slow, times(1)).currentSnapshot();
   }
 
   @Test

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ApiError } from './api'
+import { login } from './auth'
 import type { SessionInfo } from './auth'
 import {
   fetchRpApps,
@@ -25,6 +26,7 @@ export default function RpDashboardView({ session }: { session: SessionInfo | nu
   const [rotated, setRotated] = useState<RotatedApp | undefined>(undefined)
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
+  const [revokeArmed, setRevokeArmed] = useState<string | null>(null)
 
   const member = session !== null && session.roles.includes('TENANT_MEMBER')
 
@@ -67,6 +69,7 @@ export default function RpDashboardView({ session }: { session: SessionInfo | nu
     setNotice('')
     try {
       await revokeRpCredential(id)
+      setRevokeArmed(null)
       setRotated(undefined)
       setApps(await fetchRpApps())
     } catch (err: unknown) {
@@ -86,6 +89,13 @@ export default function RpDashboardView({ session }: { session: SessionInfo | nu
               ? 'Log in first — authorized apps and outcomes are visible to tenant members only.'
               : 'This session lacks the tenant member role, so the dashboard stays hidden.'}
           </p>
+          {session === null && (
+            <p>
+              <button type="button" className="primary" onClick={login}>
+                Log in with Keycloak
+              </button>
+            </p>
+          )}
         </StateCard>
       </section>
     )
@@ -140,9 +150,28 @@ export default function RpDashboardView({ session }: { session: SessionInfo | nu
                   <button type="button" disabled={loading} onClick={() => void rotate(app.id)}>
                     Rotate credential
                   </button>{' '}
-                  <button type="button" disabled={loading} onClick={() => void revoke(app.id)}>
-                    Revoke credential
-                  </button>
+                  {revokeArmed !== app.id ? (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setRevokeArmed(app.id)}
+                    >
+                      Revoke…
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => void revoke(app.id)}
+                      >
+                        Confirm revoke
+                      </button>{' '}
+                      <button type="button" onClick={() => setRevokeArmed(null)}>
+                        Keep credential
+                      </button>
+                    </>
+                  )}
                 </p>
               )}
             </article>

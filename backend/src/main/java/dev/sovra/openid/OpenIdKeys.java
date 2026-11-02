@@ -22,6 +22,7 @@ import java.text.ParseException;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -34,10 +35,13 @@ import org.springframework.stereotype.Service;
  * issuance scalar 1 — held in memory only and armed by the same two
  * synthetic flags. Both app instances derive the identical key, so a
  * wallet response lands on either instance behind the entry point.
- * Production retires this class for KMS-backed verifier keys.
+ * Production retires this class for {@link FileVerifierKeys}: the
+ * bean only exists while the synthetic flag is on, so the
+ * deterministic key cannot serve production traffic.
  */
 @Service
-public class OpenIdKeys {
+@ConditionalOnProperty(name = "sovra.synthetic-issuers.enabled", havingValue = "true")
+public class OpenIdKeys implements VerifierKeys {
 
   public static final String KEY_ID = "sovra-vp-synth-1";
 
@@ -71,7 +75,7 @@ public class OpenIdKeys {
             .build();
   }
 
-  /** Signs an authorization request object (ES256, {@code kid} set). */
+  @Override
   public String signRequestObject(Map<String, Object> claims) {
     try {
       SignedJWT jwt =
@@ -94,6 +98,7 @@ public class OpenIdKeys {
    * ({@code ECDH-ES+A256KW} / {@code A256GCM}); anything else is a
    * downgrade attempt and is rejected before decryption.
    */
+  @Override
   public String decryptResponse(String jwe) {
     try {
       EncryptedJWT parsed = EncryptedJWT.parse(jwe);
@@ -122,7 +127,7 @@ public class OpenIdKeys {
     }
   }
 
-  /** Public verifier JWKS (signing + encryption use the one G1 key). */
+  @Override
   public Map<String, Object> jwks() {
     return Map.of(
         "keys",

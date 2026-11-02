@@ -10,7 +10,7 @@ import { fetchReadiness, fetchSnapshot } from './ops'
 // accepts no input at all: there is no real-ID upload path anywhere in
 // the app, and no production issuer connectivity behind it.
 
-const STEPS: Array<{ title: string; body: string; target: 'consent' | 'verify'; action: string }> = [
+const STEPS: Array<{ title: string; body: string; target: 'consent' | 'verify' | 'portal'; action: string }> = [
   {
     title: 'Synthetic issuance',
     body: 'Issuer synth-1 mints an adultOver18 credential for a fixture P-256 holder key.',
@@ -28,6 +28,12 @@ const STEPS: Array<{ title: string; body: string; target: 'consent' | 'verify'; 
     body: 'The verifier checks signature, trust, status, freshness, and a one-time challenge.',
     target: 'verify',
     action: 'Open verify',
+  },
+  {
+    title: 'Integrate your own app',
+    body: 'Copy demo/minimal (one page, one server, zero dependencies), mint a sandbox token, then call four endpoints: setup, request, decision, verify. The full rules are in docs/demo/integrate-age-check.md.',
+    target: 'portal',
+    action: 'Open developer portal',
   },
 ]
 
@@ -74,7 +80,11 @@ export default function DemoView() {
         <StateCard key={step.title} tone="review" badge={step.title}>
           <p>{step.body}</p>
           <div className="consent-actions">
-            <a className="button-link" href={`#/${step.target}`}>
+            <a
+              className="button-link"
+              href={`#/${step.target}`}
+              aria-label={`${step.action}: ${step.title}`}
+            >
               {step.action}
             </a>
           </div>

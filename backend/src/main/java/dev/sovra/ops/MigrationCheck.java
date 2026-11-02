@@ -47,7 +47,22 @@ public class MigrationCheck implements ReadinessCheck {
           "enrollment",
           "enrollment_review",
           "holder_key",
-          "holder_recovery");
+          "holder_recovery",
+          // PROD-003: shared BFF sessions + atomic unlock challenges.
+          "spring_session",
+          "spring_session_attributes",
+          "holder_unlock_challenge",
+          // PROD-006: shared admission buckets.
+          "rate_limit_bucket",
+          // PROD-012: fleet live-AI budget ledger.
+          "ai_budget_day",
+          "ai_call_lease",
+          // PROD-015: durable holder devices.
+          "holder_device",
+          // PROD-015: accredited RP onboarding.
+          "accreditation",
+          // PROD-010: audit evidence archive.
+          "audit_event_archive");
 
   private final JdbcTemplate global;
 

@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CornerCellar demo — age-gated checkout</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="app-shop">
+    <div class="banner">Synthetic demo: CornerCellar is fictional, nothing is really for sale</div>
+    <main>
+      <p class="brand">CornerCellar · demo shop</p>
+      <h1>Your basket</h1>
+      <p class="lede">
+        One item is age-restricted. The shop learns only that you are over 18.
+      </p>
+
+      <div class="shelf" id="s-shelf">
+        <div class="product">
+          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="38" rx="26" ry="16" fill="#c98a3d"/><path d="M18 34l8-6M30 32l8-6M42 32l6-4" stroke="#8a5a20" stroke-width="2" stroke-linecap="round"/></svg>
+          <div><h2>Sourdough loaf</h2><p class="price">€4.50 <small>· no restriction</small></p></div>
+        </div>
+        <div class="product restricted">
+          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><rect x="26" y="6" width="12" height="14" rx="2" fill="#3f5a36"/><path d="M22 22h20v30a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6z" fill="#3f5a36"/><rect x="26" y="34" width="12" height="12" fill="#fbf7f0"/></svg>
+          <div><h2>House red, 75cl <span class="badge18" id="age-badge">18+</span></h2><p class="price">€12.00 <small id="age-gate-note">· age gate at checkout</small></p></div>
+        </div>
+        <div class="product">
+          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><rect x="16" y="18" width="32" height="34" rx="4" fill="#5b6b3f"/><rect x="26" y="8" width="12" height="12" rx="2" fill="#46532f"/></svg>
+          <div><h2>Olive oil, 50cl</h2><p class="price">€9.00 <small>· no restriction</small></p></div>
+        </div>
+      </div>
+      <p class="basket-summary" id="s-basketline" hidden>Basket: 3 items · €25.50 · 1 age-restricted item held</p>
+
+      <div class="sovra-head">
+        <span>Age check by Sovra</span>
+        <span class="sovra-chip" title="Sovra performs this age check on synthetic fixtures">SOVRA · <span id="chip-profile">…</span></span>
+        <span class="state-pill" id="state-pill" aria-live="polite">Nothing shared yet</span>
+      </div>
+
+      <div class="card gate-card" id="s-start">
+        <h2><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="2" fill="none"/></svg> Step 1: Checkout, €25.50 (demo)</h2>
+        <ul class="basket-lines">
+          <li><span>Sourdough loaf</span><span>€4.50</span></li>
+          <li><span>House red, 75cl (18+)</span><span>€12.00</span></li>
+          <li><span>Olive oil, 50cl</span><span>€9.00</span></li>
+          <li class="total"><span>Total</span><span>€25.50</span></li>
+        </ul>
+        <p>No payment is taken. Clearing the age gate is the only check in this demo.</p>
+        <p class="actions">
+          <button type="button" class="primary" id="b-start">Prove over-18 with Sovra</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-progress" hidden>
+        <h2>Working…</h2>
+        <p role="status" id="progress-label">Starting…</p>
+        <ol class="progress-steps" id="progress-steps" aria-label="Check progress"></ol>
+        <p class="actions">
+          <button type="button" class="linkish" id="b-cancel">Cancel this check</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-consent" hidden>
+        <h2>Step 2: Review and decide</h2>
+        <p>The shop needs one fact to release your bottle.</p>
+        <div class="learn-split">
+          <div class="learn-yes">
+            <h3>CornerCellar will learn</h3>
+            <p>You are over 18. That is enough to clear the age gate.</p>
+          </div>
+          <div class="learn-no">
+            <h3>CornerCellar will not learn</h3>
+            <p>Your birth date, document, or identity.</p>
+          </div>
+        </div>
+        <dl id="consent-human"></dl>
+        <p class="fine">
+          Synthetic evidence only. This demo sells nothing and performs no legal
+          age verification.
+        </p>
+        <p class="actions">
+          <button type="button" class="primary" id="b-approve">Approve and share</button>
+          <button type="button" id="b-decline">Decline</button>
+          <button type="button" class="linkish" id="b-back">Back without deciding</button>
+        </p>
+        <details>
+          <summary>Exact technical values</summary>
+          <dl id="consent-fields"></dl>
+        </details>
+      </div>
+
+      <div class="card" id="s-outcome" hidden>
+        <p class="verdict" id="verdict" role="status"></p>
+        <p id="outcome-note"></p>
+        <details>
+          <summary>Receipt detail</summary>
+          <dl id="receipt-fields"></dl>
+        </details>
+        <p class="actions"><button type="button" id="b-restart">Start a new check</button></p>
+      </div>
+
+      <footer>
+        <span><a href="/">All demos</a></span>
+      </footer>
+
+      <details class="integrator-feed ops" id="s-ops" hidden>
+        <summary>For integrators: live decision feed</summary>
+        <p class="fine" id="discovery">Connecting…</p>
+        <p class="fine" id="ops-metrics"></p>
+        <table>
+          <thead><tr><th>Decision</th><th>Outcome</th><th>Reason</th><th>Decided</th></tr></thead>
+          <tbody id="ops-rows"></tbody>
+        </table>
+      </details>
+    </main>
+    <script type="module">
+      import { fetchDiscovery, fetchOps, runCheck } from '/shared.js'
+
+      const $ = (id) => document.getElementById(id)
+      const show = (id) => {
+        for (const s of ['s-start', 's-progress', 's-consent', 's-outcome']) $(s).hidden = s !== id
+        // During work/consent the shelf compresses to one line so the
+        // decision is the only full card on screen.
+        const deciding = id === 's-progress' || id === 's-consent'
+        $('s-shelf').hidden = deciding
+        $('s-basketline').hidden = !deciding
+        // Land keyboard and screen-reader users on the new card.
+        const head = document.querySelector(`#${id} h2, #${id} .verdict`)
+        if (head instanceof HTMLElement) {
+          head.setAttribute('tabindex', '-1')
+          head.focus()
+        }
+      }
+
+      function setRestrictedBadge(state) {
+        // state: 'idle' | 'proved' | 'held'
+        const badge = $('age-badge')
+        badge.className = state === 'idle' ? 'badge18' : `badge18 ${state}`
+        badge.textContent = state === 'proved' ? 'Age proved ✓' : state === 'held' ? 'Held for age check' : '18+'
+        $('age-gate-note').textContent = state === 'proved' ? '· age gate cleared' : '· age gate at checkout'
+      }
+      const field = (label, value, mono = false) =>
+        `<dt>${label}</dt><dd${mono ? ' class="mono"' : ''}>${value}</dd>`
+
+      const STEPS = [
+        'Preparing your check…',
+        'Requesting your proof…',
+        'Opening your decision…',
+        'Recording your approval…',
+        'Confirming with Sovra…',
+      ]
+      const DECLINE_LABEL = 'Recording your decline…'
+
+      function resetProgress() {
+        $('progress-steps').innerHTML = STEPS.map(
+          (label) => `<li><span class="progress-dot" aria-hidden="true"></span><span class="step-state visually-hidden"></span><span class="step-label">${label}</span></li>`,
+        ).join('')
+      }
+
+      function markStep(label) {
+        const rows = [...$('progress-steps').children]
+        const declining = label === DECLINE_LABEL
+        const index = declining ? 3 : STEPS.indexOf(label)
+        rows.forEach((row, i) => {
+          row.classList.toggle('done', i < index)
+          row.classList.toggle('active', i === index)
+          row.querySelector('.step-state').textContent = i < index ? 'done: ' : i === index ? 'current: ' : ''
+          if (i === 3 && declining) row.querySelector('.step-label').textContent = DECLINE_LABEL
+        })
+      }
+
+      function setPill(text, tone = '') {
+        const pill = $('state-pill')
+        pill.textContent = text
+        pill.className = tone === '' ? 'state-pill' : `state-pill ${tone}`
+      }
+
+      function relativeExpiry(iso) {
+        const minutes = Math.max(1, Math.round((new Date(iso) - Date.now()) / 60000))
+        return minutes < 50 ? `expires in ~${minutes} min` : 'expires in about an hour'
+      }
+
+      try {
+        const d = await fetchDiscovery()
+        $('discovery').textContent = `Sovra ${d.service} ${d.version} · profile ${d.profile} · contract ${d.contractVersion}`
+        $('chip-profile').textContent = d.profile
+      } catch {
+        $('discovery').textContent = 'Sovra backend unreachable.'
+      }
+
+      async function refreshOps() {
+        try {
+          const { outcomes, metrics } = await fetchOps('cornercellar')
+          if (metrics) {
+            $('ops-metrics').textContent =
+              `${metrics.total} decisions · ${metrics.accepted} accepted · ${metrics.rejected} rejected · ${metrics.unknown} unknown`
+          }
+          $('ops-rows').innerHTML = outcomes.map((o) =>
+            `<tr><td class="mono">${o.decisionId.slice(0, 8)}…</td><td>${o.outcome}</td><td class="mono">${o.reasonCode}</td><td>${o.decidedAt}</td></tr>`,
+          ).join('')
+          $('s-ops').hidden = false
+        } catch {
+          // Ops corner is informational; the check result stands on its own.
+        }
+      }
+
+      let cancelled = false
+
+      $('b-cancel').addEventListener('click', () => {
+        // Stops the flow before any decision is signed. Artefacts
+        // already created expire unused within the hour.
+        cancelled = true
+        show('s-start')
+      })
+
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return
+        if (!$('s-consent').hidden) $('b-back').click()
+        else if (!$('s-progress').hidden) $('b-cancel').click()
+      })
+      $('b-start').addEventListener('click', () => {
+        show('s-progress')
+        resetProgress()
+        setPill('Nothing shared yet')
+        setRestrictedBadge('idle')
+        cancelled = false
+        runCheck('cornercellar', {
+          onStep: (label) => { $('progress-label').textContent = label; markStep(label) },
+          decide: ({ review }) => new Promise((resolve) => {
+            if (cancelled) {
+              resolve('back')
+              return
+            }
+            $('consent-human').innerHTML =
+              field('Who asks', 'CornerCellar (demo)') +
+              field('What they learn', 'That you are over 18') +
+              field('Expires', relativeExpiry(review.expiresAt))
+            $('consent-fields').innerHTML =
+              field('Relying party', 'CornerCellar (demo)') +
+              field('Purpose', review.purpose) +
+              field('Exact claims', 'adultOver18: true', true) +
+              field('Issuer', 'synth-1 (synthetic issuer)') +
+              field('Expires', review.expiresAt, true)
+            show('s-consent')
+            $('b-approve').onclick = () => { show('s-progress'); resolve('approve') }
+            $('b-decline').onclick = () => { show('s-progress'); resolve('deny') }
+            $('b-back').onclick = () => resolve('back')
+          }),
+        }).then(({ decision, denied, backedOut, requestId }) => {
+          if (backedOut) {
+            show('s-start')
+            return
+          }
+          setPill(
+            denied ? 'You declined — nothing shared' : 'You approved — one fact shared',
+            denied ? 'warn' : 'ok',
+          )
+          setRestrictedBadge(!denied && decision.outcome === 'ACCEPTED' ? 'proved' : 'held')
+          const card = $('s-outcome')
+          card.classList.remove('outcome-ok', 'outcome-bad', 'outcome-warn')
+          if (denied) {
+            $('verdict').textContent = 'Age check not completed — no payment taken.'
+            $('verdict').className = 'verdict warn'
+            card.classList.add('outcome-warn')
+            $('outcome-note').textContent = 'You declined, so nothing was shared. The restricted item stays held.'
+            $('receipt-fields').innerHTML = field('Request', requestId, true)
+          } else if (decision.outcome === 'ACCEPTED') {
+            $('verdict').textContent = 'Age check passed — demo order placed.'
+            $('verdict').className = 'verdict ok'
+            card.classList.add('outcome-ok')
+            $('outcome-note').textContent = 'The restricted item is released.'
+            $('receipt-fields').innerHTML =
+              field('Decision', decision.decisionId, true) +
+              field('Outcome', decision.outcome, true) +
+              field('Trust snapshot', `v${decision.trustSnapshot}`, true) +
+              field('Profile', decision.profile, true)
+          } else if (decision.outcome === 'REJECTED') {
+            $('verdict').textContent = 'Age check failed — restricted item held.'
+            $('verdict').className = 'verdict bad'
+            card.classList.add('outcome-bad')
+            $('outcome-note').textContent = `Reason: ${decision.reasonCode}. Start over to try again with a fresh challenge.`
+            $('receipt-fields').innerHTML = field('Decision', decision.decisionId, true)
+          } else {
+            $('verdict').textContent = 'Could not be determined — try again.'
+            $('verdict').className = 'verdict warn'
+            card.classList.add('outcome-warn')
+            $('outcome-note').textContent = 'The evidence was stale or a dependency failed. This is never treated as a pass.'
+            $('receipt-fields').innerHTML = field('Decision', decision.decisionId, true)
+          }
+          show('s-outcome')
+          void refreshOps()
+        }).catch((err) => {
+          console.error('demo check failed:', err)
+          $('verdict').textContent = 'Something went wrong.'
+          $('verdict').className = 'verdict bad'
+          $('outcome-note').textContent = 'Check failed before any decision. Nothing was shared. Start a new check to retry.'
+          $('receipt-fields').innerHTML = ''
+          show('s-outcome')
+        })
+      })
+
+      $('b-restart').addEventListener('click', () => {
+        setPill('Nothing shared yet')
+        setRestrictedBadge('idle')
+        show('s-start')
+      })
+      void refreshOps()
+    </script>
+  </body>
+</html>

@@ -72,7 +72,9 @@ public abstract class SovraPostgresBase {
     config.setJdbcUrl(POSTGRES.getJdbcUrl());
     config.setUsername(user);
     config.setPassword(password);
-    config.setMaximumPoolSize(2);
+    // PROD-009: the parallel claim test holds four worker-role
+    // connections at once; ceiling only, idle count unchanged.
+    config.setMaximumPoolSize(8);
     config.setConnectionTimeout(10_000);
     config.setMaxLifetime(300_000);
     config.setLeakDetectionThreshold(2_000);

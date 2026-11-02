@@ -10,6 +10,7 @@ import ConnectionFields from './components/ConnectionFields'
 import Field from './components/Field'
 import HolderKeyControls from './components/HolderKeyControls'
 import StateCard from './components/StateCard'
+import StepIndicator from './components/StepIndicator'
 import type { Tone } from './components/StateCard'
 
 // Verifier flow (SOV-011). Three visibly distinct outcomes:
@@ -32,6 +33,12 @@ function badgeFor(outcome: VerificationDecision['outcome']): string {
   if (outcome === 'ACCEPTED') return 'Accepted — synthetic evidence verified'
   if (outcome === 'REJECTED') return 'Rejected — not accepted'
   return 'Unknown — dependency unavailable'
+}
+
+function sentenceFor(outcome: VerificationDecision['outcome'], reasonCode: string): string {
+  if (outcome === 'ACCEPTED') return 'Accepted — the presentation verified.'
+  if (outcome === 'REJECTED') return `Rejected — ${reasonCode}.`
+  return 'Unknown — the evidence could not be determined.'
 }
 
 export default function VerifyView({ session }: { session: SessionInfo | null }) {
@@ -98,7 +105,12 @@ export default function VerifyView({ session }: { session: SessionInfo | null })
   return (
     <section className="consent" aria-label="Verify presentation">
       <h1 className="view-title">Verify presentation</h1>
-      <p className="view-lede">Check a consent proof against trust, status, and a fresh nonce.</p>
+      <p className="view-lede">Check a consent proof against trust, status, and a fresh nonce. Before starting: the request ID, the session audience, and the consent holder key (a fresh nonce is filled for you).</p>
+      <StepIndicator
+        steps={['Enter proof', 'Submit verification', 'Decided']}
+        current={stage.kind === 'idle' || stage.kind === 'error' ? 0 : stage.kind === 'submitting' ? 1 : 2}
+        label="Verification progress"
+      />
 
       {(stage.kind === 'idle' || stage.kind === 'error') && (
         <form
@@ -142,11 +154,6 @@ export default function VerifyView({ session }: { session: SessionInfo | null })
               </button>
             </span>
           </div>
-          <HolderKeyControls holder={holder} status={keyStatus} onGenerate={() => void onGenerateKey()}>
-            <button type="button" onClick={() => void onImportKey()}>
-              Import key
-            </button>
-          </HolderKeyControls>
           <label>
             Or import holder private JWK
             <input
@@ -158,6 +165,11 @@ export default function VerifyView({ session }: { session: SessionInfo | null })
               spellCheck={false}
             />
           </label>
+          <HolderKeyControls holder={holder} status={keyStatus} onGenerate={() => void onGenerateKey()}>
+            <button type="button" onClick={() => void onImportKey()}>
+              Import key
+            </button>
+          </HolderKeyControls>
           <p className="view-hint">The binding key must be the credential holder key from consent.</p>
           <button type="submit" className="primary" disabled={holder === null}>
             Submit verification
@@ -165,22 +177,40 @@ export default function VerifyView({ session }: { session: SessionInfo | null })
           {stage.kind === 'error' && <p role="alert">Could not verify: {stage.message}</p>}
         </form>
       )}
+      {(stage.kind === 'idle' || stage.kind === 'error') && (
+        <div className="empty-slot">
+          <p>
+            <strong>No proof submitted yet.</strong> You will need:
+          </p>
+          <ul>
+            <li>The proof request ID and session audience</li>
+            <li>The consent holder key (generate or import above)</li>
+          </ul>
+        </div>
+      )}
 
       {stage.kind === 'submitting' && (
-        <StateCard tone="review" badge="Evaluating presentation…" />
+        <StateCard tone="review" focusOnMount
+          badge="Evaluating presentation…" />
       )}
 
       {stage.kind === 'decided' && (
-        <StateCard tone={toneFor(stage.decision.outcome)} badge={badgeFor(stage.decision.outcome)}>
+        <StateCard
+          tone={toneFor(stage.decision.outcome)}
+          badge={badgeFor(stage.decision.outcome)}
+          focusOnMount
+        >
+          <p className="outcome-sentence">{sentenceFor(stage.decision.outcome, stage.decision.reasonCode)}</p>
+          <p className="standing-line">Synthetic evidence only. A technical proof, never a legal or KYC determination.</p>
           <dl>
             <Field label="Outcome" value={stage.decision.outcome} mono />
             <Field label="Reason" value={stage.decision.reasonCode} mono />
-            <Field label="Decision" value={stage.decision.decisionId} mono />
             <Field label="Profile" value={stage.decision.profile} mono />
           </dl>
           <details className="consent-details">
-            <summary>Trust evidence</summary>
+            <summary>Machine detail</summary>
             <dl>
+              <Field label="Decision" value={stage.decision.decisionId} mono />
               <Field label="Trust snapshot" value={String(stage.decision.trustSnapshot)} mono />
             </dl>
           </details>
@@ -192,7 +222,6 @@ export default function VerifyView({ session }: { session: SessionInfo | null })
           ) : (
             <p role="alert">Re-read differed from the submission response.</p>
           )}
-          <p>Synthetic evidence only. A technical proof, never a legal or KYC determination.</p>
           <button type="button" onClick={() => setStage({ kind: 'idle' })}>
             New verification
           </button>

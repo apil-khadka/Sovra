@@ -1,11 +1,16 @@
-# Sovra backend (SOV-003 bootstrap)
+# Sovra backend
 
 Java 25 + Spring Boot service. Implemented: API-key authentication,
 tenant isolation with row-level security, role/action authorization with
 emergency freeze, privacy-minimized audit, a two-person versioned trust
-registry, and synthetic credential issuance behind a constrained signer
-(SOV-005 through SOV-009). Verification, guards, and AI planning arrive
-with later backlog tasks.
+registry, synthetic credential issuance behind a constrained signer,
+holder consent with durable verification, deterministic planning guards
+with fixture/live adapters, Keycloak/BFF sessions, a software-key vault,
+isolated image quarantine, extraction/enrollment review, holder custody,
+sandbox onboarding, and RP outcomes/metrics. The exact contract is
+[implemented-api.openapi.yaml](../docs/engineering/implemented-api.openapi.yaml);
+qualification status is in the
+[continuation guide](../docs/engineering/continuation-guide.md).
 
 ## Toolchain
 
@@ -50,6 +55,22 @@ The app refuses to boot the synthetic signer unless both arming flags are
 set; production sets `SOVRA_SIGNER=kms` and leaves them off. Service-account
 credentials are managed out of band; operator SSO/MFA arrives with SOV-006.
 
+## Sessions and admission (PROD-003, PROD-006)
+
+BFF sessions live in PostgreSQL (`spring_session*` tables, Flyway-owned),
+so any replica serves any logged-in browser and rolling restarts keep
+sessions alive. Session attributes are explicit JSON envelopes — Java
+serialization never touches the store — and unlock challenges are
+single-use database rows consumable exactly once from anywhere.
+
+Every request passes shared admission budgets: per-principal and
+per-tenant token buckets, coarse anonymous buckets on login/protocol/probe
+paths, per-group in-flight ceilings, and ingress body caps (2MB default,
+20MB document paths). Denials are explicit — `429`/`503` with
+`Retry-After`, `413` for oversized bodies — in both error shapes. All
+budgets are tunable under `sovra.admission.*`; see
+`AdmissionProperties` for the full list.
+
 ## Local PostgreSQL without Docker
 
 ```sh
@@ -78,9 +99,17 @@ family first.
 
 Public federation metadata: `GET /api/health` (build identity),
 `GET /api/trust/snapshots/current` (active trust snapshot),
-`GET /api/issuance/jwks.json` (issuer verification keys).
-Everything else needs a Bearer service-account token; see
-[implemented-api.openapi.yaml](../docs/engineering/implemented-api.openapi.yaml).
+`GET /api/issuance/jwks.json` (issuer verification keys),
+`GET /api/health/ready` (readiness), `GET /api/discovery` (static
+developer-portal posture), plus OpenID4VCI/OpenID4VP wallet calls
+(`GET /.well-known/openid-credential-issuer`, `GET /api/vp/jwks.json`,
+`GET /api/vp/requests/*/object`, `POST /api/vci/token`,
+`POST /api/vci/nonce`, `POST /api/vci/credential`,
+`POST /api/vp/responses/*`, each bound to its single-use grant, token,
+or session) and the packaged SPA static assets (GET/HEAD only).
+Everything else needs a service-account Bearer token or BFF session; see
+[implemented-api.openapi.yaml](../docs/engineering/implemented-api.openapi.yaml)
+and `SecurityConfig` for the authoritative matcher list.
 
 `/actuator/health`, `/actuator/info`: exposed but require authentication.
 All other actuator endpoints are not exposed.

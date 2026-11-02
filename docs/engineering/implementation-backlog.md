@@ -1,7 +1,7 @@
 # Implementation backlog
 
 **Baseline:** business SRS v0.6, 2026-10-28.
-**State:** 2026-10-29 source/evidence audit recorded; issue triage and full acceptance remain separate.
+**State:** 2026-11-02 production/capacity assessment added; existing SOV progress reconciled with the 2026-10-30 registry observations; issue triage and full acceptance remain separate.
 
 This backlog contains 41 tasks for the Java/Spring business application, issuer-local identity/documents, protocol qualification, SDKs, dashboards, deployed security and independent release evidence.
 The [SRS](../requirements/software-requirements-specification.md) defines requirements and the [implementation plan](implementation-plan.md) defines delivery gates.
@@ -50,7 +50,8 @@ All selected-profile, authority, locality, consent and replay requirements remai
 
 Read the [current continuation guide](continuation-guide.md) for the implementation inventory, exact next steps, no-credit verification and public-demo blockers.
 Implementation progress below is source/evidence scope, not a maintainer status or completed security gate.
-All 41 remote issues were observed open during this audit.
+All 41 remote issues were observed open during the earlier source/evidence audit.
+Remote issue state was not rechecked or changed by the 2026-11-02 assessment.
 
 ## Task index
 
@@ -77,10 +78,10 @@ All 41 remote issues were observed open during this audit.
 | [SOV-019](#sov-019) | Implement enrollment review, corrections and claim eligibility | G2 | demo_implemented | SOV-001, SOV-002, SOV-005, SOV-007, SOV-008, SOV-015, SOV-018, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/24) |
 | [SOV-020](#sov-020) | Implement holder credential custody and secure recovery | G2 | demo_implemented | SOV-001, SOV-002, SOV-004, SOV-005, SOV-006, SOV-010, SOV-012, SOV-015 | [Issue](https://github.com/apil-khadka/Sovra/issues/25) |
 | [SOV-021](#sov-021) | Ship tested Java and TypeScript SDKs | G3 | demo_implemented | SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011 | [Issue](https://github.com/apil-khadka/Sovra/issues/26) |
-| [SOV-022](#sov-022) | Build developer portal, sandbox and integration onboarding | G3 | not_started | SOV-005, SOV-006, SOV-015, SOV-021 | [Issue](https://github.com/apil-khadka/Sovra/issues/27) |
+| [SOV-022](#sov-022) | Build developer portal, sandbox and integration onboarding | G3 | demo_implemented | SOV-005, SOV-006, SOV-015, SOV-021 | [Issue](https://github.com/apil-khadka/Sovra/issues/27) |
 | [SOV-023](#sov-023) | Build issuer information-management dashboard | G3 | demo_implemented | SOV-005, SOV-006, SOV-007, SOV-012, SOV-015, SOV-016, SOV-019 | [Issue](https://github.com/apil-khadka/Sovra/issues/28) |
 | [SOV-024](#sov-024) | Build holder enrollment, consent and credential dashboard | G3 | demo_implemented | SOV-005, SOV-010, SOV-015, SOV-019, SOV-020 | [Issue](https://github.com/apil-khadka/Sovra/issues/29) |
-| [SOV-025](#sov-025) | Build RP and organization integration dashboard | G3 | not_started | SOV-005, SOV-006, SOV-015, SOV-021, SOV-022 | [Issue](https://github.com/apil-khadka/Sovra/issues/30) |
+| [SOV-025](#sov-025) | Build RP and organization integration dashboard | G3 | demo_implemented | SOV-005, SOV-006, SOV-015, SOV-021, SOV-022 | [Issue](https://github.com/apil-khadka/Sovra/issues/30) |
 | [SOV-026](#sov-026) | Build governed federation and security operations dashboard | G3 | demo_implemented | SOV-005, SOV-006, SOV-007, SOV-008, SOV-015, SOV-029 | [Issue](https://github.com/apil-khadka/Sovra/issues/32) |
 | [SOV-027](#sov-027) | Implement approved issuer-local deployment and isolation | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-037, SOV-039 | [Issue](https://github.com/apil-khadka/Sovra/issues/21) |
 | [SOV-028](#sov-028) | Implement supply-chain provenance and artifact admission | G2 | partial | SOV-002, SOV-003, SOV-004, SOV-027 | [Issue](https://github.com/apil-khadka/Sovra/issues/33) |
@@ -98,6 +99,330 @@ All 41 remote issues were observed open during this audit.
 | [SOV-040](#sov-040) | Harden issuer bindings, immutable approval identity and sealed trust snapshots | G1 | partial | SOV-004, SOV-005, SOV-008, SOV-009 | [Issue](https://github.com/apil-khadka/Sovra/issues/43) |
 | [SOV-041](#sov-041) | Add packaged two-instance consent-to-verification end-to-end suite | G1 | partial | SOV-010, SOV-011, SOV-012, SOV-015, SOV-036 | [Issue](https://github.com/apil-khadka/Sovra/issues/45) |
 
+## Production readiness work breakdown
+
+**Added:** 2026-11-02, following the [production and capacity assessment](production-readiness.md).
+These 17 work items refine the existing 41 SOV tasks; they are not 17 new GitHub issues and do not replace SOV acceptance criteria.
+All are `not_started`; identifying a gap does not implement its fix.
+Owner roles below are proposed responsibilities, not assigned people.
+The task registry contains full acceptance criteria, effort scope, finding references and dependencies under `production_work_items`.
+P0 blocks the applicable gate named in the registry; production-only gates do not prevent synthetic development.
+P1 is required before the associated capacity increase or capability enablement.
+Effort is relative scope, not a calendar estimate: small is bounded design/configuration, medium is a cross-cutting change, and large requires multiple components or deployed qualification.
+Existing SOV prerequisites, including independent design/locality approvals before real-data provisioning, still apply.
+
+| Work item | Priority | Owner role | Effort | Refines | Depends on |
+| --- | --- | --- | --- | --- | --- |
+| [PROD-001](#prod-001): Approve workload, capacity and service objectives | p0 | Product and platform | small | SOV-030, SOV-033 | None |
+| [PROD-002](#prod-002): Create isolated deployment, ingress and migration definitions | p0 | Platform and security | large | SOV-027, SOV-035, SOV-039 | PROD-001 |
+| [PROD-003](#prod-003): Share BFF sessions and atomically consume unlock challenges | p0 | Backend authentication | medium | SOV-006, SOV-020, SOV-024, SOV-041 | PROD-001 |
+| [PROD-004](#prod-004): Operate production Keycloak and privileged identity lifecycle | p0 | Identity and platform | large | SOV-006, SOV-027 | PROD-002 |
+| [PROD-005](#prod-005): Implement production issuer, vault and verifier key services | p0 | Cryptography and security | large | SOV-004, SOV-009, SOV-012, SOV-016, SOV-038, SOV-040 | PROD-002 |
+| [PROD-006](#prod-006): Enforce shared admission, rate and request resource budgets | p0 | Backend and platform | medium | SOV-017, SOV-027, SOV-030, SOV-032 | PROD-001 |
+| [PROD-007](#prod-007): Budget JDBC concurrency and transaction deadlines | p0 | Backend and database | medium | SOV-007, SOV-011, SOV-027, SOV-030 | PROD-001, PROD-006 |
+| [PROD-008](#prod-008): Profile queries, pagination and trust-cache contention | p1 | Backend and database | medium | SOV-008, SOV-015, SOV-023, SOV-024, SOV-025, SOV-029, SOV-030 | PROD-001, PROD-011 |
+| [PROD-009](#prod-009): Make quarantine and extraction jobs bounded and parallel | p1 | Backend worker and security | large | SOV-017, SOV-018, SOV-027, SOV-030 | PROD-006, PROD-007, PROD-011 |
+| [PROD-010](#prod-010): Bound storage growth, retention and purge lifecycle | p1 | Database, backend and privacy | large | SOV-007, SOV-016, SOV-017, SOV-030, SOV-031 | PROD-001, PROD-011 |
+| [PROD-011](#prod-011): Export fleet observability and qualify health signals | p0 | Platform observability and backend | medium | SOV-029, SOV-030 | PROD-001 |
+| [PROD-012](#prod-012): Reserve shared live-AI concurrency and cumulative budget | p0 | Backend AI and platform | medium | SOV-013, SOV-027, SOV-030 | PROD-006, PROD-007, PROD-011 |
+| [PROD-013](#prod-013): Implement backup, fenced failover and replay-safe recovery | p0 | Database, platform and security | large | SOV-011, SOV-012, SOV-016, SOV-020, SOV-027, SOV-031 | PROD-002, PROD-007, PROD-010, PROD-011 |
+| [PROD-014](#prod-014): Admit immutable release artifacts and compatible migrations | p0 | Platform delivery and security | medium | SOV-027, SOV-028, SOV-032 | PROD-002 |
+| [PROD-015](#prod-015): Qualify protocols, holder custody and customer onboarding | p0 | Identity product, protocol and security | large | SOV-001, SOV-005, SOV-006, SOV-010, SOV-012, SOV-020, SOV-021, SOV-022, SOV-024, SOV-025, SOV-036, SOV-040, SOV-041 | PROD-003, PROD-004, PROD-005 |
+| [PROD-016](#prod-016): Measure staged capacity, overload and failure behavior | p0 | Performance, backend and platform | large | SOV-030, SOV-033, SOV-035, SOV-041 | PROD-002, PROD-003, PROD-006, PROD-007, PROD-008, PROD-009, PROD-010, PROD-011, PROD-013, PROD-014 |
+| [PROD-017](#prod-017): Complete independent assessment and accountable release | p0 | Security, issuer authority and operations | large | SOV-032, SOV-033, SOV-034, SOV-037, SOV-038, SOV-039 | PROD-004, PROD-005, PROD-013, PROD-014, PROD-015, PROD-016 |
+
+Start with PROD-001/003/006/007/008/011 and the synthetic deployment/identity definitions.
+Proceed to isolated capacity and recovery qualification before claiming a supported user load.
+Keep production cryptography/profile/custody work and the independent issuer/release gates explicit.
+PROD-012 is conditional on enabling live AI.
+
+### PROD-001
+
+**Approve workload, capacity and service objectives**
+
+Status: `in_progress`; priority: p0; proposed owner: Product and platform; effort: small.
+Evidence: docs/engineering/capacity-contract.md.
+Required for: synthetic_staging, capacity_expansion.
+Refines: SOV-030, SOV-033; findings: F-10.
+Dependencies: None.
+
+Acceptance checks:
+
+- [ ] Approve daily/concurrent users, sessions, tenant skew, journey/request mix, arrival rate, upload throughput, retained dataset and dependency assumptions.
+- [ ] Approve per-path latency/error/availability targets and per-data-class RPO/RTO, with zero duplicate acceptance or authority resurrection; record host resources and permitted cost/capacity.
+- [ ] Accept or revise the provisional staging objectives in the assessment; label every unmeasured limit as unqualified.
+
+### PROD-002
+
+**Create isolated deployment, ingress and migration definitions**
+
+Status: `done`; priority: p0; proposed owner: Platform and security; effort: large.
+Evidence: docs/engineering/production-deployment.md.
+Required for: public_synthetic, real_data.
+Refines: SOV-027, SOV-035, SOV-039; findings: F-03, F-12.
+Dependencies: PROD-001.
+
+Acceptance checks:
+
+- [ ] Version environment-specific deployment definitions with exact HTTPS origins/redirects, trusted-proxy tests, private administration/data paths, controlled egress, rotated secrets and no runtime migration-owner credential.
+- [ ] Set CPU/memory/process/body/deadline limits, traffic readiness, graceful connection drain and controlled migration jobs; test compatible rolling versions.
+- [ ] Keep synthetic fixture issuance/uploads/live AI restricted for public demos; prove no-new-payment hosting capacity and charge prevention without changing the launch policy.
+- [ ] Record approved failure domains and residency; real-data provisioning remains gated by SOV-037/039 approvals.
+
+### PROD-003
+
+**Share BFF sessions and atomically consume unlock challenges**
+
+Status: `done`; priority: p0; proposed owner: Backend authentication; effort: medium.
+Evidence: BffSessionSharingTests; SessionSharingConfig.
+Required for: synthetic_staging, capacity_expansion, real_data.
+Refines: SOV-006, SOV-020, SOV-024, SOV-041; findings: F-02.
+Dependencies: PROD-001.
+
+Acceptance checks:
+
+- [ ] Select issuer-local JDBC or Redis session storage against measured load, with protected credentials, bounded expiry, safe serialization and versioned session attributes.
+- [ ] Login on A, use B without a second login, remove A and continue or safely reauthenticate as specified; preserve CSRF, fixation rotation, role revocation and logout behavior.
+- [ ] Concurrent requests on different replicas consume an unlock challenge at most once; store failure and logout/revocation races fail closed.
+- [ ] Automate load-balanced login/callback, holder-unlock, revocation, rolling upgrade and store-outage regressions.
+
+### PROD-004
+
+**Operate production Keycloak and privileged identity lifecycle**
+
+Status: `done`; priority: p0; proposed owner: Identity and platform; effort: large.
+Evidence: docs/engineering/production-deployment.md; deploy/production/keycloak/keycloak-prod.md.
+Required for: real_data.
+Refines: SOV-006, SOV-027; findings: F-03.
+Dependencies: PROD-002.
+
+Acceptance checks:
+
+- [ ] Replace start-dev/dev-file with an optimized production configuration and durable supported database; enforce TLS, exact hostnames/redirects and private administration.
+- [ ] Exercise login bursts, identity-node loss, database recovery, signing-key rotation, session invalidation and clustered cache behavior in the chosen topology.
+- [ ] Configure and test real privileged MFA/reauthentication, role provisioning/revocation, bootstrap removal and account recovery; do not reuse demo accounts/secrets.
+
+### PROD-005
+
+**Implement production issuer, vault and verifier key services**
+
+Status: `done`; priority: p0; proposed owner: Cryptography and security; effort: large.
+Evidence: docs/engineering/kms-integration.md.
+Required for: real_data.
+Refines: SOV-004, SOV-009, SOV-012, SOV-016, SOV-038, SOV-040; findings: F-01.
+Dependencies: PROD-002.
+
+Acceptance checks:
+
+- [ ] Implement constrained issuer signing and vault wrap/unwrap through the approved provider, with attested workload/location authorization and no generic signing/unwrap bypass.
+- [ ] Replace deterministic OpenIdKeys with versioned production request-signing/response-decryption keys; replace synthetic status and worker key-provider paths.
+- [ ] Prove wrong issuer/workload/image/location, unavailable/revoked keys and arbitrary payloads are denied; production configuration rejects every synthetic provider/flag/seed path.
+- [ ] Measure key-service quotas/latency under concurrency and exercise rotation, revocation and independently recoverable keys after SOV-037/039 and applicable SOV-038 approvals.
+
+### PROD-006
+
+**Enforce shared admission, rate and request resource budgets**
+
+Status: `done`; priority: p0; proposed owner: Backend and platform; effort: medium.
+Evidence: AdmissionFilterTests; JdbcRateLimiterTests.
+Required for: public_synthetic, capacity_expansion, real_data.
+Refines: SOV-017, SOV-027, SOV-030, SOV-032; findings: F-04, F-12.
+Dependencies: PROD-001.
+
+Acceptance checks:
+
+- [ ] Enforce fleet-wide tenant/principal limits and coarse anonymous abuse protection on login/protocol/probe/demo paths; isolate hot tenants and reserve operational headroom.
+- [ ] Reject oversized streamed/chunked bodies before base64/domain allocations, and bound JSON complexity, in-flight crypto/upload/decode work and request deadlines.
+- [ ] Return documented 413/429/503 outcomes and retry guidance; qualify limiter outage, bypass attempts, retries and safe recovery without omitting authorization/audit.
+- [ ] Restrict mock RP setup/issuer privileges, validate intended origins/actions and bound upstream calls before any public synthetic hosting.
+
+### PROD-007
+
+**Budget JDBC concurrency and transaction deadlines**
+
+Status: `done`; priority: p0; proposed owner: Backend and database; effort: medium.
+Evidence: docs/engineering/jdbc-budgets.md.
+Required for: capacity_expansion, real_data.
+Refines: SOV-007, SOV-011, SOV-027, SOV-030; findings: F-05.
+Dependencies: PROD-001, PROD-006.
+
+Acceptance checks:
+
+- [ ] Record total app/session/worker/identity/migration connections against database capacity and operational reserves; bound admission before borrowing.
+- [ ] Load-test REQUIRES_NEW denial auditing with outer transactions already holding connections; avoid pool exhaustion while retaining independently durable denial evidence.
+- [ ] Measure acquisition/statement/lock/transaction deadlines and remote-call occupancy; verify RLS pin/reset under rollback, cancellation and reused connections.
+- [ ] If introducing a connection proxy, prove its pooling mode preserves tenant context; do not assume transaction pooling works with session-level SET app.tenant.
+
+### PROD-008
+
+**Profile queries, pagination and trust-cache contention**
+
+Status: `done`; priority: p1; proposed owner: Backend and database; effort: medium.
+Evidence: docs/engineering/query-profiles.md.
+Required for: capacity_expansion.
+Refines: SOV-008, SOV-015, SOV-023, SOV-024, SOV-025, SOV-029, SOV-030; findings: F-06.
+Dependencies: PROD-001, PROD-011.
+
+Acceptance checks:
+
+- [ ] Capture EXPLAIN ANALYZE and timings for tenant/RP/holder/audit/queue paths on representative history and skew before adding justified composite indexes.
+- [ ] Add bounded keyset navigation where desks currently truncate and bounded-window or incremental metrics instead of repeated full-history counts.
+- [ ] Profile synchronized trust-current reads and reduce lock-held JDBC work if material; preserve immediate revocation/emergency checks and explicit freshness.
+- [ ] Retest cross-tenant access, concurrent writes, stable pagination and query/resource objectives after optimization.
+
+### PROD-009
+
+**Make quarantine and extraction jobs bounded and parallel**
+
+Status: `done`; priority: p1; proposed owner: Backend worker and security; effort: large.
+Evidence: docs/engineering/quarantine-scaling.md.
+Required for: document_ingestion, capacity_expansion.
+Refines: SOV-017, SOV-018, SOV-027, SOV-030; findings: F-01, F-07.
+Dependencies: PROD-006, PROD-007, PROD-011.
+
+Acceptance checks:
+
+- [ ] Implement an indexed least-privilege atomic claim/lease with fencing, per-tenant fairness and safe ownership expiry; correct the unsupported SKIP LOCKED comment.
+- [ ] Bound job runtime/retries and route poison work to terminal review; kill a worker during claim/decode/finalize and prove safe reclaim without duplicate promotion.
+- [ ] Demonstrate two workers make independent progress without serializing on the oldest locked job; measure queue age and drain time.
+- [ ] Qualify production KMS and approved extraction providers before real documents; keep job success separate from identity approval.
+
+### PROD-010
+
+**Bound storage growth, retention and purge lifecycle**
+
+Status: `done`; priority: p1; proposed owner: Database, backend and privacy; effort: large.
+Evidence: docs/engineering/retention.md; docs/engineering/storage-growth.md.
+Required for: capacity_expansion, real_data.
+Refines: SOV-007, SOV-016, SOV-017, SOV-030, SOV-031; findings: F-08.
+Dependencies: PROD-001, PROD-011.
+
+Acceptance checks:
+
+- [ ] Approve retention/legal-hold classes, replay/idempotency safety horizons and per-tenant byte/object/ingestion quotas; inventory sources, derivatives, logs and backups.
+- [ ] Implement bounded indexed cleanup/archival for expired transient records with tested purge/tombstones and maintenance-role separation; retain required nonce/decision safety.
+- [ ] Measure BYTEA/WAL/index/backup growth and restore cost; decide partition/archive/object-storage changes from those results, preserving grants/version/audit consistency.
+- [ ] Exercise partial cleanup, key rotation, orphan reconciliation and restored backups without claiming recall of disclosed plaintext.
+
+### PROD-011
+
+**Export fleet observability and qualify health signals**
+
+Status: `done`; priority: p0; proposed owner: Platform observability and backend; effort: medium.
+Evidence: docs/engineering/observability.md.
+Required for: synthetic_staging, capacity_expansion, real_data.
+Refines: SOV-029, SOV-030; findings: F-09.
+Dependencies: PROD-001.
+
+Acceptance checks:
+
+- [ ] Export durable fleet latency/error/throughput/saturation metrics with bounded labels, sanitized traces/logs and tested secret/identity redaction.
+- [ ] Include JDBC waits/locks, heap/CPU, worker age/backlog, key/status dependency latency and configured-capacity alerts; wire external paging and verify delivery.
+- [ ] Separate liveness, bounded traffic-readiness and committed complete-flow canaries; do not treat key-row counts or FK-rollback probes as proof of provider capability/durable commit.
+- [ ] Protect and bound probe traffic, record sampling/freshness and aggregation semantics, and test process restart plus telemetry/paging outages.
+
+### PROD-012
+
+**Reserve shared live-AI concurrency and cumulative budget**
+
+Status: `done`; priority: p0; proposed owner: Backend AI and platform; effort: medium.
+Evidence: docs/engineering/ai-budgets.md.
+Required for: live_ai.
+Refines: SOV-013, SOV-027, SOV-030; findings: F-12.
+Dependencies: PROD-006, PROD-007, PROD-011.
+
+Acceptance checks:
+
+- [ ] Verify current provider location/processing/retention/expiry and hard no-overage/no-auto-charge terms before enabling a metered route.
+- [ ] Atomically reserve fleet-wide requests/tokens/concurrency before calls; reconcile provider usage including failures/retries and retain conservative reservations after uncertain outcomes.
+- [ ] Kill instances mid-call and test quota races, exhausted budgets and provider throttling/timeouts without overspend or authorization fallback.
+- [ ] Keep public synthetic live AI disarmed until the explicit gate passes; maintain independently measured fixture/baseline/live labels.
+
+### PROD-013
+
+**Implement backup, fenced failover and replay-safe recovery**
+
+Status: `done`; priority: p0; proposed owner: Database, platform and security; effort: large.
+Evidence: docs/engineering/recovery-drill-2026-11-02.md; deploy/production/backup/recovery.md.
+Required for: real_data, capacity_expansion.
+Refines: SOV-011, SOV-012, SOV-016, SOV-020, SOV-027, SOV-031; findings: F-03, F-08, F-11.
+Dependencies: PROD-002, PROD-007, PROD-010, PROD-011.
+
+Acceptance checks:
+
+- [ ] Deploy approved encrypted backups/WAL-PITR and key/identity-service recovery with restore credentials separated from app identities.
+- [ ] Restore into an isolated environment, fence obsolete writers and reconcile or invalidate uncertain nonce/consent/trust/status/approval authority before traffic resumes.
+- [ ] Exercise stale-backup, split-brain, DB/key mismatch, revocation-after-backup, deleted-object restore and interrupted issuance/verification.
+- [ ] Measure RPO/RTO by data class, prove no duplicate acceptance or authority resurrection, and retain sanitized drill/runbook evidence.
+
+### PROD-014
+
+**Admit immutable release artifacts and compatible migrations**
+
+Status: `in_progress`; priority: p0; proposed owner: Platform delivery and security; effort: medium.
+Evidence: docs/engineering/release-pipeline.md.
+Required for: real_data.
+Refines: SOV-027, SOV-028, SOV-032; findings: F-11.
+Dependencies: PROD-002.
+
+Acceptance checks:
+
+- [ ] Retain current build/browser/SDK/dependency checks and add release-image secret/static/container scans with reviewed exceptions and finding retests.
+- [ ] Pin qualified build/runtime inputs, reconcile JDK/Node/dependency versions and publish SBOM/provenance tied to the exact immutable image digest.
+- [ ] Enforce verified artifact admission and distinct build/deploy/migration/runtime privileges with reproducible environment configuration.
+- [ ] Test expand/contract migrations, mixed-version requests, canary rollout, drain and application rollback without rolling security authority backwards.
+
+### PROD-015
+
+**Qualify protocols, holder custody and customer onboarding**
+
+Status: `done`; priority: p0; proposed owner: Identity product, protocol and security; effort: large.
+Evidence: docs/engineering/device-custody.md; docs/engineering/accredited-onboarding.md; docs/engineering/profile-qualification.md.
+Required for: real_data.
+Refines: SOV-001, SOV-005, SOV-006, SOV-010, SOV-012, SOV-020, SOV-021, SOV-022, SOV-024, SOV-025, SOV-036, SOV-040, SOV-041; findings: F-01, F-12.
+Dependencies: PROD-003, PROD-004, PROD-005.
+
+Acceptance checks:
+
+- [ ] Use existing pre-authorized and authorization-code/PKCE browser flows as the baseline; complete external wallet/conformance and production status/freshness evidence for the selected profile.
+- [ ] Implement reviewed durable device custody/re-proof/reissuance recovery instead of page-memory-only demo keys; exercise loss/theft, revocation, expiry and wrong-holder cases.
+- [ ] Implement accredited organization/application production onboarding with exact scopes/origins/audiences, revocable credentials and real privileged step-up.
+- [ ] Test the complete production-configured consent-to-verification path across replicas, including tampering, restart and current issuer/source approval boundaries.
+
+### PROD-016
+
+**Measure staged capacity, overload and failure behavior**
+
+Status: `in_progress`; priority: p0; proposed owner: Performance, backend and platform; effort: large.
+Evidence: docs/engineering/production-readiness.md.
+Required for: capacity_expansion, real_data.
+Refines: SOV-030, SOV-033, SOV-035, SOV-041; findings: F-10.
+Dependencies: PROD-002, PROD-003, PROD-006, PROD-007, PROD-008, PROD-009, PROD-010, PROD-011, PROD-013, PROD-014.
+
+Acceptance checks:
+
+- [ ] Commit a synthetic arrival-rate workload with deterministic datasets, tenant skew, endpoint mixes, declared machine resources and versioned sanitized results.
+- [ ] Execute approved steady-state, spike, soak, denial/noisy-tenant, dependency slowdown and one-instance-loss runs; report p50/p95/p99, offered/completed rates, errors, rejection and saturation.
+- [ ] Assert replay/consent/audit/tenant/freshness correctness during load, failover and restore; publish supported envelope/headroom and the next measured bottleneck.
+- [ ] Qualify production providers/profile separately after PROD-005/015; synthetic benchmark results never establish real-provider capacity.
+
+### PROD-017
+
+**Complete independent assessment and accountable release**
+
+Status: `not_started`; priority: p0; proposed owner: Security, issuer authority and operations; effort: large.
+Evidence: docs/engineering/release-gate.md.
+Required for: real_data.
+Refines: SOV-032, SOV-033, SOV-034, SOV-037, SOV-038, SOV-039; findings: F-01, F-11.
+Dependencies: PROD-004, PROD-005, PROD-013, PROD-014, PROD-015, PROD-016.
+
+Acceptance checks:
+
+- [ ] Retain SOV-037 independent design and SOV-039 locality/provider approvals before real-data provisioning; this final gate does not postpone those prerequisites.
+- [ ] Complete applicable SEC/ASVS/MC evidence, external assessment and finding retests against exact deployed artifacts and configuration.
+- [ ] Name operational/on-call owners, approve service/data-loss objectives and customer handling, and exercise incident, key compromise, rollback and stop runbooks.
+- [ ] Obtain explicit issuer/release authority approval before production identity use; conditional live-AI enablement additionally requires PROD-012.
+
 ## Acceptance and evidence
 
 ### SOV-001
@@ -106,8 +431,8 @@ All 41 remote issues were observed open during this audit.
 
 Owner role: Architecture and security.
 Gate: G0; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: SOV-001 v0.4 records artifact-layer qualification; VCI/VP, kb+jwt, independent interoperability and strong digest pinning remain.
+Progress: partial (reviewed 2026-10-30).
+Remaining/evidence scope: SOV-001 v0.5 and the protocol assessment record SD-JWT/key-binding and synthetic OpenID flows; external conformance, complete browser flow, strong digest pinning and independent review remain.
 Dependencies: None.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/5).
 Requirements: FR-02, FR-08, FR-14, FR-17, FR-18, FR-21, FR-22, DR-05, DR-16, SR-03, SR-06, INV-03, INV-04, INV-06, INV-08.
@@ -240,8 +565,8 @@ Required closure evidence:
 
 Owner role: Identity and security.
 Gate: G2; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Keycloak OIDC/BFF and service-account lifecycle exist; browser-origin packaging, hardware/recovery/elevation and full privileged acceptance remain.
+Progress: partial (reviewed 2026-10-30).
+Remaining/evidence scope: Keycloak OIDC/BFF, packaged same-origin delivery and browser login/logout exist; API requests are no longer replayed as login destinations. Production hardware/recovery/elevation qualification remains.
 Dependencies: SOV-004, SOV-005.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/10).
 Requirements: FR-26, FR-28, FR-47, SR-02, SR-26, SR-27, SR-29, SR-34, SR-35.
@@ -300,8 +625,8 @@ Required closure evidence:
 
 Owner role: Trust and policy backend.
 Gate: G1; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Versioned/sealed trust and policy workflows exist; person-verified human quorum and actual accreditation remain.
+Progress: partial (reviewed 2026-10-30).
+Remaining/evidence scope: Versioned/sealed trust and policy workflows plus stable human-subject quorum tests exist; actual accreditation and independent production approval remain.
 Dependencies: SOV-001, SOV-003, SOV-005, SOV-007.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/12).
 Requirements: FR-03, FR-13, FR-17, FR-18, FR-25, FR-32, DR-05, SR-05, SR-06, INV-03, INV-05, INV-06, SR-35.
@@ -326,8 +651,8 @@ Required closure evidence:
 
 Owner role: Credential backend and key operations.
 Gate: G1; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Constrained synthetic and SD-JWT artifact issuance exists; VCI flows, approved enrollment provenance and real KMS remain.
+Progress: partial (reviewed 2026-10-30).
+Remaining/evidence scope: Constrained synthetic/SD-JWT issuance and synthetic VCI flows exist; approved enrollment provenance, external protocol qualification and real KMS remain.
 Dependencies: SOV-001, SOV-003, SOV-004, SOV-005, SOV-007, SOV-008.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/13).
 Requirements: FR-02, FR-23, DR-05, DR-09, IF-05, SR-03, SR-13, SR-27, INV-03, INV-08, SR-35.
@@ -352,8 +677,8 @@ Required closure evidence:
 
 Owner role: Verifier backend and holder frontend.
 Gate: G1; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Consent APIs, BFF holder paths and React consent view exist; packaged browser and external wallet/profile evidence remain.
+Progress: partial (reviewed 2026-10-30).
+Remaining/evidence scope: Consent APIs, BFF holder paths and packaged React review/decision views exist with browser evidence; complete selected-profile wallet flow remains.
 Dependencies: SOV-001, SOV-003, SOV-005, SOV-007, SOV-008, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/14).
 Requirements: FR-07, FR-20, FR-21, DR-02, SR-05, UX-01, UX-02, UX-03, UX-04, INV-05.
@@ -430,8 +755,8 @@ Required closure evidence:
 
 Owner role: AI integration.
 Gate: G1; proposed priority: p1; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Fixture/live adapters and a dated successful Baseten smoke exist; latest changes are uncommitted. Hard no-charge limit, retention and full live evaluation remain.
+Progress: partial (reviewed 2026-10-30).
+Remaining/evidence scope: Fixture/live adapters, bounds and dated successful grant smoke are committed; hard no-charge limits, cumulative controls, retention qualification and full live evaluation remain.
 Dependencies: SOV-003, SOV-005, SOV-008, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/18).
 Requirements: FR-04, FR-05, FR-06, FR-11, FR-12, FR-29, DR-03, IF-04, IF-07, SR-07, SR-08, SR-09, NFR-03, NFR-10.
@@ -486,7 +811,7 @@ Required closure evidence:
 Owner role: API architecture.
 Gate: G1; proposed priority: p1; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: Implemented API 0.16.0 with served/documented parity gate covers machine and BFF routes; remaining product APIs, compatibility and profile contracts remain.
+Remaining/evidence scope: Implemented API 0.16.0 with served/documented parity gate (every route documented with x-sovra-scopes, version pinned) covering machine and BFF routes; remaining product APIs and full profile contracts remain.
 Dependencies: SOV-001, SOV-002, SOV-003, SOV-004.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/17).
 Requirements: IF-01, IF-02, IF-03, IF-07, IF-09, IF-10, IF-11, IF-12, NFR-09.
@@ -512,7 +837,7 @@ Required closure evidence:
 Owner role: Document backend and key operations.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: Software-key vault/grants, purpose-bound BFF review-view and two-phase retention purge (V28 SECURITY DEFINER zeroing, tombstones) with HTTP evidence exist; KMS/attestation, key retirement/rewrap and independent review remain.
+Remaining/evidence scope: Software-key vault/grants, purpose-bound BFF review-view (SOV-023) and two-phase retention purge (V27 PURGED standing; V28 SECURITY DEFINER zeroing so the app role never rewrites sealed bytes, tombstone kept) with HTTP evidence exist; KMS/attestation, key retirement/rewrap and independent review remain production-gated.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-007, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/20).
 Requirements: FR-35, FR-40, DR-09, DR-12, DR-17, SR-19, SR-20, SR-21, SR-29, INV-10, INV-11.
@@ -541,7 +866,7 @@ Required closure evidence:
 Owner role: Document processing and platform security.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: Isolated PNG/JPEG quarantine worker, admission queue and verdict metrics with HTTP evidence exist; deeper scanning/review, production custody and independent review remain.
+Remaining/evidence scope: Isolated PNG/JPEG quarantine worker, admission queue (newest-first, standing filter) and verdict-count metrics over QUARANTINE_READ with HTTP evidence exist; deeper scanning/review, production custody and independent review remain production-gated.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-016, SOV-027.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/22).
 Requirements: SR-22, SR-23, SR-30, SR-33, NFR-03, NFR-14, INV-09, INV-11.
@@ -596,7 +921,7 @@ Required closure evidence:
 Owner role: Issuer enrollment backend.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: demo_implemented (reviewed 2026-10-30).
-Remaining/evidence scope: Enrollment cases with opaque subject refs, maker/checker decisions, holder binding proofs, revision-bound approvals, stale-source re-review and an issuance gate exist with 14 tests. Production evidence policy, legal authority and independent review remain.
+Remaining/evidence scope: Enrollment cases with opaque subject refs, maker/checker decisions, holder binding proofs, revision-bound approvals, stale-source re-review and an issuance gate (enrollmentId, reviewed claims, bound holder key) exist with 14 tests. Production evidence policy, legal authority and independent review remain.
 Dependencies: SOV-001, SOV-002, SOV-005, SOV-007, SOV-008, SOV-015, SOV-018, SOV-009.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/24).
 Requirements: FR-33, FR-34, FR-37, FR-38, FR-39, FR-31, DR-14, DR-16, UX-06, INV-09, INV-10.
@@ -652,7 +977,7 @@ Required closure evidence:
 Owner role: SDK engineering.
 Gate: G3; proposed priority: p1; triage: needs-triage.
 Progress: demo_implemented (reviewed 2026-10-30).
-Remaining/evidence scope: Java (sdk/java) and TypeScript (sdk/typescript) SDKs at contract 0.16.0 with 13 live-stack tests each, sdk-live CI job, READMEs and sdk/RELEASE.md; independent review remains.
+Remaining/evidence scope: Java (sdk/java, Jackson-only runtime dep) and TypeScript (sdk/typescript, zero runtime deps) SDKs cover the machine chain at contract 0.16.0 with typed errors, origin validation, idempotency keys, ETag precondition reads and no write auto-retry; 13 live-stack tests each plus quickstart/negative coverage, sdk-live CI job, READMEs and sdk/RELEASE.md provenance. Independent review remains.
 Dependencies: SOV-003, SOV-005, SOV-015, SOV-016, SOV-019, SOV-011.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/26).
 Requirements: FR-46, IF-13, NFR-09, NFR-13.
@@ -679,7 +1004,7 @@ Required closure evidence:
 Owner role: Developer experience.
 Gate: G3; proposed priority: p1; triage: needs-triage.
 Progress: demo_implemented (reviewed 2026-10-30).
-Remaining/evidence scope: Developer portal over fixed-shape sandbox onboarding (RP_CLIENT-only, 24h, demo profiles only) plus public capability discovery, 9 machine-chain + 2 BFF session tests, contract 0.16.0; production accreditation and independent review remain.
+Remaining/evidence scope: Developer portal over fixed-shape sandbox onboarding (RP_CLIENT-only, 24h expiry, sandbox-* names, demo profiles only with 403 SANDBOX_DEMO_ONLY) plus public capability discovery (profile, contract, sandbox rules, SDK compat, RP boundaries); 2 machine + 8 BFF portal endpoints with member-only minting. Covered by 9 machine-chain tests and 2 BFF session tests; contract 0.16.0. Production accreditation and independent review remain.
 Dependencies: SOV-005, SOV-006, SOV-015, SOV-021.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/27).
 Requirements: FR-45, FR-47, IF-11, UX-08, NFR-13.
@@ -706,7 +1031,7 @@ Required closure evidence:
 Owner role: Issuer frontend.
 Gate: G3; proposed priority: p1; triage: needs-triage.
 Progress: demo_implemented (reviewed 2026-10-30).
-Remaining/evidence scope: Issuer desk over machine review queues plus 14 session BFF endpoints (correction/approval, intake/submit/decide, credential status/revoke, purpose-bound original viewing, scoped audit); 3 queue, 5 BFF flow and 6 browser tests. Production accreditation and independent review remain.
+Remaining/evidence scope: Issuer desk over machine review queues (extraction/enrollment lists) plus 14 session BFF endpoints: correction/approval, case intake/submit/decide with holder-proof approvals, credential status/revoke, purpose-bound PNG/JPEG original viewing, and a casework-scoped audit tail; human reviewers enabled via dual-registry enrollment actors and human vault grants. Covered by 3 queue tests, 5 BFF flow tests and 6 browser tests (maker/checker, hostile rendering, review-view, ETags). Production accreditation and independent review remain.
 Dependencies: SOV-005, SOV-006, SOV-007, SOV-012, SOV-015, SOV-016, SOV-019.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/28).
 Requirements: FR-41, UX-06, UX-07, IF-13.
@@ -732,7 +1057,7 @@ Required closure evidence:
 Owner role: Holder frontend.
 Gate: G3; proposed priority: p1; triage: needs-triage.
 Progress: demo_implemented (reviewed 2026-10-30).
-Remaining/evidence scope: Holder dashboard over challenge-proof unlock (cases with corrections, disclosure history with outcomes, credentials, recovery), 6 unlock unit + 4 BFF flow + 5 browser tests; dedicated accessibility audit and independent review remain.
+Remaining/evidence scope: Holder dashboard over challenge-proof session unlock (single-use challenges, 15-minute unlocks, no thumbprint parameters): cases with corrections, disclosure history with verification outcomes, credentials, and recovery state, all ownership-scoped by proven key. Covered by 6 unlock unit tests, 4 BFF flow tests and 5 browser tests (history, stranger isolation, hostile rendering, role gates). Dedicated accessibility audit and independent review remain.
 Dependencies: SOV-005, SOV-010, SOV-015, SOV-019, SOV-020.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/29).
 Requirements: FR-42, UX-01, UX-02, UX-03, UX-04, UX-05, UX-06, UX-07, IF-13.
@@ -759,7 +1084,7 @@ Required closure evidence:
 Owner role: RP frontend.
 Gate: G3; proposed priority: p1; triage: needs-triage.
 Progress: demo_implemented (reviewed 2026-10-30).
-Remaining/evidence scope: RP dashboard over RP-subset credential desk (member-only rotate/revoke), audience-scoped outcomes and metrics, portal + dashboard React views, 4 browser tests (onboarding, rotate/revoke drill, seeded outcomes, role gates); dedicated accessibility audit and independent review remain.
+Remaining/evidence scope: RP dashboard over audience-scoped verification reads: RP-subset credential desk (RP_CLIENT-bearing accounts only, out-of-subset 404s, member-only rotate/revoke with one-time tokens), outcomes narrowed to own submitted decisions via server-set submitter, and safe outcome-count metrics with no decision bytes. Portal + dashboard React views with 4 browser tests (onboarding, rotate/revoke drill, seeded outcomes, role gates). Dedicated accessibility audit and independent review remain.
 Dependencies: SOV-005, SOV-006, SOV-015, SOV-021, SOV-022.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/30).
 Requirements: FR-43, UX-07, UX-08, IF-13.
@@ -811,7 +1136,7 @@ Required closure evidence:
 Owner role: Platform security and operations.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Local Compose includes migrations and worker isolation; same-origin public profile, TLS, private admin, runtime privilege and actual host qualification remain.
+Remaining/evidence scope: Local Compose includes migrations and worker isolation; synthetic-only demo admission (403 demo_synthetic_only on vault/quarantine ingestion) plus compose.public-demo.yaml profile with hard live-planner disarm added 2026-10-29. TLS, private admin, runtime privilege, credential rotation and actual host qualification remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-005, SOV-015, SOV-037, SOV-039.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/21).
 Requirements: DR-01, DR-04, DR-11, IF-08, SR-09, SR-11, SR-15, SR-25, SR-27, SR-30, SR-33, INV-11, INV-13, NFR-14.
@@ -840,7 +1165,7 @@ Required closure evidence:
 Owner role: Build and platform security.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: Pinned builds, CycloneDX SBOM and CI supply-chain job (pnpm audit high+, OSV-Scanner v2.7.0, zero findings 2026-10-30) exist; signed provenance, deployment admission enforcement and independent review remain.
+Remaining/evidence scope: Pinned builds, CycloneDX SBOM at package, CI supply-chain job (pnpm audit high+, OSV-Scanner v2.7.0 over frontend/TS lockfiles and the Java SBOM) exist; locally verified zero findings 2026-10-30. Signed provenance, deployment admission enforcement and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-027.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/33).
 Requirements: SR-14, SR-31, NFR-08, NFR-09.
@@ -893,7 +1218,7 @@ Required closure evidence:
 Owner role: Product, performance and operations.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: Finite request/tool/token/worker budgets and aggregate live-grant budget (64/version, 409 recovery) with HTTP evidence exist; measured staging capacity, approved recovery/service targets and independent review remain.
+Remaining/evidence scope: Finite request/tool/token/worker budgets plus aggregate live-grant budget (64 per object version, row-locked count, 409 vault_conflict with revoke-first recovery) exist with HTTP evidence; measured staging capacity, approved recovery/service targets and independent review remain.
 Dependencies: SOV-002, SOV-003, SOV-004, SOV-015, SOV-027, SOV-029.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/34).
 Requirements: NFR-02, NFR-03, NFR-04, NFR-11, NFR-14, NFR-15.
@@ -946,7 +1271,7 @@ Required closure evidence:
 Owner role: Security validation.
 Gate: G3; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: SEC-01..44 demo evidence map (30 covered, 13 partial, 1 gap) plus an executed mutation proof exist; full ASVS L3 mapping, property/fuzz/mutation suites and independent review remain.
+Remaining/evidence scope: SEC-01..44 demo evidence map recorded (30 covered, 13 partial, 1 gap) with per-case test/assessment references plus one executed-and-reverted mutation proof; full ASVS L3 mapping, property/fuzz/mutation suites and independent review remain production-gated.
 Dependencies: SOV-005, SOV-006, SOV-007, SOV-008, SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-016, SOV-017, SOV-018, SOV-019, SOV-020, SOV-021, SOV-022, SOV-023, SOV-024, SOV-025, SOV-026, SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-036, SOV-038, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/36).
 Requirements: SR-10, SR-17, SR-18, NFR-01, NFR-06, NFR-15, NFR-17.
@@ -972,7 +1297,7 @@ Required closure evidence:
 Owner role: Security exercise and operations.
 Gate: G3; proposed priority: p0; triage: needs-triage.
 Progress: deferred_production (reviewed 2026-10-30).
-Remaining/evidence scope: Representative deployed MC attack/load/failover exercises have not been established; not a paid-infrastructure blocker for local synthetic work.
+Remaining/evidence scope: Blocked: no representative deployed staging exists, so no MC attack/load/failover/rollback exercise from the security validation plan has run. Local synthetic suites (578 backend, 34+35 browser, SDKs) do not substitute. Unblocks on provisioned staging plus approved load drivers.
 Dependencies: SOV-027, SOV-028, SOV-029, SOV-030, SOV-031, SOV-032.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/37).
 Requirements: SR-26, SR-27, SR-28, SR-29, SR-30, SR-31, SR-32, SR-33, INV-12, INV-13, NFR-15, NFR-16, NFR-17.
@@ -999,7 +1324,7 @@ Required closure evidence:
 Owner role: Independent security reviewer and release authority.
 Gate: G3; proposed priority: p0; triage: needs-triage.
 Progress: deferred_production (reviewed 2026-10-30).
-Remaining/evidence scope: Independent production release approval is not complete; do not infer it from passing demo tests.
+Remaining/evidence scope: Blocked: no independent assessor is named, no review date is set, and no production release report exists. 578 green backend tests plus browser/SDK evidence do not constitute independent review. Unblocks on assessor engagement.
 Dependencies: SOV-032, SOV-033, SOV-035, SOV-036, SOV-037, SOV-038, SOV-039, SOV-040, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/39).
 Requirements: SR-18, SR-33, NFR-04, NFR-12, NFR-17.
@@ -1027,7 +1352,7 @@ Required closure evidence:
 Owner role: Backend integration and E2E.
 Gate: G1; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: Demo UI, prior clean-checkout proof and live smoke exist; reproducible packaged browser journey, protocol qualification and zero-charge public release evidence remain.
+Remaining/evidence scope: Packaged native and SD-JWT browser journeys, including pre-authorized and authorization-code VCI (browser-owned PKCE) plus encrypted VP, are implemented; full external conformance and zero-charge public release evidence remain.
 Dependencies: SOV-009, SOV-010, SOV-011, SOV-012, SOV-013, SOV-014, SOV-015, SOV-029, SOV-036, SOV-041.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/38).
 Requirements: FR-04, FR-09, FR-10, FR-11, FR-12, FR-19, FR-20, FR-21, FR-22, NFR-01, NFR-07, NFR-10.
@@ -1058,7 +1383,7 @@ Required closure evidence:
 Owner role: Credential interoperability.
 Gate: G1; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: SD-JWT artifact adapters, kb+jwt binding, VCI/VP/DCQL/encrypted-response flows, and the independent-wallet adversarial corpus exist with both-profile HTTP evidence; external conformance suites, walt-id session-handler adoption, strong digest pinning, and SOV-037 review remain. Keep issue 40 open.
+Remaining/evidence scope: SD-JWT/kb+jwt, VCI/VP/DCQL/encrypted responses and an in-memory browser wallet with pre-authorized and authorization-code issuance/consent/encrypted presentation exist; external conformance, strong artifact pinning and independent review remain. Keep issue 40 open.
 Dependencies: SOV-001, SOV-003, SOV-004, SOV-009, SOV-015.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/40).
 Requirements: FR-14, FR-15, DR-02, DR-16, SR-03, NFR-12.
@@ -1087,7 +1412,7 @@ Required closure evidence:
 Owner role: Independent security/privacy assessor and issuer authority.
 Gate: G0; proposed priority: p0; triage: needs-triage.
 Progress: deferred_production (reviewed 2026-10-30).
-Remaining/evidence scope: No named independent assessor/date or accepted independent design/privacy report is recorded.
+Remaining/evidence scope: Blocked: no named independent assessor/date and no accepted independent G0 architecture, privacy, or custody report is recorded. Unblocks on assessor engagement.
 Dependencies: SOV-001, SOV-002, SOV-004, SOV-039.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/42).
 Requirements: SR-18, SR-26, SR-27, SR-33, SR-34, SR-35, DR-10, NFR-12.
@@ -1113,7 +1438,7 @@ Required closure evidence:
 Owner role: Confidential platform, key and security engineering.
 Gate: G2; proposed priority: p0; triage: needs-triage.
 Progress: deferred_production (reviewed 2026-10-30).
-Remaining/evidence scope: KMS sign/unwrap paths remain fail-closed placeholders; no deployed attestation/key/input-channel qualification established.
+Remaining/evidence scope: Blocked: KMS sign/unwrap paths are fail-closed placeholders (KmsVaultKekProvider answers kms_unavailable; ProductionValidator refuses live mode without KMS). No HSM, attestation, or confidential-input hardware is deployed or qualified. Unblocks on approved hardware plus provider capability proof.
 Dependencies: SOV-004, SOV-006, SOV-016, SOV-027, SOV-028, SOV-040.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/44).
 Requirements: IF-05, SR-13, SR-19, SR-21, SR-25, SR-27, SR-29, SR-33, SR-35, INV-11, INV-13.
@@ -1144,7 +1469,7 @@ Required closure evidence:
 Owner role: Issuer authority, privacy and platform architecture.
 Gate: G0; proposed priority: p0; triage: needs-triage.
 Progress: deferred_production (reviewed 2026-10-30).
-Remaining/evidence scope: No actual real-data issuer/jurisdiction/provider capability approval recorded; demo hosting is a separate zero-charge qualification.
+Remaining/evidence scope: Blocked: no real-data issuer, jurisdiction, or provider capability approval is recorded; the demo runs synthetic fixtures only with no paid services. Unblocks on first-issuer approval (legal, retention, residency) per SOV-002/SOV-004.
 Dependencies: SOV-002, SOV-004.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/41).
 Requirements: DR-01, DR-04, DR-11, SR-25, SR-33, INV-11, NFR-12, NFR-14.
@@ -1169,8 +1494,8 @@ Required closure evidence:
 
 Owner role: Authority backend and database security.
 Gate: G1; proposed priority: p0; triage: needs-triage.
-Progress: partial (reviewed 2026-10-29).
-Remaining/evidence scope: Trust sealing, stable subject/quorum checks and production startup guards exist; BFF human trust changes, source provenance and actual issuer authority remain.
+Progress: partial (reviewed 2026-10-30).
+Remaining/evidence scope: Trust sealing, stable human subject/quorum binding, tenant binding and production startup guards exist; approved source provenance and actual issuer authority remain.
 Dependencies: SOV-004, SOV-005, SOV-008, SOV-009.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/43).
 Requirements: FR-23, FR-25, DR-05, DR-06, SR-01, SR-27, SR-34, SR-35, INV-03, INV-05, INV-06.
@@ -1199,7 +1524,7 @@ Required closure evidence:
 Owner role: Integration and security E2E engineering.
 Gate: G1; proposed priority: p0; triage: needs-triage.
 Progress: partial (reviewed 2026-10-30).
-Remaining/evidence scope: Both artifact-profile HTTP E2E suites exist, the packaged same-origin SPA/BFF delivery is implemented with HTTP evidence, and a pinned Playwright/Chromium suite proves DOM/JS login, holder consent, verification, and the SD-JWT wallet journeys (pre-authorized and authorization-code with browser-owned PKCE) with a CI job; full external selected-profile flow evidence remains. Keep issue 45 open.
+Remaining/evidence scope: Same-origin SPA/BFF and browser profile matrix cover native synthetic and SD-JWT wallet journeys (pre-authorized and authorization-code with browser-owned PKCE), replay, denial and tampering. External conformance, remaining selected-profile criteria and full two-instance qualification remain. Keep issue 45 open.
 Dependencies: SOV-010, SOV-011, SOV-012, SOV-015, SOV-036.
 Tracker: [GitHub issue](https://github.com/apil-khadka/Sovra/issues/45).
 Requirements: FR-08, FR-19, FR-20, FR-21, FR-22, SR-03, SR-04, SR-05, SR-06, INV-01, INV-02, INV-07, INV-08, NFR-01, NFR-07.

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ApiError } from './api'
+import { login } from './auth'
 import type { SessionInfo } from './auth'
 import { importHolder, signMessage } from './crypto'
 import type { HolderKey } from './crypto'
@@ -23,6 +24,7 @@ import type {
 } from './holder'
 import Field from './components/Field'
 import StateCard from './components/StateCard'
+import { jsonBlocked, jsonError } from './jsoncheck'
 
 // Holder dashboard (SOV-024). Members unlock with a holder-key
 // proof, then read exactly that key's enrollment cases with
@@ -86,6 +88,7 @@ export default function HolderDeskView({ session }: { session: SessionInfo | nul
       const bound = await unlockHolder(
         { kty: 'EC', crv: 'P-256', x: key.jwk.x, y: key.jwk.y },
         proof,
+        asked.challenge,
       )
       setHolder(key)
       setUnlocked(bound)
@@ -170,6 +173,13 @@ export default function HolderDeskView({ session }: { session: SessionInfo | nul
               ? 'Log in first — your history unlocks with your holder key.'
               : 'This session lacks the member role, so holder history stays hidden.'}
           </p>
+          {session === null && (
+            <p>
+              <button type="button" className="primary" onClick={login}>
+                Log in with Keycloak
+              </button>
+            </p>
+          )}
         </StateCard>
       </section>
     )
@@ -192,13 +202,15 @@ export default function HolderDeskView({ session }: { session: SessionInfo | nul
               onChange={(e) => setPrivateJwk(e.target.value)}
               rows={3}
               placeholder='{"kty":"EC","crv":"P-256","x":"…","y":"…","d":"…"}'
+              aria-invalid={jsonError(privateJwk) !== null}
             />
           </label>
+          {jsonError(privateJwk) !== null && <p role="alert">{jsonError(privateJwk)}</p>}
           <p>
             <button
               type="button"
               className="primary"
-              disabled={busy !== ''}
+              disabled={busy !== '' || jsonBlocked(privateJwk)}
               onClick={() => void onUnlock()}
             >
               {busy === 'unlock' ? 'Unlocking…' : 'Unlock my history'}
@@ -221,7 +233,7 @@ export default function HolderDeskView({ session }: { session: SessionInfo | nul
           Lock
         </button>
       </p>
-      <nav className="app-nav" aria-label="History areas">
+      <div className="app-nav" role="group" aria-label="History areas">
         {(['cases', 'consents', 'credentials', 'recovery'] as const).map((area) => (
           <button
             key={area}
@@ -230,7 +242,7 @@ export default function HolderDeskView({ session }: { session: SessionInfo | nul
               setTab(area)
               setNotice('')
             }}
-            aria-current={tab === area ? 'page' : undefined}
+            aria-pressed={tab === area}
           >
             {area === 'cases'
               ? 'My cases'
@@ -241,7 +253,7 @@ export default function HolderDeskView({ session }: { session: SessionInfo | nul
                   : 'Recovery'}
           </button>
         ))}
-      </nav>
+      </div>
       {notice !== '' && <p role="alert">{notice}</p>}
       {tab === 'cases' && (
         <>

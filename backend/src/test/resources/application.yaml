@@ -42,17 +42,24 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: never
   info:
     env:
       enabled: true
+  metrics:
+    tags:
+      instance: ${sovra.instance-id}
 
 sovra:
   # Injected from the Maven build; see pom.xml resource filtering.
   version: "@project.version@"
+  # PROD-011: instance identity for tests. The main yaml default
+  # (container hostname) does not cross into test contexts, so tests
+  # pin a static value; per-class overrides set their own.
+  instance-id: test-instance
   # Signing backend: local-dev (G1 synthetic double, needs both arming
   # flags below) or kms (production; arrives with the G2 provider pick).
   signer: local-dev

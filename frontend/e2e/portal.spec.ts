@@ -257,7 +257,8 @@ test('members onboard, rotate, and revoke sandbox credentials', async ({ page, b
   const fresh = await api(base, rotated.trim(), 'GET', '/api/rp/metrics')
   expect(fresh.status).toBe(200)
 
-  await card.getByRole('button', { name: 'Revoke credential' }).click()
+  await card.getByRole('button', { name: 'Revoke…', exact: true }).click()
+  await card.getByRole('button', { name: 'Confirm revoke' }).click()
   await expect(card.getByText('revoked')).toBeVisible()
   const dead = await api(base, rotated.trim(), 'GET', '/api/rp/metrics')
   expect(dead.status).toBe(401)

@@ -1,0 +1,234 @@
+package dev.sovra.planning;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import dev.sovra.SovraPostgresBase;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+/**
+ * Fleet AI budget ledger (PROD-012): atomic reservations across
+ * racers, exact settle/refund/burn accounting, concurrency caps,
+ * and sweeper burns for abandoned leases — all as the
+ * least-privilege role, no provider touched.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+class AiBudgetTests extends SovraPostgresBase {
+
+  JdbcTemplate owner;
+  JdbcTemplate app;
+
+  @BeforeEach
+  void setup() {
+    owner = new JdbcTemplate(ownerDataSource());
+    app = new JdbcTemplate(appRoleDataSource());
+    owner.update("DELETE FROM ai_call_lease");
+    owner.update("DELETE FROM ai_budget_day");
+  }
+
+  @Test
+  void reserveSettleAccountsExactly() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID lease = ledger.reserve(UUID.randomUUID(), 5_000);
+    ledger.settle(lease, 3_000);
+    assertThat(day().requestsUsed()).isEqualTo(1);
+    assertThat(day().tokensUsed()).isEqualTo(3_000);
+    assertThat(day().requestsReserved()).isEqualTo(0);
+    assertThat(day().tokensReserved()).isEqualTo(0);
+    assertThat(leaseState(lease)).isEqualTo("SETTLED");
+  }
+
+  @Test
+  void refundReturnsReservation() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID lease = ledger.reserve(UUID.randomUUID(), 5_000);
+    ledger.refund(lease);
+    assertThat(day().requestsUsed()).isEqualTo(0);
+    assertThat(day().tokensUsed()).isEqualTo(0);
+    assertThat(day().requestsReserved()).isEqualTo(0);
+    assertThat(day().tokensReserved()).isEqualTo(0);
+    assertThat(leaseState(lease)).isEqualTo("REFUNDED");
+  }
+
+  @Test
+  void failureBurnsUncertain() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID tenant = UUID.randomUUID();
+    assertThatThrownBy(
+            () -> ledger.execute(
+                tenant,
+                4_000,
+                new AiBudgetService.AiCall<String>() {
+                  @Override
+                  public String invoke() {
+                    throw new RuntimeException("provider timeout");
+                  }
+
+                  @Override
+                  public long usageOf(String result) {
+                    return -1;
+                  }
+                }))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("provider timeout");
+    assertThat(day().requestsUsed()).isEqualTo(1);
+    assertThat(day().tokensUsed()).isEqualTo(4_000);
+    assertThat(day().requestsReserved()).isEqualTo(0);
+    assertThat(
+            owner.queryForObject(
+                "SELECT state FROM ai_call_lease WHERE tenant_id = ?", String.class, tenant))
+        .isEqualTo("UNCERTAIN");
+  }
+
+  @Test
+  void successSettlesActualOrEstimate() throws Exception {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    String ok =
+        ledger.execute(
+            UUID.randomUUID(),
+            4_000,
+            new AiBudgetService.AiCall<String>() {
+              @Override
+              public String invoke() {
+                return "candidate";
+              }
+
+              @Override
+              public long usageOf(String result) {
+                return 2_500;
+              }
+            });
+    assertThat(ok).isEqualTo("candidate");
+    // Provider omits usage: settle the estimate, conservatively.
+    ledger.execute(
+        UUID.randomUUID(),
+        4_000,
+        new AiBudgetService.AiCall<String>() {
+          @Override
+          public String invoke() {
+            return "candidate";
+          }
+
+          @Override
+          public long usageOf(String result) {
+            return -1;
+          }
+        });
+    assertThat(day().requestsUsed()).isEqualTo(2);
+    assertThat(day().tokensUsed()).isEqualTo(6_500);
+  }
+
+  @Test
+  void quotaRaceAdmitsExactlyBudget() throws Exception {
+    AiBudgetService ledger = ledger(5, 100_000_000L, 100);
+    AtomicInteger admitted = new AtomicInteger();
+    AtomicInteger denied = new AtomicInteger();
+    ExecutorService pool = Executors.newFixedThreadPool(16);
+    try {
+      List<Future<?>> futures = new ArrayList<>();
+      for (int i = 0; i < 16; i++) {
+        futures.add(
+            pool.submit(
+                () -> {
+                  try {
+                    ledger.reserve(UUID.randomUUID(), 1_000);
+                    admitted.incrementAndGet();
+                  } catch (AiBudgetExhaustedException e) {
+                    denied.incrementAndGet();
+                  }
+                }));
+      }
+      for (Future<?> future : futures) {
+        future.get();
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+    assertThat(admitted.get()).isEqualTo(5);
+    assertThat(denied.get()).isEqualTo(11);
+    assertThat(day().requestsReserved()).isEqualTo(5);
+  }
+
+  @Test
+  void concurrencyCapDeniesAndFrees() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 2);
+    UUID first = ledger.reserve(UUID.randomUUID(), 1_000);
+    ledger.reserve(UUID.randomUUID(), 1_000);
+    assertThatThrownBy(() -> ledger.reserve(UUID.randomUUID(), 1_000))
+        .isInstanceOf(AiBudgetExhaustedException.class)
+        .hasMessageContaining("concurrency");
+    ledger.settle(first, 1_000);
+    ledger.reserve(UUID.randomUUID(), 1_000);
+  }
+
+  @Test
+  void tokenBudgetDenies() {
+    AiBudgetService ledger = ledger(100, 10_000, 10);
+    ledger.reserve(UUID.randomUUID(), 6_000);
+    assertThatThrownBy(() -> ledger.reserve(UUID.randomUUID(), 6_000))
+        .isInstanceOf(AiBudgetExhaustedException.class)
+        .hasMessageContaining("token budget");
+  }
+
+  @Test
+  void sweepBurnsAbandonedAndFreesTheSlot() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 1);
+    UUID abandoned = ledger.reserve(UUID.randomUUID(), 7_000);
+    // Simulate the kill-mid-call: the lease expires unsettled.
+    owner.update(
+        "UPDATE ai_call_lease SET expires_at = now() - interval '1 minute' WHERE id = ?",
+        abandoned);
+    assertThat(ledger.sweepStale()).isEqualTo(1);
+    assertThat(leaseState(abandoned)).isEqualTo("UNCERTAIN");
+    assertThat(day().tokensUsed()).isEqualTo(7_000);
+    assertThat(day().tokensReserved()).isEqualTo(0);
+    // The slot is free again, but the tokens stay burned.
+    ledger.reserve(UUID.randomUUID(), 1_000);
+    assertThat(day().tokensUsed()).isEqualTo(7_000);
+  }
+
+  @Test
+  void doubleSettleFailsLoud() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID lease = ledger.reserve(UUID.randomUUID(), 1_000);
+    ledger.settle(lease, 1_000);
+    assertThatThrownBy(() -> ledger.settle(lease, 1_000))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("not held");
+  }
+
+  private AiBudgetService ledger(int requests, long tokens, int concurrency) {
+    AiBudgetProperties budgets = new AiBudgetProperties();
+    budgets.setDailyRequests(requests);
+    budgets.setDailyTokens(tokens);
+    budgets.setMaxConcurrency(concurrency);
+    budgets.setLeaseSeconds(3_600);
+    return new AiBudgetService(appRoleDataSource(), Clock.systemUTC(), budgets);
+  }
+
+  private Day day() {
+    return owner.queryForObject(
+        "SELECT requests_used, tokens_used, requests_reserved, tokens_reserved"
+            + " FROM ai_budget_day WHERE day = CURRENT_DATE",
+        (rs, row) -> new Day(rs.getInt(1), rs.getLong(2), rs.getInt(3), rs.getLong(4)));
+  }
+
+  private String leaseState(UUID lease) {
+    return owner.queryForObject(
+        "SELECT state FROM ai_call_lease WHERE id = ?", String.class, lease);
+  }
+
+  record Day(int requestsUsed, long tokensUsed, int requestsReserved, long tokensReserved) {}
+}

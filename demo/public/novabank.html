@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NovaBank demo — synthetic age eligibility</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="app-bank">
+    <div class="banner">Synthetic demo: NovaBank is fictional, no real account is opened</div>
+    <main>
+      <p class="brand">NovaBank · demo onboarding</p>
+      <h1>Open a demo account</h1>
+      <p class="lede">
+        No uploads. No scans. NovaBank requests one fact: that you are over 18.
+      </p>
+
+      <div class="bank-grid">
+        <aside class="bank-rail" aria-label="Demo account">
+          <div class="bank-account">
+            <h2>Demo current account</h2>
+            <p class="balance">€1,250.00</p>
+            <p class="fine">demo funds · not real money</p>
+            <p class="iban">DEMO ·· 4021</p>
+          </div>
+          <div>
+            <h2>Onboarding</h2>
+            <ol class="onboarding-steps" id="onboarding-steps">
+              <li class="now">Prove over-18</li>
+            </ol>
+            <p class="fine">Reserving the account is the banker's next step, outside this demo.</p>
+          </div>
+          <div class="privacy-card">
+            <p id="privacy-text">After you approve, NovaBank may open your demo account. The proof expires in about an hour.</p>
+          </div>
+        </aside>
+        <div class="bank-flow">
+      <div class="sovra-head">
+        <span>Age check by Sovra</span>
+        <span class="sovra-chip" title="Sovra performs this age check on synthetic fixtures">SOVRA · <span id="chip-profile">…</span></span>
+        <span class="state-pill" id="state-pill" aria-live="polite">Nothing shared yet</span>
+      </div>
+
+      <div class="card" id="s-start">
+        <h2>Step 1: Request age evidence</h2>
+        <p>
+          Your browser generates a fresh holder key, NovaBank prepares a proof
+          request, and you approve or decline exactly what is shown.
+        </p>
+        <p class="actions">
+          <button type="button" class="primary" id="b-start">Check age eligibility</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-progress" hidden>
+        <h2>Working…</h2>
+        <p role="status" id="progress-label">Starting…</p>
+        <ol class="progress-steps" id="progress-steps" aria-label="Check progress"></ol>
+        <p class="actions">
+          <button type="button" class="linkish" id="b-cancel">Cancel this check</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-consent" hidden>
+        <h2>Step 2: Review and decide</h2>
+        <p>NovaBank needs one fact to open your demo account.</p>
+        <div class="learn-split">
+          <div class="learn-yes">
+            <h3>NovaBank will learn</h3>
+            <p>You are over 18. That is enough to open this demo account.</p>
+          </div>
+          <div class="learn-no">
+            <h3>NovaBank will not learn</h3>
+            <p>Your birth date, documents, or source profile.</p>
+          </div>
+        </div>
+        <dl id="consent-human"></dl>
+        <p class="fine">
+          Synthetic evidence only. This demo opens no real account and performs
+          no legal KYC/AML check.
+        </p>
+        <p class="actions">
+          <button type="button" class="primary" id="b-approve">Approve and share</button>
+          <button type="button" id="b-decline">Decline</button>
+          <button type="button" class="linkish" id="b-back">Back without deciding</button>
+        </p>
+        <details>
+          <summary>Exact technical values</summary>
+          <dl id="consent-fields"></dl>
+        </details>
+      </div>
+
+      <div class="card" id="s-outcome" hidden>
+        <p class="verdict" id="verdict" role="status"></p>
+        <p id="outcome-note"></p>
+        <details>
+          <summary>Receipt detail</summary>
+          <dl id="receipt-fields"></dl>
+        </details>
+        <p class="actions"><button type="button" id="b-restart">Start a new check</button></p>
+      </div>
+        </div>
+      </div>
+
+      <footer>
+        <span><a href="/">All demos</a></span>
+      </footer>
+
+      <details class="integrator-feed ops" id="s-ops" hidden>
+        <summary>For integrators: live decision feed</summary>
+        <p class="fine" id="discovery">Connecting…</p>
+        <p class="fine" id="ops-metrics"></p>
+        <table>
+          <thead><tr><th>Decision</th><th>Outcome</th><th>Reason</th><th>Decided</th></tr></thead>
+          <tbody id="ops-rows"></tbody>
+        </table>
+      </details>
+    </main>
+    <script type="module">
+      import { fetchDiscovery, fetchOps, runCheck } from '/shared.js'
+
+      const $ = (id) => document.getElementById(id)
+      const show = (id) => {
+        for (const s of ['s-start', 's-progress', 's-consent', 's-outcome']) $(s).hidden = s !== id
+        // Land keyboard and screen-reader users on the new card.
+        const head = document.querySelector(`#${id} h2, #${id} .verdict`)
+        if (head instanceof HTMLElement) {
+          head.setAttribute('tabindex', '-1')
+          head.focus()
+        }
+      }
+      const field = (label, value, mono = false) =>
+        `<dt>${label}</dt><dd${mono ? ' class="mono"' : ''}>${value}</dd>`
+
+      const STEPS = [
+        'Preparing your check…',
+        'Requesting your proof…',
+        'Opening your decision…',
+        'Recording your approval…',
+        'Confirming with Sovra…',
+      ]
+      const DECLINE_LABEL = 'Recording your decline…'
+
+      function resetProgress() {
+        $('progress-steps').innerHTML = STEPS.map(
+          (label) => `<li><span class="progress-dot" aria-hidden="true"></span><span class="step-state visually-hidden"></span><span class="step-label">${label}</span></li>`,
+        ).join('')
+      }
+
+      function markStep(label) {
+        const rows = [...$('progress-steps').children]
+        const declining = label === DECLINE_LABEL
+        const index = declining ? 3 : STEPS.indexOf(label)
+        rows.forEach((row, i) => {
+          row.classList.toggle('done', i < index)
+          row.classList.toggle('active', i === index)
+          row.querySelector('.step-state').textContent = i < index ? 'done: ' : i === index ? 'current: ' : ''
+          if (i === 3 && declining) row.querySelector('.step-label').textContent = DECLINE_LABEL
+        })
+      }
+
+      function setPill(text, tone = '') {
+        const pill = $('state-pill')
+        pill.textContent = text
+        pill.className = tone === '' ? 'state-pill' : `state-pill ${tone}`
+      }
+
+      const PRIVACY_START = 'After you approve, NovaBank may open your demo account. The proof expires in about an hour.'
+      const PRIVACY_DONE = 'Approved. This proof expires in about an hour.'
+
+      function setOnboarding(state) {
+        // The rail shows the single step this demo proves.
+        const row = $('onboarding-steps').children[0]
+        row.classList.toggle('done', state === 'accepted')
+        row.classList.toggle('now', state !== 'accepted')
+        $('privacy-text').textContent = state === 'accepted' ? PRIVACY_DONE : PRIVACY_START
+      }
+
+      function relativeExpiry(iso) {
+        const minutes = Math.max(1, Math.round((new Date(iso) - Date.now()) / 60000))
+        return minutes < 50 ? `expires in ~${minutes} min` : 'expires in about an hour'
+      }
+
+      try {
+        const d = await fetchDiscovery()
+        $('discovery').textContent = `Sovra ${d.service} ${d.version} · profile ${d.profile} · contract ${d.contractVersion}`
+        $('chip-profile').textContent = d.profile
+      } catch {
+        $('discovery').textContent = 'Sovra backend unreachable.'
+      }
+
+      async function refreshOps() {
+        try {
+          const { outcomes, metrics } = await fetchOps('novabank')
+          if (metrics) {
+            $('ops-metrics').textContent =
+              `${metrics.total} decisions · ${metrics.accepted} accepted · ${metrics.rejected} rejected · ${metrics.unknown} unknown`
+          }
+          $('ops-rows').innerHTML = outcomes.map((o) =>
+            `<tr><td class="mono">${o.decisionId.slice(0, 8)}…</td><td>${o.outcome}</td><td class="mono">${o.reasonCode}</td><td>${o.decidedAt}</td></tr>`,
+          ).join('')
+          $('s-ops').hidden = false
+        } catch {
+          // Ops corner is informational; the check result stands on its own.
+        }
+      }
+
+      function outcomeClass(outcome) {
+        if (outcome === 'ACCEPTED') return 'ok'
+        if (outcome === 'REJECTED') return 'bad'
+        return 'warn'
+      }
+
+      let cancelled = false
+
+      $('b-cancel').addEventListener('click', () => {
+        // Stops the flow before any decision is signed. Artefacts
+        // already created expire unused within the hour.
+        cancelled = true
+        show('s-start')
+      })
+
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return
+        if (!$('s-consent').hidden) $('b-back').click()
+        else if (!$('s-progress').hidden) $('b-cancel').click()
+      })
+      $('b-start').addEventListener('click', () => {
+        show('s-progress')
+        resetProgress()
+        setPill('Nothing shared yet')
+        cancelled = false
+        runCheck('novabank', {
+          onStep: (label) => { $('progress-label').textContent = label; markStep(label) },
+          decide: ({ review }) => new Promise((resolve) => {
+            if (cancelled) {
+              resolve('back')
+              return
+            }
+            $('consent-human').innerHTML =
+              field('Who asks', 'NovaBank (demo)') +
+              field('What they learn', 'That you are over 18') +
+              field('Expires', relativeExpiry(review.expiresAt))
+            $('consent-fields').innerHTML =
+              field('Relying party', 'NovaBank (demo)') +
+              field('Purpose', review.purpose) +
+              field('Exact claims', 'adultOver18: true', true) +
+              field('Issuer', 'synth-1 (synthetic issuer)') +
+              field('Expires', review.expiresAt, true)
+            show('s-consent')
+            $('b-approve').onclick = () => { show('s-progress'); resolve('approve') }
+            $('b-decline').onclick = () => { show('s-progress'); resolve('deny') }
+            $('b-back').onclick = () => resolve('back')
+          }),
+        }).then(({ decision, denied, backedOut, requestId, review }) => {
+          if (backedOut) {
+            show('s-start')
+            return
+          }
+          setPill(
+            denied ? 'You declined — nothing shared' : 'You approved — one fact shared',
+            denied ? 'warn' : 'ok',
+          )
+          setOnboarding(!denied && decision.outcome === 'ACCEPTED' ? 'accepted' : 'start')
+          const card = $('s-outcome')
+          card.classList.remove('outcome-ok', 'outcome-bad', 'outcome-warn')
+          if (denied) {
+            $('verdict').textContent = 'You declined — nothing was shared.'
+            $('verdict').className = 'verdict warn'
+            card.classList.add('outcome-warn')
+            $('outcome-note').textContent = 'No presentation exists for this request. You can start a new check any time.'
+            $('receipt-fields').innerHTML = field('Request', requestId, true)
+          } else if (decision.outcome === 'ACCEPTED') {
+            $('verdict').textContent = 'Eligibility evidence recorded.'
+            $('verdict').className = 'verdict ok'
+            card.classList.add('outcome-ok')
+            $('outcome-note').textContent = 'NovaBank may now open your demo account. The proof expires in about an hour.'
+            $('receipt-fields').innerHTML =
+              field('Decision', decision.decisionId, true) +
+              field('Outcome', decision.outcome, true) +
+              field('Trust snapshot', `v${decision.trustSnapshot}`, true) +
+              field('Profile', decision.profile, true)
+          } else if (decision.outcome === 'REJECTED') {
+            $('verdict').textContent = 'Not accepted — no account reserved.'
+            $('verdict').className = 'verdict bad'
+            card.classList.add('outcome-bad')
+            $('outcome-note').textContent = `Reason: ${decision.reasonCode}. Start a new check to try again with a fresh challenge.`
+            $('receipt-fields').innerHTML = field('Decision', decision.decisionId, true)
+          } else {
+            $('verdict').textContent = 'Could not be determined — try again.'
+            $('verdict').className = 'verdict warn'
+            card.classList.add('outcome-warn')
+            $('outcome-note').textContent = 'The evidence was stale or a dependency failed. This is never treated as a pass.'
+            $('receipt-fields').innerHTML = field('Decision', decision.decisionId, true)
+          }
+          show('s-outcome')
+          void refreshOps()
+        }).catch((err) => {
+          console.error('demo check failed:', err)
+          $('verdict').textContent = 'Something went wrong.'
+          $('verdict').className = 'verdict bad'
+          $('outcome-note').textContent = 'Check failed before any decision. Nothing was shared. Start a new check to retry.'
+          $('receipt-fields').innerHTML = ''
+          show('s-outcome')
+        })
+      })
+
+      $('b-restart').addEventListener('click', () => {
+        setPill('Nothing shared yet')
+        setOnboarding('start')
+        show('s-start')
+      })
+      void refreshOps()
+    </script>
+  </body>
+</html>

@@ -23,6 +23,9 @@ import dev.sovra.trust.TrustService;
 import dev.sovra.vault.KmsVaultKekProvider;
 import dev.sovra.verification.VerificationFixtures;
 import dev.sovra.verification.VerificationService;
+import dev.sovra.kms.TestKmsProvider;
+import dev.sovra.planning.AiBudgetProperties;
+import dev.sovra.planning.PlanningProperties;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Set;
@@ -80,12 +83,154 @@ class ProductionValidatorTests extends SovraPostgresBase {
 
   @Test
   void entryScanRefusesTheSyntheticGenesis() {
+    // Valid deployment posture, so the refusal comes from the data
+    // markers, not the posture checks.
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("production"), new KmsSigner(), new KmsVaultKekProvider(),
-        ownerDataSource(), "sdjwt-vc", "");
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
     assertThatThrownBy(() -> validator.run(null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("production entry refused");
+  }
+
+  @Test
+  void productionRefusesInBootMigration() {
+    ProductionStartupValidator validator = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", 8091, true, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
+    assertThatThrownBy(() -> validator.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("SOVRA_MIGRATE_ON_BOOT must be false");
+  }
+
+  @Test
+  void productionRequiresManagementPort() {
+    ProductionStartupValidator validator = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", -1, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
+    assertThatThrownBy(() -> validator.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("SOVRA_MANAGEMENT_PORT must set a private scrape/health port");
+  }
+
+  @Test
+  void productionRequiresHttpsIdentityOrigins() {
+    String issuer = "https://login.example.com/realms/sovra";
+    String redirect = "https://app.example.com/login/oauth2/code/sovra";
+    String postLogout = "https://app.example.com/";
+    // Each origin is checked independently.
+    assertThatThrownBy(() -> new ProductionStartupValidator(
+            new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+            ownerDataSource(), "sdjwt-vc", "", true,
+            "http://login.example.com/realms/sovra", redirect, postLogout, 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties())
+        .run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("sovra.bff.issuer must be an absolute https URL");
+    assertThatThrownBy(() -> new ProductionStartupValidator(
+            new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+            ownerDataSource(), "sdjwt-vc", "", true,
+            issuer, "/login/oauth2/code/sovra", postLogout, 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties())
+        .run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("sovra.bff.redirect-uri must be an absolute https URL");
+    assertThatThrownBy(() -> new ProductionStartupValidator(
+            new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+            ownerDataSource(), "sdjwt-vc", "", true,
+            issuer, redirect, "", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties())
+        .run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("sovra.bff.post-logout-redirect-uri must be an absolute https URL");
+  }
+
+  @Test
+  void productionRejectsSyntheticIssuerKeys() {
+    ProductionStartupValidator validator = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""),
+        new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", 8091, false,
+        true, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
+    assertThatThrownBy(() -> validator.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("sovra.synthetic-issuers.enabled must be false");
+  }
+
+  @Test
+  void productionRequiresFileVerifierKeys() {
+    ProductionStartupValidator validator = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""),
+        new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", 8091, false,
+        false, "synthetic", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
+    assertThatThrownBy(() -> validator.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("sovra.openid.keys must be file");
+  }
+
+  @Test
+  void productionRequiresKmsAttestation() {
+    ProductionStartupValidator validator = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""),
+        new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", 8091, false,
+        false, "file", "", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
+    assertThatThrownBy(() -> validator.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("sovra.kms.workload must be configured");
+  }
+
+  @Test
+  void armedLiveAiRequiresFundedBudget() {
+    // Armed but unfunded: refused at the gate, before markers.
+    PlanningProperties armed = new PlanningProperties();
+    armed.setLiveEnabled(true);
+    ProductionStartupValidator unfunded = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""),
+        new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", 8091, false,
+        false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), armed);
+    assertThatThrownBy(() -> unfunded.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("sovra.ai-budget is unfunded");
+    // Funded: the gate passes posture and only data markers can
+    // still refuse (the genesis database has them).
+    AiBudgetProperties funded = new AiBudgetProperties();
+    funded.setDailyRequests(100);
+    funded.setDailyTokens(1_000_000);
+    funded.setMaxConcurrency(4);
+    ProductionStartupValidator passes = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""),
+        new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", 8091, false,
+        false, "file", "workload", "digest", "region",
+        funded, armed);
+    assertThatThrownBy(() -> passes.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageNotContaining("ai-budget");
+  }
+
+  @Test
+  void machineOnlyDeploymentsSkipOriginChecks() {
+    // BFF disabled: blank origins are fine, the posture checks pass,
+    // and only the data markers can still refuse.
+    ProductionStartupValidator validator = new ProductionStartupValidator(
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        ownerDataSource(), "sdjwt-vc", "", false, "", "", "", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
+    assertThatThrownBy(() -> validator.run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageNotContaining("https URL")
+        .hasMessageNotContaining("SOVRA_MIGRATE_ON_BOOT")
+        .hasMessageNotContaining("SOVRA_MANAGEMENT_PORT");
   }
 
   @Test
@@ -110,8 +255,12 @@ class ProductionValidatorTests extends SovraPostgresBase {
           "INSERT INTO issuer_record (scope, issuer_id) VALUES ('adult-status',"
               + " 'https://issuer.example/np-1')");
       ProductionStartupValidator validator = new ProductionStartupValidator(
-          new SovraMode("production"), new KmsSigner(), new KmsVaultKekProvider(),
-          clean, "sdjwt-vc", "");
+          new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+          clean, "sdjwt-vc", "", true,
+          "https://login.example.com/realms/sovra",
+          "https://app.example.com/login/oauth2/code/sovra",
+          "https://app.example.com/", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
       validator.run(null);
       setup.update("INSERT INTO tenant (slug) VALUES ('sovra-demo')");
       assertThatThrownBy(() -> validator.run(null))

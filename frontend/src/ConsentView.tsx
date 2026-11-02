@@ -10,6 +10,7 @@ import ConnectionFields from './components/ConnectionFields'
 import Field from './components/Field'
 import HolderKeyControls from './components/HolderKeyControls'
 import StateCard from './components/StateCard'
+import StepIndicator from './components/StepIndicator'
 
 // Holder consent flow (SOV-010). Five visibly distinct states:
 // pending, review, denied, unavailable, verified. Every server value
@@ -110,7 +111,18 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
   return (
     <section className="consent" aria-label="Holder consent">
       <h1 className="view-title">Holder consent</h1>
-      <p className="view-lede">Review the exact request, then approve or deny it with your key.</p>
+      <p className="view-lede">Review the exact request, then approve or deny it with your key. Before starting: the proof request ID and the holder key for its credential.</p>
+      <StepIndicator
+        steps={['Load request', 'Review bound values', 'Decided']}
+        current={
+          stage.kind === 'pending' || stage.kind === 'review'
+            ? 1
+            : stage.kind === 'idle' || stage.kind === 'loading' || stage.kind === 'error'
+              ? 0
+              : 2
+        }
+        label="Consent progress"
+      />
 
       {(stage.kind === 'idle' || stage.kind === 'loading' || stage.kind === 'error') && (
         <form
@@ -139,9 +151,21 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
           {stage.kind === 'error' && <p role="alert">Could not load: {stage.message}</p>}
         </form>
       )}
+      {(stage.kind === 'idle' || stage.kind === 'loading' || stage.kind === 'error') && (
+        <div className="empty-slot">
+          <p>
+            <strong>No request loaded yet.</strong> You will need:
+          </p>
+          <ul>
+            <li>The proof request ID from the relying party</li>
+            <li>The holder key for that credential (generate it above)</li>
+          </ul>
+        </div>
+      )}
 
       {stage.kind === 'pending' && (
-        <StateCard tone="pending" badge="Pending — awaiting your decision">
+        <StateCard tone="pending" focusOnMount
+          badge="Pending — awaiting your decision">
           <dl>
             <Field label="Relying party" value={stage.review.rpId} />
             <Field label="Purpose" value={stage.review.purpose} />
@@ -163,7 +187,8 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
       )}
 
       {stage.kind === 'review' && (
-        <StateCard tone="review" badge="Review — check every bound value">
+        <StateCard tone="review" focusOnMount
+          badge="Review — check every bound value">
           <dl>
             <Field label="Relying party" value={stage.review.rpId} />
             <Field label="Audience" value={stage.review.audience} />
@@ -211,11 +236,14 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
       )}
 
       {stage.kind === 'deciding' && (
-        <StateCard tone="review" badge="Signing your decision…" />
+        <StateCard tone="review" focusOnMount
+          badge="Signing your decision…" />
       )}
 
       {stage.kind === 'denied' && (
-        <StateCard tone="denied" badge="Denied — nothing was shared">
+        <StateCard tone="denied" focusOnMount
+          badge="Denied — nothing was shared">
+          <p className="outcome-sentence">Nothing was shared with {stage.review.rpId}.</p>
           <dl>
             <Field label="Relying party" value={stage.review.rpId} />
             <Field label="Purpose" value={stage.review.purpose} />
@@ -228,7 +256,8 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
       )}
 
       {stage.kind === 'unavailable' && (
-        <StateCard tone="unavailable" badge="Unavailable — no decision possible">
+        <StateCard tone="unavailable" focusOnMount
+          badge="Unavailable — no decision possible">
           <p>{stage.review.stateReason}</p>
           <p>An expired request, or one whose credential was revoked, cannot be approved.</p>
           <button type="button" onClick={onReset}>
@@ -238,24 +267,28 @@ export default function ConsentView({ session }: { session: SessionInfo | null }
       )}
 
       {stage.kind === 'verified' && (
-        <StateCard tone="verified" badge="Verified — synthetic consent proof">
+        <StateCard tone="verified" focusOnMount
+          badge="Verified — synthetic consent proof">
+          <p className="outcome-sentence">
+            Shared with {stage.review.rpId}: one fact (adultOver18).
+          </p>
+          <p className="standing-line">Synthetic evidence only. A technical proof, never a legal or KYC determination.</p>
           <dl>
             <Field label="Relying party" value={stage.review.rpId} />
             <Field label="Purpose" value={stage.review.purpose} />
-            <Field
-              label="Exact claims"
-              value={JSON.stringify(stage.presentation.claims)}
-              mono
-            />
             <Field label="Profile" value={stage.presentation.profile} mono />
           </dl>
           <details className="consent-details">
-            <summary>Signed presentation</summary>
+            <summary>Machine detail</summary>
             <dl>
+              <Field
+                label="Exact claims"
+                value={JSON.stringify(stage.presentation.claims)}
+                mono
+              />
               <Field label="Presentation" value={stage.presentation.presentation} mono />
             </dl>
           </details>
-          <p>Synthetic evidence only. A technical proof, never a legal or KYC determination.</p>
           <button type="button" onClick={onReset}>
             Done
           </button>

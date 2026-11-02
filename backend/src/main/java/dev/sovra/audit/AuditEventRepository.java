@@ -15,6 +15,10 @@ import tools.jackson.databind.ObjectMapper;
 @Repository
 public class AuditEventRepository {
 
+  private static final String COLUMNS =
+      "id, occurred_at, actor_type, actor_id, action, resource_type,"
+          + " resource_id, decision, reason_code, policy_version, correlation_id, detail";
+
   private final JdbcTemplate tenant;
   private final ObjectMapper mapper;
 
@@ -66,19 +70,34 @@ public class AuditEventRepository {
    * appear. Tenant filtering applies before the cursor, so a foreign
    * cursor can only narrow the caller's own page, never widen it.
    */
+  private static String unionAll(boolean scoped) {
+    String branch =
+        "SELECT " + COLUMNS + " FROM audit_event WHERE (tenant_id = ? OR tenant_id IS NULL)";
+    String archived =
+        "SELECT "
+            + COLUMNS
+            + " FROM audit_event_archive WHERE (tenant_id = ? OR tenant_id IS NULL)";
+    if (scoped) {
+      branch += " AND action = ANY (?)";
+      archived += " AND action = ANY (?)";
+    }
+    return branch + " UNION ALL " + archived;
+  }
+
   public List<Map<String, Object>> listRecent(UUID tenantId, int limit, AuditCursor cursor) {
     // Typed mapping: raw PG types (jsonb, arrays) must never reach Jackson.
-    String sql =
-        "SELECT id, occurred_at, actor_type, actor_id, action, resource_type,"
-            + " resource_id, decision, reason_code, policy_version, correlation_id, detail"
-            + " FROM audit_event WHERE (tenant_id = ? OR tenant_id IS NULL)";
+    // PROD-010: reads union the live table with the archive, so
+    // archival never hides evidence; the keyset still orders the
+    // merged stream.
+    String sql = "SELECT " + COLUMNS + " FROM (" + unionAll(false) + ") events";
     Object[] args;
     if (cursor == null) {
-      args = new Object[] {tenantId, bounded(limit)};
+      args = new Object[] {tenantId, tenantId, bounded(limit)};
     } else {
-      sql += " AND (occurred_at, id) < (?, ?)";
+      sql += " WHERE (occurred_at, id) < (?, ?)";
       args =
           new Object[] {
+            tenantId,
             tenantId,
             java.sql.Timestamp.from(cursor.occurredAt()),
             cursor.id(),
@@ -115,17 +134,20 @@ public class AuditEventRepository {
    */
   public List<Map<String, Object>> listIssuerActions(
       UUID tenantId, int limit, AuditCursor cursor, List<String> actions) {
-    String sql =
-        "SELECT id, occurred_at, actor_type, actor_id, action, resource_type,"
-            + " resource_id, decision, reason_code, policy_version, correlation_id, detail"
-            + " FROM audit_event WHERE (tenant_id = ? OR tenant_id IS NULL) AND action = ANY (?)";
+    String sql = "SELECT " + COLUMNS + " FROM (" + unionAll(true) + ") events";
     Object[] args;
     if (cursor == null) {
-      args = new Object[] {tenantId, actions.toArray(new String[0]), bounded(limit)};
-    } else {
-      sql += " AND (occurred_at, id) < (?, ?)";
       args =
           new Object[] {
+            tenantId, actions.toArray(new String[0]), tenantId, actions.toArray(new String[0]),
+            bounded(limit)
+          };
+    } else {
+      sql += " WHERE (occurred_at, id) < (?, ?)";
+      args =
+          new Object[] {
+            tenantId,
+            actions.toArray(new String[0]),
             tenantId,
             actions.toArray(new String[0]),
             java.sql.Timestamp.from(cursor.occurredAt()),

@@ -1,0 +1,420 @@
+# PROD-002 production deployment definition (standalone — not an
+# overlay). This file is the versioned production topology; the demo
+# compose.yaml at the repository root is never used for production.
+#
+# Usage (from the repository root):
+#   docker compose -f deploy/production/compose.yaml --env-file /run/sovra/prod.env up -d
+#
+# Every secret is ${VAR:?} (required, no default). Nothing publishes
+# a port: platform ingress attaches to sovra-front and terminates
+# TLS; data-plane traffic stays on the internal sovra-back network;
+# administration rides `docker exec` and the internal scrape port.
+# See docs/engineering/production-deployment.md for the ingress
+# contract, failure domains, rollout, and rotation procedures.
+name: sovra-prod
+
+services:
+  db:
+    image: postgres:17.7
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - log_min_duration_statement=1000
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=test ! -f /wal/app/%f && cp %p /wal/app/%f
+      - -c
+      - archive_timeout=60
+    environment:
+      POSTGRES_DB: sovra
+      POSTGRES_USER: sovra
+      POSTGRES_PASSWORD: ${SOVRA_DB_ADMIN_PASSWORD:?SOVRA_DB_ADMIN_PASSWORD is required}
+      SOVRA_APP_DB_PASSWORD: ${SOVRA_APP_DB_PASSWORD:?SOVRA_APP_DB_PASSWORD is required}
+      # The quarantine role password stays required so role setup is
+      # uniform; the worker itself is omitted below until the KMS KEK
+      # lands (PROD-005), so nothing logs in as this role yet.
+      SOVRA_QUARANTINE_DB_PASSWORD: ${SOVRA_QUARANTINE_DB_PASSWORD:?SOVRA_QUARANTINE_DB_PASSWORD is required}
+      SOVRA_BACKUP_DB_PASSWORD: ${SOVRA_BACKUP_DB_PASSWORD:?SOVRA_BACKUP_DB_PASSWORD is required}
+    volumes:
+      - sovra-prod-pgdata:/var/lib/postgresql/data
+      - ../../db/init:/docker-entrypoint-initdb.d:ro
+      - sovra-prod-wal:/wal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sovra -d sovra"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          memory: 1G
+    networks:
+      - sovra-back
+
+  keycloak-db:
+    image: postgres:17.7
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=test ! -f /wal/keycloak/%f && cp %p /wal/keycloak/%f
+      - -c
+      - archive_timeout=60
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${SOVRA_KC_DB_PASSWORD:?SOVRA_KC_DB_PASSWORD is required}
+      SOVRA_BACKUP_DB_PASSWORD: ${SOVRA_BACKUP_DB_PASSWORD:?SOVRA_BACKUP_DB_PASSWORD is required}
+    volumes:
+      - sovra-prod-kc-pgdata:/var/lib/postgresql/data
+      - ../../db/init/20-backup-role.sh:/docker-entrypoint-initdb.d/20-backup-role.sh:ro
+      - sovra-prod-wal:/wal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - sovra-back
+
+  # Nightly base backup for both clusters (PROD-013). Holds the
+  # backup credential only (REPLICATION + CONNECT, no table
+  # privileges). A failed cycle exits non-zero (restart + alert);
+  # a missed night is visible, never silent.
+  backup:
+    image: postgres:17.7
+    command:
+      - sh
+      - -c
+      - while true; do /scripts/backup-base.sh; sleep 86400; done
+    environment:
+      SOVRA_BACKUP_DB_PASSWORD: ${SOVRA_BACKUP_DB_PASSWORD:?SOVRA_BACKUP_DB_PASSWORD is required}
+      SOVRA_BACKUP_RETENTION_DAYS: "7"
+    volumes:
+      - ./backup/backup-base.sh:/scripts/backup-base.sh:ro
+      - sovra-prod-backups:/backups
+      - sovra-prod-wal:/wal
+    depends_on:
+      db:
+        condition: service_healthy
+      keycloak-db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+    networks:
+      - sovra-back
+
+  # Controlled migration job (PROD-002): the ONLY holder of the
+  # owner credential. Apps below carry no SOVRA_DB_ADMIN_* and boot
+  # with SOVRA_MIGRATE_ON_BOOT=false; SchemaValidationGuard refuses
+  # boot unless this job already brought the schema current. Runs
+  # once per deploy (restart: no); apps wait for its success.
+  migrate:
+    image: ${SOVRA_IMAGE:-sovra-backend}:${SOVRA_VERSION:?SOVRA_VERSION is required}
+    entrypoint:
+      ["java", "-cp", "BOOT-INF/classes:BOOT-INF/lib/*",
+        "dev.sovra.migrate.MigrateMain"]
+    environment:
+      SOVRA_DB_URL: jdbc:postgresql://db:5432/sovra
+      SOVRA_DB_ADMIN_USER: sovra
+      SOVRA_DB_ADMIN_PASSWORD: ${SOVRA_DB_ADMIN_PASSWORD:?SOVRA_DB_ADMIN_PASSWORD is required}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+    networks:
+      - sovra-back
+
+  app-a:
+    image: ${SOVRA_IMAGE:-sovra-backend}:${SOVRA_VERSION:?SOVRA_VERSION is required}
+    environment:
+      SOVRA_DB_URL: jdbc:postgresql://db:5432/sovra
+      SOVRA_DB_USER: sovra_app
+      SOVRA_DB_PASSWORD: ${SOVRA_APP_DB_PASSWORD:?SOVRA_APP_DB_PASSWORD is required}
+      # No SOVRA_DB_ADMIN_*: the migrate job owns DDL (see above).
+      SOVRA_MIGRATE_ON_BOOT: "false"
+      SOVRA_MODE: production
+      SOVRA_SIGNER: kms
+      SOVRA_PROFILE: sdjwt-vc
+      SOVRA_SYNTHETIC_ISSUERS_ENABLED: "false"
+      SOVRA_VAULT_KEK: kms
+      # No vault seed variable. PROD-005 attested KMS identity: every
+      # production key call presents workload/image/location to the
+      # provider; the G2 provider bean itself is still pending, so
+      # kms-mode boot fails until it registers (fail closed, loudly).
+      SOVRA_KMS_WORKLOAD: ${SOVRA_KMS_WORKLOAD:?SOVRA_KMS_WORKLOAD is required}
+      SOVRA_KMS_IMAGE_DIGEST: ${SOVRA_KMS_IMAGE_DIGEST:?SOVRA_KMS_IMAGE_DIGEST is required}
+      SOVRA_KMS_LOCATION: ${SOVRA_KMS_LOCATION:?SOVRA_KMS_LOCATION is required}
+      # PROD-005 file verifier keys (mounted read-only, vault-agent
+      # shape). Rotation: add the new decryption pair as current with
+      # the old as previous (comma lists, same order), rolling
+      # restart, drain, then drop the previous pair and restart.
+      SOVRA_OPENID_KEYS: file
+      SOVRA_OPENID_SIGNING_KEY_PATH: /run/sovra/keys/vp-sign.pem
+      SOVRA_OPENID_SIGNING_KID: ${SOVRA_OPENID_SIGNING_KID:?SOVRA_OPENID_SIGNING_KID is required}
+      SOVRA_OPENID_DECRYPTION_KEY_PATHS: /run/sovra/keys/vp-dec-current.pem
+      SOVRA_OPENID_DECRYPTION_KIDS: ${SOVRA_OPENID_DECRYPTION_KIDS:?SOVRA_OPENID_DECRYPTION_KIDS is required}
+      SOVRA_BFF_ENABLED: "true"
+      SOVRA_BFF_ISSUER: ${SOVRA_BFF_ISSUER:?SOVRA_BFF_ISSUER is required}
+      SOVRA_BFF_ISSUER_URI: ${SOVRA_BFF_ISSUER:?SOVRA_BFF_ISSUER is required}
+      SOVRA_BFF_CLIENT_ID: sovra-bff
+      SOVRA_BFF_CLIENT_SECRET: ${SOVRA_BFF_CLIENT_SECRET:?SOVRA_BFF_CLIENT_SECRET is required}
+      SOVRA_BFF_REDIRECT_URI: ${SOVRA_BFF_REDIRECT_URI:?SOVRA_BFF_REDIRECT_URI is required}
+      SOVRA_BFF_POST_LOGOUT_URI: ${SOVRA_BFF_POST_LOGOUT_URI:?SOVRA_BFF_POST_LOGOUT_URI is required}
+      SOVRA_BFF_END_SESSION: ${SOVRA_BFF_END_SESSION:?SOVRA_BFF_END_SESSION is required}
+      SOVRA_BFF_REQUIRE_HTTPS_ISSUER: "true"
+      SOVRA_BFF_TENANT_SLUGS: ${SOVRA_BFF_TENANT_SLUGS:?SOVRA_BFF_TENANT_SLUGS is required}
+      # Public-demo control, NOT production: production accepts real
+      # operator uploads, so this stays false; SOVRA_MODE=production
+      # is what refuses synthetic configuration and data.
+      SOVRA_DEMO_SYNTHETIC_ONLY: "false"
+      # Charge prevention pinned in the file (PROD-002): live AI is
+      # off with empty credentials; enabling it is a conscious,
+      # budgeted change (PROD-012).
+      SOVRA_AI_LIVE_ENABLED: "false"
+      SOVRA_AI_BASE_URL: ""
+      SOVRA_AI_MODEL: ""
+      SOVRA_AI_API_KEY: ""
+      # Fleet live-AI budgets (PROD-012): disarmed at 0. Funding any
+      # of these requires the capacity-committee sign-off recorded in
+      # the capacity contract; the startup gate refuses armed-but-
+      # unfunded boot.
+      SOVRA_AI_BUDGET_DAILY_REQUESTS: "0"
+      SOVRA_AI_BUDGET_DAILY_TOKENS: "0"
+      SOVRA_AI_BUDGET_MAX_CONCURRENCY: "0"
+      SOVRA_AI_BUDGET_LEASE_SECONDS: "120"
+      # Fleet scrape/health (PROD-011): unpublished, internal only.
+      SOVRA_MANAGEMENT_PORT: 8091
+      # Graceful drain: SIGTERM stops intake, in-flight requests get
+      # 30s, then the container is killed at 45s.
+      SERVER_SHUTDOWN: graceful
+      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 30s
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0"
+    healthcheck:
+      # Traffic readiness, not liveness: the semantic /ready probe
+      # (every dependency UP) is what admits this replica to ingress.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    volumes:
+      # Verifier key files (PROD-005): provisioned by the vault
+      # agent, read-only, never committed.
+      - /run/sovra/keys:/run/sovra/keys:ro
+    stop_grace_period: 45s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+    networks:
+      - sovra-front
+      - sovra-back
+
+  app-b:
+    image: ${SOVRA_IMAGE:-sovra-backend}:${SOVRA_VERSION:?SOVRA_VERSION is required}
+    environment:
+      SOVRA_DB_URL: jdbc:postgresql://db:5432/sovra
+      SOVRA_DB_USER: sovra_app
+      SOVRA_DB_PASSWORD: ${SOVRA_APP_DB_PASSWORD:?SOVRA_APP_DB_PASSWORD is required}
+      SOVRA_MIGRATE_ON_BOOT: "false"
+      SOVRA_MODE: production
+      SOVRA_SIGNER: kms
+      SOVRA_PROFILE: sdjwt-vc
+      SOVRA_SYNTHETIC_ISSUERS_ENABLED: "false"
+      SOVRA_VAULT_KEK: kms
+      # No vault seed variable. PROD-005 attested KMS identity: every
+      # production key call presents workload/image/location to the
+      # provider; the G2 provider bean itself is still pending, so
+      # kms-mode boot fails until it registers (fail closed, loudly).
+      SOVRA_KMS_WORKLOAD: ${SOVRA_KMS_WORKLOAD:?SOVRA_KMS_WORKLOAD is required}
+      SOVRA_KMS_IMAGE_DIGEST: ${SOVRA_KMS_IMAGE_DIGEST:?SOVRA_KMS_IMAGE_DIGEST is required}
+      SOVRA_KMS_LOCATION: ${SOVRA_KMS_LOCATION:?SOVRA_KMS_LOCATION is required}
+      # PROD-005 file verifier keys (mounted read-only, vault-agent
+      # shape). Rotation: add the new decryption pair as current with
+      # the old as previous (comma lists, same order), rolling
+      # restart, drain, then drop the previous pair and restart.
+      SOVRA_OPENID_KEYS: file
+      SOVRA_OPENID_SIGNING_KEY_PATH: /run/sovra/keys/vp-sign.pem
+      SOVRA_OPENID_SIGNING_KID: ${SOVRA_OPENID_SIGNING_KID:?SOVRA_OPENID_SIGNING_KID is required}
+      SOVRA_OPENID_DECRYPTION_KEY_PATHS: /run/sovra/keys/vp-dec-current.pem
+      SOVRA_OPENID_DECRYPTION_KIDS: ${SOVRA_OPENID_DECRYPTION_KIDS:?SOVRA_OPENID_DECRYPTION_KIDS is required}
+      SOVRA_BFF_ENABLED: "true"
+      SOVRA_BFF_ISSUER: ${SOVRA_BFF_ISSUER:?SOVRA_BFF_ISSUER is required}
+      SOVRA_BFF_ISSUER_URI: ${SOVRA_BFF_ISSUER:?SOVRA_BFF_ISSUER is required}
+      SOVRA_BFF_CLIENT_ID: sovra-bff
+      SOVRA_BFF_CLIENT_SECRET: ${SOVRA_BFF_CLIENT_SECRET:?SOVRA_BFF_CLIENT_SECRET is required}
+      SOVRA_BFF_REDIRECT_URI: ${SOVRA_BFF_REDIRECT_URI:?SOVRA_BFF_REDIRECT_URI is required}
+      SOVRA_BFF_POST_LOGOUT_URI: ${SOVRA_BFF_POST_LOGOUT_URI:?SOVRA_BFF_POST_LOGOUT_URI is required}
+      SOVRA_BFF_END_SESSION: ${SOVRA_BFF_END_SESSION:?SOVRA_BFF_END_SESSION is required}
+      SOVRA_BFF_REQUIRE_HTTPS_ISSUER: "true"
+      SOVRA_BFF_TENANT_SLUGS: ${SOVRA_BFF_TENANT_SLUGS:?SOVRA_BFF_TENANT_SLUGS is required}
+      SOVRA_DEMO_SYNTHETIC_ONLY: "false"
+      SOVRA_AI_LIVE_ENABLED: "false"
+      SOVRA_AI_BASE_URL: ""
+      SOVRA_AI_MODEL: ""
+      SOVRA_AI_API_KEY: ""
+      # Fleet live-AI budgets (PROD-012): disarmed at 0. Funding any
+      # of these requires the capacity-committee sign-off recorded in
+      # the capacity contract; the startup gate refuses armed-but-
+      # unfunded boot.
+      SOVRA_AI_BUDGET_DAILY_REQUESTS: "0"
+      SOVRA_AI_BUDGET_DAILY_TOKENS: "0"
+      SOVRA_AI_BUDGET_MAX_CONCURRENCY: "0"
+      SOVRA_AI_BUDGET_LEASE_SECONDS: "120"
+      SOVRA_MANAGEMENT_PORT: 8091
+      SERVER_SHUTDOWN: graceful
+      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 30s
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    volumes:
+      # Verifier key files (PROD-005): provisioned by the vault
+      # agent, read-only, never committed.
+      - /run/sovra/keys:/run/sovra/keys:ro
+    stop_grace_period: 45s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+    networks:
+      - sovra-front
+      - sovra-back
+
+  # PROD-004 production Keycloak: optimized build over durable
+  # PostgreSQL, TLS everywhere, exact hostnames, private admin. No
+  # demo users, no file store, never the developer boot mode. See
+  # deploy/production/keycloak/keycloak-prod.md for provisioning,
+  # bootstrap removal, rotation, and recovery.
+  keycloak:
+    build:
+      context: ../..
+      dockerfile: deploy/production/keycloak/Dockerfile
+    image: ${SOVRA_KEYCLOAK_IMAGE:-sovra-keycloak}:${SOVRA_VERSION:?SOVRA_VERSION is required}
+    command:
+      - start
+      - --optimized
+      - --hostname=${SOVRA_KC_HOSTNAME:?SOVRA_KC_HOSTNAME is required}
+      - --https-certificate-file=/run/sovra/tls/login.crt
+      - --https-certificate-key-file=/run/sovra/tls/login.key
+      - --http-management-port=9000
+      - --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${SOVRA_KC_DB_PASSWORD:?SOVRA_KC_DB_PASSWORD is required}
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: "true"
+      # One-time bootstrap: set for first boot, provision real
+      # admins, DELETE the bootstrap user, then UNSET these (leaving
+      # them recreates the bootstrap account on restart).
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${SOVRA_KC_BOOTSTRAP_ADMIN:?set for first boot, unset after}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${SOVRA_KC_BOOTSTRAP_PASSWORD:?set for first boot, unset after}
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+      - /run/sovra/tls:/run/sovra/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+    networks:
+      - sovra-front
+      - sovra-back
+
+networks:
+  # Ingress <-> apps <-> keycloak. No published ports here either:
+  # the platform ingress attaches to this network or routes to it.
+  sovra-front: {}
+  # Data plane only. internal:true blocks all egress: the databases
+  # and the migration job cannot reach the internet even if asked.
+  sovra-back:
+    internal: true
+
+volumes:
+  sovra-prod-pgdata:
+    name: sovra-prod-pgdata
+  sovra-prod-kc-pgdata:
+    name: sovra-prod-kc-pgdata
+  sovra-prod-wal:
+    name: sovra-prod-wal
+  sovra-prod-backups:
+    name: sovra-prod-backups

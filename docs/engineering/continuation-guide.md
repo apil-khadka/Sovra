@@ -1,9 +1,11 @@
 # Implementation status and continuation guide
 
-**Reviewed:** 2026-10-30.
+**Reviewed:** 2026-11-02.
 **Scope:** public demo with synthetic identities/documents only and no new paid services.
 Passing synthetic checks does not authorize publication, real identity-data use or production claims.
 Use this guide with the [implementation plan](implementation-plan.md), [task registry](implementation-tasks.json) and dated assessments.
+The [production and capacity assessment](production-readiness.md) records the current readiness gaps and the new PROD-001 through PROD-017 work breakdown.
+Capacity remains unqualified; a two-instance local harness is not a supported-user or high-availability claim.
 
 ## Current implementation
 
@@ -19,9 +21,9 @@ See [browser evidence](sov-041-browser-e2e.md) and [packaging](sov-041-same-orig
 
 The protocol implementation includes SD-JWT artifacts and `kb+jwt`, synthetic OpenID4VCI grants, signed OpenID4VP requests, DCQL and encrypted `direct_post.jwt` responses.
 Separate JOSE wallet fixtures and backend adversarial suites exercise those adapters.
-The [OpenID demo wallet](sov-041-browser-wallet.md) adds in-memory browser VCI pre-authorized issuance, explicit consent, signed-request checks, encrypted VP submission and replay.
+The [OpenID demo wallet](sov-041-browser-wallet.md) adds in-memory browser VCI pre-authorized and authorization-code issuance with browser-owned PKCE, explicit consent, signed-request checks, encrypted VP submission and replay.
 The native verifier screen retains its synthetic binding.
-Authorization-code/PKCE browser coverage, external wallet/conformance evidence and full qualification remain open; see [SOV-036](sov-036-protocol-assessment.md).
+Both grant paths have repository browser tests; external wallet/conformance evidence, production key/status services and full qualification remain open; see [SOV-036](sov-036-protocol-assessment.md).
 
 Vault and quarantine service entry points reject caller ingestion when `SOVRA_DEMO_SYNTHETIC_ONLY=true`.
 The public-demo Compose overlay forces this boundary and disables live planning on both application instances.
@@ -37,6 +39,15 @@ No cumulative usage ledger currently enforces an aggregate budget across applica
 Use the [live integration record](../ai/live-integration.md) for the remaining evidence and operating rules.
 
 ## Verification baseline
+
+The fresh 2026-11-02 full backend build passed 738 tests across 127 report suites with zero failures/errors/skips.
+Frontend typecheck/lint, the Playwright browser suite (34 passed, 5 skipped), and the demo smoke flows (45 checks) passed.
+Both app replicas answer READY; BFF login sessions are shared in PostgreSQL, so a session created on app A works on app B (PROD-003).
+Production KMS signing/wrapping seams are implemented with attested call contexts, but no G2 provider bean is registered yet, so kms-mode boot refuses by design (PROD-005).
+A synthetic arrival-rate load harness is committed with a 600-offer smoke run showing zero 5xx/timeouts and honest 429 capacity denials (PROD-016).
+These results use synthetic local data and do not establish throughput, deployed security, failover or external interoperability.
+
+Historical baseline:
 
 The clean 2026-10-30 Java 25 build passed 498 tests with zero failures/errors/skips, including durable-denial and nested tenant-pin regressions.
 An earlier 501-test report does not match that clean baseline; do not reuse retained report totals as new evidence.
@@ -85,7 +96,7 @@ The HTTP suites also rebuild/restart services, so qualify isolation, ports, orig
    Keep the continuation records consistent with implemented behavior and fresh evidence.
    Exclude `.intel` and secrets before any authorized commit or push.
 2. Complete the remaining SOV-036/041 qualification.
-   Extend the implemented pre-authorized browser wallet to the authorization-code/PKCE grant and remaining profile cases.
+   Preserve the implemented pre-authorized and authorization-code/PKCE browser wallet flows and extend the remaining profile cases.
    Preserve consent, trust/status freshness, RLS, audit and durable replay through the adapters.
    Add browser-visible tampering, expiry and wrong-holder/audience failures alongside the existing HTTP concurrency/restart tests.
    Qualify external wallet/conformance compatibility and record exact library adoption or incompatibilities.
@@ -98,10 +109,10 @@ The HTTP suites also rebuild/restart services, so qualify isolation, ports, orig
    Implement shared admission, concurrency and cumulative usage reservations across both instances.
    Per-request token limits and spend alerts do not constitute an aggregate cap.
    Complete the frozen baseline/live evaluation only within a verified no-charge call/token budget.
-5. Build SOV-018 extraction/provenance and SOV-019 enrollment review as the next product vertical slice.
-   Bind protected exact-byte/normalized digests and immutable extraction revisions to source versions, corrections and reviewer eligibility.
-   Require eligible approved claims at issuance; OCR/job completion must never confer identity approval.
-   Follow with holder custody/recovery, SDKs, portals and role dashboards.
+5. Promote the existing SOV-018/019 extraction/enrollment, holder custody, SDKs, portals and role dashboards toward production rather than rebuilding them.
+   Follow the [production work breakdown](implementation-backlog.md#production-readiness-work-breakdown), beginning with capacity objectives, shared sessions, admission, JDBC budgets, query profiling and fleet observability.
+   Qualify parallel workers, storage lifecycle, recovery and release artifacts before capacity expansion.
+   Complete production key/profile services, device custody/recovery, accredited organization onboarding and independent release gates before real identity use.
 
 Production KMS/HSM, sovereign deployment qualification and independent assessment remain real-data gates.
 They do not prevent continued labelled synthetic implementation.

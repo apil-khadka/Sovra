@@ -11,6 +11,7 @@ Architecture documents describe intended behavior rather than implemented guaran
 ## Start here
 
 - [Current status and continuation guide](docs/engineering/continuation-guide.md): what exists, remaining launch gates, next implementation steps and safe verification.
+- [Production readiness and capacity assessment](docs/engineering/production-readiness.md): implemented capabilities, verified gaps, proposed load objectives and 17 prioritized production work items (13 done, 3 in progress, 1 pending — see the [task backlog](docs/engineering/implementation-backlog.md) for status and evidence).
 
 - [Documentation index](docs/README.md): product scope, architecture, requirements, and implementation plan.
 - [Software Requirements Specification](docs/requirements/software-requirements-specification.md): business scope, testable requirements, security, and release acceptance.

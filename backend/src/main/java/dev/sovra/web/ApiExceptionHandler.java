@@ -25,7 +25,6 @@ import dev.sovra.trust.InvalidProposalException;
 import dev.sovra.trust.ProposalNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -72,7 +71,7 @@ public class ApiExceptionHandler {
     detail.put("title", code);
     detail.put("status", status.value());
     detail.put("code", code);
-    detail.put("correlationId", UUID.randomUUID().toString());
+    detail.put("correlationId", CorrelationIds.currentOrRandom());
     detail.put("retryable", retryable);
     return ResponseEntity.status(status).contentType(PROBLEM_JSON).body(detail);
   }
@@ -90,6 +89,8 @@ public class ApiExceptionHandler {
     dev.sovra.extraction.ExtractionNotFoundException.class,
     dev.sovra.enrollment.EnrollmentNotFoundException.class,
     dev.sovra.custody.HolderCustodyNotFoundException.class,
+    dev.sovra.auth.AccreditationService.AccreditationNotFoundException.class,
+    dev.sovra.tenancy.TenantHoldService.TenantHoldNotFoundException.class,
     dev.sovra.openid.OpenIdNotFoundException.class
   })
   public ResponseEntity<Void> notFound() {
@@ -113,6 +114,18 @@ public class ApiExceptionHandler {
     }
     return ResponseEntity.status(HttpStatus.FORBIDDEN)
         .body(Map.of("error", "forbidden", "reason", e.reasonCode().name()));
+  }
+
+  @ExceptionHandler(dev.sovra.bff.StepUpRequiredException.class)
+  public ResponseEntity<Object> stepUpRequired(HttpServletRequest request) {
+    // PROD-015: the caller's session is valid but its
+    // authentication is too old or too weak for a privileged
+    // decision. 401, not 403: re-authentication fixes it.
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.UNAUTHORIZED, "step_up_required", false);
+    }
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        .body(Map.of("error", "step_up_required"));
   }
 
   @ExceptionHandler(dev.sovra.bff.HolderUnlockException.class)
@@ -140,6 +153,7 @@ public class ApiExceptionHandler {
     InvalidPlanningException.class,
     dev.sovra.openid.InvalidOpenIdRequestException.class,
     dev.sovra.auth.ServiceAccountService.InvalidServiceAccountException.class,
+    dev.sovra.auth.AccreditationService.InvalidAccreditationException.class,
     AuditCursorException.class,
     GuardRejectedException.class,
     MalformedPlanException.class,
@@ -172,6 +186,26 @@ public class ApiExceptionHandler {
     }
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "service_account_conflict"));
+  }
+
+  @ExceptionHandler(dev.sovra.vault.VaultLegalHoldException.class)
+  public ResponseEntity<Object> legalHold(HttpServletRequest request) {
+    // PROD-010: destruction refused for a held tenant. 409, not
+    // 403: the caller is authorized, the object is frozen.
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.CONFLICT, "legal_hold", false);
+    }
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "legal_hold"));
+  }
+
+  @ExceptionHandler(
+      dev.sovra.auth.AccreditationService.AccreditationConflictException.class)
+  public ResponseEntity<Object> accreditationConflict(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.CONFLICT, "accreditation_conflict", false);
+    }
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(Map.of("error", "accreditation_conflict"));
   }
 
   @ExceptionHandler(dev.sovra.vault.VaultConflictException.class)
@@ -210,6 +244,23 @@ public class ApiExceptionHandler {
         .body(Map.of("error", "planning_unavailable"));
   }
 
+  @ExceptionHandler({
+    org.springframework.dao.QueryTimeoutException.class,
+    org.springframework.jdbc.CannotGetJdbcConnectionException.class,
+    org.springframework.transaction.TransactionTimedOutException.class
+  })
+  public ResponseEntity<Object> deadlineExceeded(HttpServletRequest request) {
+    // PROD-007: pool exhaustion and statement/transaction deadlines
+    // are typed dependency failures with retry guidance — never a
+    // bare 500. Narrow on purpose: other data exceptions stay 500s
+    // so SQL bugs cannot hide behind "retryable".
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.SERVICE_UNAVAILABLE, "dependency_unavailable", true);
+    }
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body(Map.of("error", "dependency_unavailable"));
+  }
+
   @ExceptionHandler(dev.sovra.issuance.KmsUnavailableException.class)
   public ResponseEntity<Object> kmsUnavailable(HttpServletRequest request) {
     if (wantsProblem(request)) {
@@ -217,6 +268,42 @@ public class ApiExceptionHandler {
     }
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .body(Map.of("error", "kms_unavailable"));
+  }
+
+  @ExceptionHandler(dev.sovra.planning.AiBudgetExhaustedException.class)
+  public ResponseEntity<Object> aiBudgetExhausted(HttpServletRequest request) {
+    // PROD-012: the day budget resets at UTC midnight, so the honest
+    // Retry-After is the seconds remaining in the UTC day. Distinct
+    // code from rate_limited (request-rate) and quota_exceeded
+    // (storage): this is metered-spend capacity.
+    long retryAfter =
+        java.time.Duration.between(
+                java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
+                    .toLocalTime(),
+                java.time.LocalTime.MAX)
+            .getSeconds();
+    if (wantsProblem(request)) {
+      ResponseEntity<Object> body =
+          problem(HttpStatus.TOO_MANY_REQUESTS, "ai_budget_exhausted", true);
+      return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+          .contentType(PROBLEM_JSON)
+          .header("Retry-After", Long.toString(Math.max(1, retryAfter)))
+          .body(body.getBody());
+    }
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header("Retry-After", Long.toString(Math.max(1, retryAfter)))
+        .body(Map.of("error", "ai_budget_exhausted"));
+  }
+
+  @ExceptionHandler(dev.sovra.vault.VaultQuotaExceededException.class)
+  public ResponseEntity<Object> quotaExceeded(HttpServletRequest request) {
+    // PROD-010: quota exhaustion is a 429 the caller cannot retry
+    // through — capacity, not rate. Distinct code from rate_limited.
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.TOO_MANY_REQUESTS, "quota_exceeded", false);
+    }
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .body(Map.of("error", "quota_exceeded"));
   }
 
   @ExceptionHandler(AlreadyDecidedException.class)
@@ -246,8 +333,11 @@ public class ApiExceptionHandler {
         .body(Map.of("error", "internal"));
   }
 
-  @ExceptionHandler(SigningRefusedException.class)
-  public ResponseEntity<Object> signingRefused(SigningRefusedException e, HttpServletRequest request) {
+  @ExceptionHandler({
+    SigningRefusedException.class,
+    dev.sovra.kms.KmsDeniedException.class
+  })
+  public ResponseEntity<Object> signingRefused(Exception e, HttpServletRequest request) {
     log.error("signer refused a signing call", e);
     if (wantsProblem(request)) {
       return problem(HttpStatus.INTERNAL_SERVER_ERROR, "internal", false);
@@ -330,6 +420,15 @@ public class ApiExceptionHandler {
     }
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "holder_custody_conflict"));
+  }
+
+  @ExceptionHandler(dev.sovra.admission.BodyTooLargeException.class)
+  public ResponseEntity<Object> bodyTooLarge(HttpServletRequest request) {
+    if (wantsProblem(request)) {
+      return problem(HttpStatus.PAYLOAD_TOO_LARGE, "body_too_large", false);
+    }
+    return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+        .body(Map.of("error", "body_too_large"));
   }
 
   @ExceptionHandler(dev.sovra.vault.VaultAuthenticationException.class)

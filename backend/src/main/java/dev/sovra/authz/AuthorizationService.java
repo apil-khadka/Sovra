@@ -66,6 +66,21 @@ public class AuthorizationService {
           Map.entry(Action.READ_SERVICE_ACCOUNT, EnumSet.of(Role.TRUST_ADMIN)),
           Map.entry(Action.ROTATE_SERVICE_ACCOUNT, EnumSet.of(Role.TRUST_ADMIN)),
           Map.entry(Action.REVOKE_SERVICE_ACCOUNT, EnumSet.of(Role.TRUST_ADMIN)),
+          // Accredited onboarding (PROD-015): operators request,
+          // trust admins decide, everyone involved reads.
+          Map.entry(
+              Action.ACCREDIT_REQUEST, EnumSet.of(Role.TENANT_MEMBER, Role.ISSUER_OPS)),
+          Map.entry(Action.ACCREDIT_DECIDE, EnumSet.of(Role.TRUST_ADMIN)),
+          Map.entry(
+              Action.ACCREDIT_READ,
+              EnumSet.of(Role.TENANT_MEMBER, Role.ISSUER_OPS, Role.AUDIT_READER,
+                  Role.TRUST_ADMIN)),
+          // Legal hold (PROD-010): trust admins set and release
+          // holds on any tenant (platform power, like trust
+          // administration); auditors read the hold register.
+          Map.entry(Action.TENANT_SET_HOLD, EnumSet.of(Role.TRUST_ADMIN)),
+          Map.entry(
+              Action.TENANT_READ_HOLD, EnumSet.of(Role.TRUST_ADMIN, Role.AUDIT_READER)),
           // Vault (SOV-016): issuer workers ingest and grant; members
           // read only through a live grant; relying parties never see
           // source (INV-11); auditors see metadata, never content; key

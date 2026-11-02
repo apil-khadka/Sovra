@@ -117,12 +117,18 @@ public class TelemetryService {
   /**
    * Reason metrics from the durable audit log (RLS applies): counts by
    * action, decision, and reason code for the caller's tenant. Actions and
-   * codes are fixed identifiers, safe to report.
+   * codes are fixed identifiers, safe to report. PROD-010: aggregates
+   * the live table and the archive, so archival never rewrites
+   * history.
    */
   public List<Map<String, Object>> reasonCounts(UUID tenantId) {
     return tenant.query(
-        "SELECT action, decision, reason_code, COUNT(*) AS n FROM audit_event"
-            + " WHERE tenant_id = ? GROUP BY action, decision, reason_code"
+        "SELECT action, decision, reason_code, COUNT(*) AS n FROM ("
+            + "SELECT action, decision, reason_code FROM audit_event WHERE tenant_id = ?"
+            + " UNION ALL"
+            + " SELECT action, decision, reason_code FROM audit_event_archive"
+            + " WHERE tenant_id = ?) events"
+            + " GROUP BY action, decision, reason_code"
             + " ORDER BY action, decision, reason_code",
         (rs, row) -> {
           Map<String, Object> entry = new LinkedHashMap<>();
@@ -132,6 +138,7 @@ public class TelemetryService {
           entry.put("count", rs.getLong("n"));
           return entry;
         },
+        tenantId,
         tenantId);
   }
 

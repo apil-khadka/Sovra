@@ -175,8 +175,12 @@ class BffHolderDeskFlowTests extends SovraAppRoleBase {
 
     // A bad proof never unlocks, and locking re-arms the refusal.
     BffTestSessions.Session other = login(List.of("sovra-members"));
+    HttpResponse<String> otherChallenge = sessionGet("/api/bff/holder/challenge", other);
+    String otherValue = mapper.readTree(otherChallenge.body()).get("challenge").asString();
     HttpResponse<String> denied = postJson("/api/bff/holder/unlock", other, Map.of(
-        "holderJwk", mapper.convertValue(holder.jwk(), Map.class), "proof", "bogus"));
+        "holderJwk", mapper.convertValue(holder.jwk(), Map.class),
+        "proof", "bogus",
+        "challenge", otherValue));
     assertThat(denied.statusCode()).isEqualTo(400);
     assertThat(postJson("/api/bff/holder/lock", member, Map.of()).statusCode()).isEqualTo(200);
     assertThat(sessionGet("/api/bff/holder/cases", member).statusCode()).isEqualTo(403);
@@ -268,7 +272,9 @@ class BffHolderDeskFlowTests extends SovraAppRoleBase {
         "holder-unlock/v1\n" + value + "\n" + IssuanceFixtures.thumbprint(holder),
         mapper);
     HttpResponse<String> unlocked = postJson("/api/bff/holder/unlock", session, Map.of(
-        "holderJwk", mapper.convertValue(holder.jwk(), Map.class), "proof", proof));
+        "holderJwk", mapper.convertValue(holder.jwk(), Map.class),
+        "proof", proof,
+        "challenge", value));
     assertThat(unlocked.statusCode()).isEqualTo(200);
     assertThat(unlocked.body()).contains(IssuanceFixtures.thumbprint(holder));
   }

@@ -719,8 +719,10 @@ paths:
         Recover a reported key (SOV-020, OD-09): requires a trust
         admin, a still-eligible live enrollment, and a possession
         proof from the fresh replacement key over the recovery id.
-        Activates the new key and closes the case; reissuance uses
-        normal issuance, never resurrection.
+        Activates the new key and closes the case; an optional
+        device label binds the fresh key to a named replacement
+        device. Reissuance is recovery-scoped (see
+        /api/holder-recoveries), never resurrection.
       requestBody:
         required: true
         content:
@@ -739,6 +741,12 @@ paths:
                     ES256 JWS by the replacement key over
                     holder-recovery, the recovery id, and the new
                     thumbprint
+                deviceLabel:
+                  type: string
+                  description: >-
+                    Optional replacement device label (1-64 chars);
+                    blank keeps key-level recovery without device
+                    facts
       responses:
         '200': { description: '{recoveryId, newThumbprint}' }
         '400': { description: Malformed key or missing/invalid proof }
@@ -2656,6 +2664,315 @@ paths:
         '200': { description: '{total, accepted, rejected, unknown}' }
         '401': { description: No live session }
         '403': { description: Lacks TENANT_MEMBER }
+  /api/holder-devices/report:
+    post:
+      operationId: reportHolderDevice
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Report a holder device lost, stolen, or compromised
+        (PROD-015). The device flips to LOST/STOLEN/COMPROMISED,
+        every live key on it gets its own recovery case, and every
+        credential those keys authorize revokes at once, linked to
+        its case for scoped reissuance.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, reason]
+              properties:
+                deviceId: { type: string, format: uuid }
+                reason: { type: string, description: loss, theft, or compromise }
+      responses:
+        '200': { description: '{deviceId, status, cases[], revokedCredentials}' }
+        '400': { description: Bad reason }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown device }
+        '409': { description: Device already reported }
+  /api/holder-recoveries/{id}/reissue-plan:
+    get:
+      operationId: reissuePlan
+      x-sovra-scopes: [ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: >-
+        Recovery-scoped reissue plan (PROD-015): the exact
+        credentials the report killed, with the deterministic
+        idempotency key each reissue must use. Only linked REVOKED
+        rows are reissuable; earlier independent revocations stay
+        dead. Requires a completed recovery.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{recoveryId, enrollmentEligible, eligibilityReason, items[]}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a custody-reading role }
+        '404': { description: Unknown recovery }
+        '409': { description: Recovery is not complete }
+  /api/holder-recoveries/{id}/reissue:
+    post:
+      operationId: reissueRecovery
+      x-sovra-scopes: [ISSUER_OPS]
+      summary: >-
+        Recovery-scoped reissuance (PROD-015): replaces exactly the
+        report-linked credentials under fresh holder proofs from the
+        replacement key. Separation of duties is structural — trust
+        admins recover, issuer ops reissue — and the batch is
+        all-or-nothing. Validity anchors to the recovery event; each
+        minted credential chains to the revoked id it replaces.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                proofs:
+                  type: object
+                  description: Map of credential id to ES256 issuance proof by the new key
+                  additionalProperties: { type: string }
+      responses:
+        '200': { description: '{recoveryId, credentials[{oldCredentialId, newCredentialId}]}' }
+        '400': { description: Missing proof or proof by the wrong key }
+        '401': { description: Anonymous }
+        '403': { description: Lacks ISSUER_OPS }
+        '404': { description: Unknown recovery }
+        '409': { description: Recovery incomplete, replacement key inactive, or case no longer qualifies }
+  /api/accreditations:
+    post:
+      operationId: requestAccreditation
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS]
+      summary: >-
+        Request accredited RP onboarding (PROD-015) with an exact
+        contract: roles (RP_CLIENT with optional TENANT_MEMBER),
+        exact https origins, and exact https audiences. No
+        wildcards; operator roles are not accreditable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orgName]
+              properties:
+                orgName: { type: string }
+                roles: { type: array, items: { type: string } }
+                origins: { type: array, items: { type: string } }
+                audiences: { type: array, items: { type: string } }
+      responses:
+        '200': { description: '{accreditationId, orgName, roles, origins, audiences, state, ...}' }
+        '400': { description: Loose or unknown contract terms }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a requesting role }
+    get:
+      operationId: listAccreditations
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: List the tenant's accreditation cases, oldest first.
+      responses:
+        '200': { description: '{accreditations[]}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a reading role }
+  /api/accreditations/{id}:
+    get:
+      operationId: readAccreditation
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: Read one accreditation case. Never repeats the one-time token.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{accreditationId, orgName, roles, origins, audiences, state, ...}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a reading role }
+        '404': { description: Unknown accreditation }
+  /api/accreditations/{id}/approve:
+    post:
+      operationId: approveAccreditation
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Approve an accreditation (PROD-015): mints the bound,
+        expiring bearer credential with the exact roles, origins,
+        and audiences. The plaintext token appears exactly once, in
+        this response. Machine path for break-glass automation; the
+        interactive path additionally requires step-up.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresAt: { type: string, format: date-time, description: Optional earlier expiry }
+      responses:
+        '200': { description: '{..., state APPROVED, credentialId, oneTimeToken}' }
+        '400': { description: Expiry is not in the future }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown accreditation }
+        '409': { description: Accreditation already decided }
+  /api/accreditations/{id}/reject:
+    post:
+      operationId: rejectAccreditation
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Reject a requested accreditation. Terminal; mints nothing.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{..., state REJECTED}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown accreditation }
+        '409': { description: Accreditation already decided }
+  /api/accreditations/{id}/revoke:
+    post:
+      operationId: revokeAccreditation
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Revoke an approved accreditation (PROD-015): the bearer
+        stops authenticating immediately, and the case never leaves
+        REVOKED.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{..., state REVOKED}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown accreditation }
+        '409': { description: Accreditation is not revocable }
+  /api/bff/accreditations:
+    get:
+      operationId: bffListAccreditations
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: List the tenant's accreditation cases for the trust-admin console.
+      security: [{ bffSession: [] }]
+      responses:
+        '200': { description: '{accreditations[]}' }
+        '401': { description: No live session }
+        '403': { description: Lacks a reading role }
+  /api/bff/accreditations/{id}:
+    get:
+      operationId: bffReadAccreditation
+      x-sovra-scopes: [TENANT_MEMBER, ISSUER_OPS, AUDIT_READER, TRUST_ADMIN]
+      summary: Read one accreditation case for the trust-admin console.
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{accreditationId, orgName, roles, origins, audiences, state, ...}' }
+        '401': { description: No live session }
+        '403': { description: Lacks a reading role }
+        '404': { description: Unknown accreditation }
+  /api/bff/accreditations/{id}/approve:
+    post:
+      operationId: bffApproveAccreditation
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Interactive accreditation approval (PROD-015): mints the
+        bound credential, but only with step-up — the session must
+        carry a hardware-bound method and an authentication fresher
+        than 15 minutes, else step_up_required.
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresAt: { type: string, format: date-time, description: Optional earlier expiry }
+      responses:
+        '200': { description: '{..., state APPROVED, credentialId, oneTimeToken}' }
+        '400': { description: Expiry is not in the future }
+        '401': { description: No live session, or step_up_required }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown accreditation }
+        '409': { description: Accreditation already decided }
+  /api/tenants/holds:
+    get:
+      operationId: listTenantHolds
+      x-sovra-scopes: [TRUST_ADMIN, AUDIT_READER]
+      summary: >-
+        List the legal-hold register (PROD-010): every tenant with
+        its hold flag.
+      responses:
+        '200': { description: '{holds[{tenantId, slug, legalHold}]}' }
+        '401': { description: Anonymous }
+        '403': { description: Lacks a hold-reading role }
+  /api/tenants/{id}/legal-hold:
+    put:
+      operationId: setTenantHold
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: >-
+        Set or release a tenant's legal hold (PROD-010). A hold
+        suspends vault destruction and audit archival for the
+        tenant; protocol-state purges continue. Platform power,
+        audited with the target tenant.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [held]
+              properties:
+                held: { type: boolean }
+      responses:
+        '200': { description: '{tenantId, slug, legalHold}' }
+        '400': { description: Missing held flag }
+        '401': { description: Anonymous }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown tenant }
+  /api/bff/accreditations/{id}/reject:
+    post:
+      operationId: bffRejectAccreditation
+      x-sovra-scopes: [TRUST_ADMIN]
+      summary: Interactive accreditation rejection under the same step-up as approval.
+      security: [{ bffSession: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: '{..., state REJECTED}' }
+        '401': { description: No live session, or step_up_required }
+        '403': { description: Lacks TRUST_ADMIN }
+        '404': { description: Unknown accreditation }
+        '409': { description: Accreditation already decided }
 components:
   securitySchemes:
     bearerAuth:

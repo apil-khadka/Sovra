@@ -142,6 +142,23 @@ class QuarantineWorkerContainmentTests extends SovraPostgresBase {
   }
 
   @Test
+  void workerRequeuesStaleScans() throws Exception {
+    // PROD-009: the verdict policy widens by exactly one
+    // transition, SCANNING -> QUARANTINED, so the sweep can rescue
+    // rows orphaned by a dead worker.
+    UUID admission = seedAdmission("SCANNING");
+    int updated;
+    try (Statement stmt = worker.createStatement()) {
+      updated = stmt.executeUpdate(
+          "UPDATE quarantine_admission SET status = 'QUARANTINED', claimed_at = NULL,"
+              + " claimed_by = '', verdict = 'requeued-after-lease'"
+              + " WHERE id = '" + admission + "'");
+    }
+    assertThat(updated).isEqualTo(1);
+    assertThat(admissionStatus(admission)).isEqualTo("QUARANTINED");
+  }
+
+  @Test
   void workerCannotRewriteIdentityColumns() {
     UUID admission = seedAdmission("QUARANTINED");
     assertThatThrownBy(() -> {

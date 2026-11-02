@@ -92,12 +92,14 @@ class FlowReadinessTests {
         new HealthController(
             "0.1.0",
             new FlowReadinessService(
-                List.of(fixed("a", CheckResult.up("a", "ok", Map.of(), 1)))));
+                List.of(fixed("a", CheckResult.up("a", "ok", Map.of(), 1)))),
+            new InstanceIdentity("test-instance"));
     HealthController notReadyController =
         new HealthController(
             "0.1.0",
             new FlowReadinessService(
-                List.of(fixed("a", CheckResult.down("a", "unreachable", Map.of(), 1)))));
+                List.of(fixed("a", CheckResult.down("a", "unreachable", Map.of(), 1)))),
+            new InstanceIdentity("test-instance"));
 
     assertThat(readyController.ready().getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(readyController.ready().getBody().status()).isEqualTo("READY");

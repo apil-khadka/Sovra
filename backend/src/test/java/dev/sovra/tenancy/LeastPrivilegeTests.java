@@ -206,15 +206,35 @@ class LeastPrivilegeTests extends SovraPostgresBase {
   }
 
   @Test
-  void appRoleCannotTouchMigrations() {
-    assertThatThrownBy(
-            () -> {
-              try (Statement stmt = app.createStatement()) {
-                stmt.executeQuery("SELECT * FROM flyway_schema_history LIMIT 1");
-              }
-            })
-        .isInstanceOf(PSQLException.class)
-        .hasMessageContaining("permission denied");
+  void appRoleReadsHistoryButCannotWriteIt() throws Exception {
+    // PROD-002 moved the contract: the startup guard reads the
+    // migration history over the least-privilege connection, so
+    // SELECT is granted — but the app role still cannot mutate
+    // history or run DDL.
+    try (Statement stmt = app.createStatement();
+        java.sql.ResultSet rows =
+            stmt.executeQuery("SELECT COUNT(*) FROM flyway_schema_history")) {
+      assertThat(rows.next()).isTrue();
+      assertThat(rows.getInt(1)).isGreaterThan(0);
+    }
+    for (String sql :
+        List.of(
+            "INSERT INTO flyway_schema_history (installed_rank, version, description, type,"
+                + " script, checksum, installed_by, execution_time, success)"
+                + " VALUES (-1, '0', 'probe', 'SQL', 'probe.sql', 0, 'probe', 0, true)",
+            "UPDATE flyway_schema_history SET description = 'probe' WHERE installed_rank = -1",
+            "DELETE FROM flyway_schema_history WHERE installed_rank = -1",
+            "TRUNCATE flyway_schema_history")) {
+      assertThatThrownBy(
+              () -> {
+                try (Statement stmt = app.createStatement()) {
+                  stmt.executeUpdate(sql);
+                }
+              })
+          .as("history write must fail: " + sql)
+          .isInstanceOf(PSQLException.class)
+          .hasMessageContaining("permission denied");
+    }
   }
 
   @Test

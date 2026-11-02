@@ -141,6 +141,30 @@ class TenantDataSourceTests extends SovraPostgresBase {
   }
 
   @Test
+  void failedStatementsStillResetThePinOnClose() {
+    // PROD-007: the denied path — a statement that throws
+    // mid-request must not leave its tenant on the pooled
+    // connection for the next borrower.
+    JdbcTemplate owner = new JdbcTemplate(ownerDataSource());
+    TestAccount account = TestAccounts.create(owner, "denied", Set.of("TENANT_MEMBER"));
+    TenantDataSource pooled = new TenantDataSource(appRoleDataSource());
+    TenantContext.set(
+        new ServiceAccountPrincipal(
+            account.accountId(), account.tenantId(), account.name(), account.roles()));
+    try {
+      assertThatThrownBy(() -> new JdbcTemplate(pooled).queryForList("SELECT * FROM no_such_table"))
+          .isInstanceOf(Exception.class);
+    } finally {
+      TenantContext.clear();
+    }
+    // Raw borrow proves the reset: the physical connection answers
+    // the default tenant, not the failed request's.
+    String setting = new JdbcTemplate(appRoleDataSource())
+        .queryForObject("SELECT current_setting('app.tenant', true)", String.class);
+    assertThat(setting).isNotEqualTo(account.tenantId().toString());
+  }
+
+  @Test
   void malformedTenantCannotReachSql() {
     // Tenant IDs only ever come from parsed UUIDs; a hand-built principal
     // with a random UUID round-trips without touching other tenants.

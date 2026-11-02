@@ -1,6 +1,6 @@
 # Sovra - Documentation Index
 
-**Snapshot:** 2026-10-29 · **Status:** synthetic Java demo implementations with remaining browser/protocol/public-release gates; not a production identity system.
+**Snapshot:** 2026-11-02 · **Status:** working synthetic Java/React demo with remaining protocol/public-release/production gates and unqualified capacity.
 
 Sovra explores whether a **Meta-powered, policy-grounded interoperability planner** can discover compatible verification evidence across independently governed identity systems, while keeping user identity source records in local jurisdiction-controlled domains.
 It is a research/demo prototype using **synthetic data** and **simulated jurisdictions**.
@@ -9,7 +9,7 @@ It is a research/demo prototype using **synthetic data** and **simulated jurisdi
 
 ## Reading map
 
-Start implementation work with the [current continuation guide](engineering/continuation-guide.md), reviewed 2026-10-29.
+Start implementation work with the [current continuation guide](engineering/continuation-guide.md), reviewed 2026-11-02.
 It reconciles implemented demo features, remaining browser/protocol/public-hosting gates and no-credit verification.
 
 | Question | Document |
@@ -17,6 +17,7 @@ It reconciles implemented demo features, remaining browser/protocol/public-hosti
 | Why does Sovra exist, and what is new? | [Vision](product/vision-and-scope.md), [Positioning](product/positioning-and-alternatives.md) |
 | What exactly must we build? | [Business SRS](requirements/software-requirements-specification.md) (requirements and production gates), [MVP](engineering/mvp-specification.md) (synthetic milestone) |
 | What should we implement next, and what blocks release? | [Business implementation plan](engineering/implementation-plan.md), [41-task backlog](engineering/implementation-backlog.md), [Machine-readable tasks](engineering/implementation-tasks.json) |
+| What is ready for production and larger user volumes? | [Production and capacity assessment](engineering/production-readiness.md), [17 production work items](engineering/implementation-backlog.md#production-readiness-work-breakdown) |
 | How do the nodes work together? | [Architecture](architecture/system-architecture.md), [Sequence flows](architecture/sequence-diagrams.md), [Data and trust boundaries](architecture/data-boundaries-and-trust.md) |
 | What are the AI agent's permitted behaviors? | [Agent design](architecture/ai-agent-design.md), [Agent contract](ai/agent-contract.md), [AI evaluation](ai/evaluation-plan.md) |
 | Which APIs and data shapes? | [Custom API draft](engineering/api-contract.openapi.yaml), [Schemas/fixtures](engineering/fixtures/README.md) |
@@ -36,9 +37,9 @@ It reconciles implemented demo features, remaining browser/protocol/public-hosti
 
 ## Repository status
 
-The repository contains documentation, a Java 25/Spring Boot backend bootstrap, a React frontend bootstrap, and synthetic examples.
+The repository contains a Java 25/Spring Boot backend, React application, synthetic identity/document workflows, SDKs, operator/product desks and mock relying-party integration examples.
 The earlier TypeScript prototype was removed; JSON fixtures are preserved as migration evidence.
-The G1 vertical slice and security assessment are pending.
+The synthetic vertical slice has automated evidence; full profile qualification, deployed production security assessment and capacity qualification remain pending.
 Use the [root README](../README.md) for the current setup and validation commands.
 
 ## Local research

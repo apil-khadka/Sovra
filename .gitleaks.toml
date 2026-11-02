@@ -1,0 +1,16 @@
+# Sovra secret-scanning configuration (PROD-014). Extends the
+# gitleaks defaults; the release workflow fails on any finding
+# outside this allowlist.
+title = "Sovra secret scanning"
+
+[extend]
+useDefault = true
+
+# The production compose pins credential-free JDBC URLs
+# (jdbc:postgresql://host:5432/db); the generic-api-key rule
+# flags the port/db fragment. Real secrets in deployment files
+# use ${VAR:?} references, which never match this pattern.
+[allowlist]
+description = "JDBC URL fragments without credentials"
+paths = ['''deploy/production/compose\.yaml''']
+regexes = ['''5432/[a-z]+''']

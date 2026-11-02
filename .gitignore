@@ -24,3 +24,6 @@ __pycache__/
 .vscode/
 *.log
 *.zip
+
+# Load-harness credentials (provisioned bearer tokens).
+load/.tokens.json

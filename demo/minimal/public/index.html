@@ -1,0 +1,159 @@
+<!doctype html>
+<!--
+  Minimal Sovra RP page — COPY THIS.
+  One flow, no fiction: start → review → approve/decline → outcome.
+  The crypto and orchestration come from the shared engine
+  (demo/public/shared.js); this page only renders screens.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minimal Sovra RP — synthetic</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="banner">Synthetic demo — minimal RP, nothing here is real</div>
+    <main>
+      <p class="brand">Minimal RP · copy-paste starting point</p>
+      <h1>Prove over-18</h1>
+      <p class="lede">
+        The smallest honest integration: your server holds the RP token, this
+        page holds a holder key, Sovra verifies. This proves eligibility only;
+        it is not legal KYC/AML identity verification.
+      </p>
+
+      <div class="card" id="s-start">
+        <h2>Start</h2>
+        <p class="actions">
+          <button type="button" class="primary" id="b-start">Start check</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-progress" hidden>
+        <h2>Working…</h2>
+        <p role="status" id="progress-label">Starting…</p>
+        <p class="actions">
+          <button type="button" class="linkish" id="b-cancel">Cancel this check</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-consent" hidden>
+        <h2>Review and decide</h2>
+        <dl id="consent-human"></dl>
+        <details>
+          <summary>Exact technical values</summary>
+          <dl id="consent-fields"></dl>
+        </details>
+        <p class="fine">Synthetic evidence only. Nothing is shared until you approve.</p>
+        <p class="actions">
+          <button type="button" class="primary" id="b-approve">Approve and share</button>
+          <button type="button" id="b-decline">Decline</button>
+          <button type="button" class="linkish" id="b-back">Back without deciding</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-outcome" hidden>
+        <p class="verdict" id="verdict" role="status"></p>
+        <p id="outcome-note"></p>
+        <dl id="receipt-fields"></dl>
+        <p class="actions"><button type="button" id="b-restart">Start a new check</button></p>
+      </div>
+
+      <footer><span id="discovery">Connecting…</span></footer>
+    </main>
+    <script type="module">
+      import { fetchDiscovery, runCheck } from '/shared.js'
+
+      const $ = (id) => document.getElementById(id)
+      const show = (id) => {
+        for (const s of ['s-start', 's-progress', 's-consent', 's-outcome']) $(s).hidden = s !== id
+        const head = document.querySelector(`#${id} h2, #${id} .verdict`)
+        if (head instanceof HTMLElement) {
+          head.setAttribute('tabindex', '-1')
+          head.focus()
+        }
+      }
+      const field = (label, value, mono = false) =>
+        `<dt>${label}</dt><dd${mono ? ' class="mono"' : ''}>${value}</dd>`
+
+      try {
+        const d = await fetchDiscovery()
+        $('discovery').textContent = `Sovra ${d.service} ${d.version} · profile ${d.profile} · contract ${d.contractVersion}`
+      } catch {
+        $('discovery').textContent = 'Sovra backend unreachable.'
+      }
+
+      let cancelled = false
+
+      $('b-cancel').addEventListener('click', () => {
+        cancelled = true
+        show('s-start')
+      })
+
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return
+        if (!$('s-consent').hidden) $('b-back').click()
+        else if (!$('s-progress').hidden) $('b-cancel').click()
+      })
+      $('b-start').addEventListener('click', () => {
+        show('s-progress')
+        cancelled = false
+        runCheck('minimal', {
+          onStep: (label) => { $('progress-label').textContent = label },
+          decide: ({ review }) => new Promise((resolve) => {
+            if (cancelled) {
+              resolve('back')
+              return
+            }
+            const minutes = Math.max(1, Math.round((new Date(review.expiresAt) - Date.now()) / 60000))
+            $('consent-human').innerHTML =
+              field('Who asks', 'Minimal RP (demo)') +
+              field('What they learn', 'That you are over 18') +
+              field('Expires', minutes < 50 ? `expires in ~${minutes} min` : 'expires in about an hour')
+            $('consent-fields').innerHTML =
+              field('Relying party', 'Minimal RP (demo)') +
+              field('Purpose', review.purpose) +
+              field('Exact claims', 'adultOver18: true', true) +
+              field('Expires', review.expiresAt, true)
+            show('s-consent')
+            $('b-approve').onclick = () => { show('s-progress'); resolve('approve') }
+            $('b-decline').onclick = () => { show('s-progress'); resolve('deny') }
+            $('b-back').onclick = () => resolve('back')
+          }),
+        }).then(({ decision, denied, backedOut, requestId }) => {
+          if (backedOut) {
+            show('s-start')
+            return
+          }
+          const card = $('s-outcome')
+          card.classList.remove('outcome-ok', 'outcome-bad', 'outcome-warn')
+          if (denied) {
+            $('verdict').textContent = 'Declined — nothing was shared.'
+            $('verdict').className = 'verdict warn'
+            card.classList.add('outcome-warn')
+            $('outcome-note').textContent = 'No presentation exists for this request.'
+            $('receipt-fields').innerHTML = field('Request', requestId, true)
+          } else {
+            $('verdict').textContent = `Outcome: ${decision.outcome}`
+            $('verdict').className = `verdict ${decision.outcome === 'ACCEPTED' ? 'ok' : decision.outcome === 'REJECTED' ? 'bad' : 'warn'}`
+            card.classList.add(decision.outcome === 'ACCEPTED' ? 'outcome-ok' : decision.outcome === 'REJECTED' ? 'outcome-bad' : 'outcome-warn')
+            $('outcome-note').textContent = `Reason ${decision.reasonCode}; trust snapshot v${decision.trustSnapshot}; ${decision.profile}.`
+            $('receipt-fields').innerHTML = field('Decision', decision.decisionId, true)
+          }
+          show('s-outcome')
+        }).catch((err) => {
+          console.error('demo check failed:', err)
+          $('verdict').textContent = 'Something went wrong.'
+          $('verdict').className = 'verdict bad'
+          $('outcome-note').textContent = 'Check failed before any decision. Nothing was shared. Start a new check to retry.'
+          $('receipt-fields').innerHTML = ''
+          show('s-outcome')
+        })
+      })
+
+      $('b-restart').addEventListener('click', () => show('s-start'))
+    </script>
+  </body>
+</html>

@@ -13,6 +13,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -208,6 +214,55 @@ class ConsentNegativeTests extends SovraAppRoleBase {
                         "approve", mapper)))
         .isInstanceOf(HttpClientErrorException.Conflict.class);
     assertNoPresentation(denied);
+  }
+
+  @Test
+  void concurrentDecideRacesResolveToOneWinner() throws Exception {
+    Stage stage = stage("race");
+    Map<String, Object> approveBody = ConsentFixtures.decideBody(
+        stage.holder(), stage.review(), "approve", mapper);
+    Map<String, Object> denyBody = ConsentFixtures.decideBody(
+        stage.holder(), stage.review(), "deny", mapper);
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      CountDownLatch ready = new CountDownLatch(2);
+      CountDownLatch go = new CountDownLatch(1);
+      Callable<String> approve = () -> raceDecide(stage, "approve", approveBody, ready, go);
+      Callable<String> deny = () -> raceDecide(stage, "deny", denyBody, ready, go);
+      Future<String> first = pool.submit(approve);
+      Future<String> second = pool.submit(deny);
+      assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+      go.countDown();
+      Set<String> outcomes =
+          Set.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS));
+      assertThat(outcomes).hasSize(2).contains("conflict");
+      String winner = outcomes.stream()
+          .filter(outcome -> !"conflict".equals(outcome)).findFirst().orElseThrow();
+      Map<String, Object> after =
+          ConsentFixtures.review(client, stage.rp(), stage.requestId());
+      if ("approve".equals(winner)) {
+        // The review derives its state: an approved, unexpired,
+        // usable credential reads VERIFIED (see ConsentFlowTests).
+        assertThat(after.get("state")).isEqualTo("VERIFIED");
+      } else {
+        assertThat(after.get("state")).isEqualTo("DENIED");
+        assertNoPresentation(stage);
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  private String raceDecide(Stage stage, String decision, Map<String, Object> body,
+      CountDownLatch ready, CountDownLatch go) throws Exception {
+    ready.countDown();
+    assertThat(go.await(10, TimeUnit.SECONDS)).isTrue();
+    try {
+      ConsentFixtures.decide(client, stage.holderAgent(), stage.requestId(), body);
+      return decision;
+    } catch (HttpClientErrorException.Conflict expected) {
+      return "conflict";
+    }
   }
 
   @Test

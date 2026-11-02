@@ -544,6 +544,17 @@ public class IssuanceService {
    */
   @Transactional
   public int revokeByHolder(ServiceAccountPrincipal caller, String thumbprint) {
+    return revokeByHolder(caller, thumbprint, null);
+  }
+
+  /**
+   * Revokes a holder's live credentials, optionally linking the
+   * flipped rows to the recovery case that killed them (PROD-015).
+   * Only VALID rows flip, so an earlier independent revocation keeps
+   * its own link and reissuance never resurrects it.
+   */
+  public int revokeByHolder(
+      ServiceAccountPrincipal caller, String thumbprint, UUID recoveryId) {
     ResourceRef resource =
         ResourceRef.tenantScoped("credential", "holder", caller.tenantId());
     Decision decision =
@@ -551,13 +562,16 @@ public class IssuanceService {
     int revoked =
         tenant.update(
             "UPDATE credential_artifact SET status = ?, status_updated_at = ?,"
-                + " status_version = status_version + 1"
+                + " status_version = status_version + 1, revoked_by_recovery = ?"
                 + " WHERE tenant_id = ? AND holder_thumbprint = ? AND status = ?",
-            CredentialStatus.REVOKED.name(), java.sql.Timestamp.from(clock.instant()),
+            CredentialStatus.REVOKED.name(), java.sql.Timestamp.from(clock.instant()), recoveryId,
             caller.tenantId(), thumbprint, CredentialStatus.VALID.name());
     audit.record(
         caller, Action.ISSUE_CREDENTIAL, resource, decision, "",
-        Map.of("holder", thumbprint, "revoked", String.valueOf(revoked)));
+        recoveryId == null
+            ? Map.of("holder", thumbprint, "revoked", String.valueOf(revoked))
+            : Map.of("holder", thumbprint, "revoked", String.valueOf(revoked),
+                "recoveryId", recoveryId.toString()));
     return revoked;
   }
 

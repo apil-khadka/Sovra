@@ -117,11 +117,12 @@ export function fetchHolderChallenge(): Promise<HolderChallenge> {
 export function unlockHolder(
   holderJwk: Record<string, unknown>,
   proof: string,
+  challenge: string,
 ): Promise<HolderUnlock> {
   return requestJson<HolderUnlock>(
     '/api/holder/unlock',
     SESSION,
-    { method: 'POST', body: JSON.stringify({ holderJwk, proof }) },
+    { method: 'POST', body: JSON.stringify({ holderJwk, proof, challenge }) },
     UNLOCK_MESSAGES,
   )
 }

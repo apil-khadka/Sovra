@@ -6,10 +6,12 @@
 # survives into the runtime image. Build context is the repository
 # root (see compose.yaml); .dockerignore keeps secrets, local
 # research, and build outputs out of the context.
-FROM node:24-alpine AS frontend-build
+FROM node:22-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN npm install -g pnpm@10 && pnpm install --frozen-lockfile
+# PROD-014: Node 22 matches CI and local dev; pnpm 9 matches the v9
+# lockfile. Bump the trio (Dockerfile, CI, packageManager) together.
+RUN npm install -g pnpm@9 && pnpm install --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm run build
 

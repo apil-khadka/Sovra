@@ -391,9 +391,17 @@ class IssuanceNegativeTests extends SovraAppRoleBase {
 
   @Test
   void kmsSignerFailsLoudly() {
-    assertThatThrownBy(() -> new KmsSigner().sign(
+    // PROD-005: the kms signer delegates, so outage and denial come
+    // from the provider, never from a stub.
+    dev.sovra.kms.TestKmsProvider outage = dev.sovra.kms.TestKmsProvider.local();
+    outage.outage(true);
+    assertThatThrownBy(() -> new KmsSigner(outage, "w", "i", "l").sign(
             new KeyRef("i", "k", 1), new byte[0], "issuer=i"))
         .isInstanceOf(KmsUnavailableException.class);
+    dev.sovra.kms.TestKmsProvider denying = dev.sovra.kms.TestKmsProvider.local();
+    assertThatThrownBy(() -> new KmsSigner(denying, "wrong", "i", "l").sign(
+            new KeyRef("i", "k", 1), new byte[0], "issuer=i"))
+        .isInstanceOf(SigningRefusedException.class);
   }
 
   @Test

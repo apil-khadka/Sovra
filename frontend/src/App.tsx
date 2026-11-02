@@ -10,7 +10,6 @@ import SecOpsView from './SecOpsView'
 import VerifyView from './VerifyView'
 import OpenIdWalletView from './OpenIdWalletView'
 import ReadinessPanel from './components/ReadinessPanel'
-import Field from './components/Field'
 import { useAsync } from './hooks/useAsync'
 import { fetchSession, login, logout } from './auth'
 import { fetchHealth, fetchReadiness } from './ops'
@@ -45,6 +44,17 @@ const NAV: Array<{ view: ViewName; label: string }> = [
   { view: 'rpdash', label: 'Relying-party dashboard' },
 ]
 
+const NAV_GROUPS: Array<{ label: string | null; views: ViewName[] }> = [
+  { label: null, views: ['status'] },
+  { label: 'Try it', views: ['demo', 'consent', 'verify', 'wallet'] },
+  { label: 'Operate', views: ['issuer', 'holder', 'federation', 'secops'] },
+  { label: 'Build', views: ['portal', 'rpdash'] },
+]
+
+function navLabel(view: ViewName): string {
+  return NAV.find((item) => item.view === view)?.label ?? view
+}
+
 function viewFromHash(): ViewName {
   const match = window.location.hash.match(/^#\/(\w+)/)
   const found = NAV.find((item) => item.view === match?.[1])
@@ -66,6 +76,7 @@ export default function App() {
   const [view, setView] = useState<ViewName>(viewFromHash)
   const [authError] = useState<string | null>(consumeAuthError)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutFailed, setLogoutFailed] = useState(false)
   const health = useAsync(fetchHealth)
   const readiness = useAsync(fetchReadiness)
   const session = useAsync(fetchSession)
@@ -80,12 +91,24 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
+  // View transitions move focus to the new heading so keyboard
+  // and screen-reader users land on the content they chose.
+  useEffect(() => {
+    const heading = document.querySelector('main h1')
+    if (heading instanceof HTMLElement) {
+      heading.setAttribute('tabindex', '-1')
+      heading.focus({ preventScroll: true })
+    }
+  }, [view])
+
   async function onLogout() {
     setLoggingOut(true)
+    setLogoutFailed(false)
     try {
       await logout()
     } catch {
       setLoggingOut(false)
+      setLogoutFailed(true)
     }
   }
 
@@ -100,49 +123,83 @@ export default function App() {
         <p className="wordmark" translate="no">
           Sovra
         </p>
-        <div className="auth-bar">
-          {sessionInfo === null ? (
-            <button type="button" onClick={login}>
-              Log in with Keycloak
-            </button>
-          ) : (
-            <>
-              <span className="session-id" translate="no">
-                {sessionInfo.displayName} · {sessionInfo.roles.join(', ')}
-              </span>
-              <button type="button" onClick={() => void onLogout()} disabled={loggingOut}>
-                {loggingOut ? 'Logging out…' : 'Log out'}
-              </button>
-            </>
-          )}
-        </div>
       </header>
       <main id="view">
-        {authError !== null && (
-          <p role="alert">Login denied: {authError}. No session was created.</p>
-        )}
-        <nav className="app-nav" aria-label="Views">
-          {NAV.map((item) => (
-            <a
-              key={item.view}
-              href={`#/${item.view}`}
-              aria-current={view === item.view ? 'page' : undefined}
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
+        <div className="app-shell">
+          <aside className="app-rail">
+            <nav className="app-nav-groups" aria-label="Views">
+              {NAV_GROUPS.map((group) => (
+                <div key={group.label ?? 'status'}>
+                  {group.label !== null && (
+                    <p className="nav-group-label" aria-hidden="true">
+                      {group.label}
+                    </p>
+                  )}
+                  <div
+                    className="app-nav"
+                    role="group"
+                    aria-label={group.label ?? 'Status'}
+                  >
+                    {group.views.map((name) => (
+                      <a
+                        key={name}
+                        href={`#/${name}`}
+                        aria-current={view === name ? 'page' : undefined}
+                      >
+                        {navLabel(name)}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </nav>
+            <div className="auth-bar rail-session">
+              {sessionInfo === null ? (
+                <button type="button" onClick={login}>
+                  Log in with Keycloak
+                </button>
+              ) : (
+                <>
+                  <span className="session-id" translate="no">
+                    {sessionInfo.displayName}
+                  </span>
+                  <span className="role-chips">
+                    {sessionInfo.roles.map((role) => (
+                      <span key={role} className="role-chip" translate="no">
+                        {role}
+                      </span>
+                    ))}
+                  </span>
+                  <button type="button" onClick={() => void onLogout()} disabled={loggingOut}>
+                    {loggingOut ? 'Logging out…' : 'Log out'}
+                  </button>
+                  {logoutFailed && (
+                    <span role="alert" className="auth-error">
+                      Logout failed — try again.
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          </aside>
+          <div className="app-content">
+            {authError !== null && (
+              <p role="alert">Login denied: {authError}. No session was created.</p>
+            )}
         {view === 'status' && (
           <section className="consent" aria-label="Backend status">
             <h1 className="view-title">Status</h1>
-            {health.kind === 'loading' && <p>Checking backend…</p>}
+            {health.kind === 'loading' && <p role="status">Checking backend…</p>}
             {health.kind === 'ready' && (
               <>
-                <dl className="health-list">
-                  <Field label="Status" value={health.value.status} />
-                  <Field label="Service" value={health.value.service} />
-                  <Field label="Version" value={health.value.version} mono />
-                </dl>
+                <div className="status-strip" role="status">
+                  <strong>
+                    {readiness.kind === 'ready' ? readiness.value.status : health.value.status}
+                  </strong>
+                  <span translate="no">
+                    {health.value.service} {health.value.version}
+                  </span>
+                </div>
                 {readiness.kind === 'ready' && <ReadinessPanel report={readiness.value} />}
                 {readiness.kind === 'error' && (
                   <p role="alert">Readiness unreachable: {readiness.message}</p>
@@ -162,6 +219,8 @@ export default function App() {
         {view === 'holder' && <HolderDeskView session={sessionInfo} />}
         {view === 'portal' && <DevPortalView session={sessionInfo} />}
         {view === 'rpdash' && <RpDashboardView session={sessionInfo} />}
+          </div>
+        </div>
       </main>
     </>
   )

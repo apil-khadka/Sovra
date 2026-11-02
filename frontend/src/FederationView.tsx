@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ApiError } from './api'
+import { login } from './auth'
 import type { SessionInfo } from './auth'
 import {
   activateSnapshot,
@@ -12,6 +13,7 @@ import type { IssuerOnboarding, ProposalSummary } from './federation'
 import type { TrustSnapshot } from './ops'
 import Field from './components/Field'
 import StateCard from './components/StateCard'
+import { jsonBlocked, jsonError } from './jsoncheck'
 
 // Federation desk (SOV-026). Trust admins review the proposal
 // queue, onboard issuers, and activate snapshots. Every value
@@ -41,6 +43,7 @@ export default function FederationView({ session }: { session: SessionInfo | nul
   const [busy, setBusy] = useState('')
   const [form, setForm] = useState(EMPTY_ONBOARDING)
   const [formOpen, setFormOpen] = useState(false)
+  const [activateArmed, setActivateArmed] = useState<number | null>(null)
 
   const admin = session !== null && session.roles.includes('TRUST_ADMIN')
 
@@ -108,6 +111,7 @@ export default function FederationView({ session }: { session: SessionInfo | nul
     setNotice('')
     try {
       await activateSnapshot(version)
+      setActivateArmed(null)
       setNotice(`Version ${version} is now live.`)
       await refresh()
     } catch (err: unknown) {
@@ -127,6 +131,13 @@ export default function FederationView({ session }: { session: SessionInfo | nul
               ? 'Log in first — the review queue is visible to trust admins only.'
               : 'This session lacks the trust admin role, so the queue stays hidden.'}
           </p>
+          {session === null && (
+            <p>
+              <button type="button" className="primary" onClick={login}>
+                Log in with Keycloak
+              </button>
+            </p>
+          )}
         </StateCard>
       </section>
     )
@@ -174,15 +185,24 @@ export default function FederationView({ session }: { session: SessionInfo | nul
                 value={form.publicKeyJwk}
                 onChange={(e) => setForm({ ...form, publicKeyJwk: e.target.value })}
                 rows={4}
+                aria-invalid={jsonError(form.publicKeyJwk) !== null}
               />
             </label>
+            {jsonError(form.publicKeyJwk) !== null && (
+              <p role="alert">{jsonError(form.publicKeyJwk)}</p>
+            )}
             <label>
               Valid through, ISO date time
               <input value={form.validThrough} onChange={(e) => setForm({ ...form, validThrough: e.target.value })} placeholder="2030-01-01T00:00:00Z" />
             </label>
           </div>
           <p>
-            <button type="button" className="primary" disabled={busy !== ''} onClick={() => void onPropose()}>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy !== '' || jsonBlocked(form.publicKeyJwk)}
+              onClick={() => void onPropose()}
+            >
               {busy === 'propose' ? 'Proposing…' : 'Propose issuer'}
             </button>
           </p>
@@ -229,10 +249,30 @@ export default function FederationView({ session }: { session: SessionInfo | nul
                     {busy === proposal.proposalId ? 'Approving…' : 'Approve'}
                   </button>
                 )}{' '}
-                {proposal.state === 'APPROVED' && (
-                  <button type="button" className="primary" disabled={busy !== ''} onClick={() => void onActivate(proposal.version)}>
-                    {busy === `activate-${proposal.version}` ? 'Activating…' : 'Activate'}
+                {proposal.state === 'APPROVED' && activateArmed !== proposal.version && (
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={busy !== ''}
+                    onClick={() => setActivateArmed(proposal.version)}
+                  >
+                    Activate…
                   </button>
+                )}
+                {proposal.state === 'APPROVED' && activateArmed === proposal.version && (
+                  <>
+                    <button
+                      type="button"
+                      className="primary"
+                      disabled={busy !== ''}
+                      onClick={() => void onActivate(proposal.version)}
+                    >
+                      {busy === `activate-${proposal.version}` ? 'Activating…' : 'Confirm activation'}
+                    </button>{' '}
+                    <button type="button" onClick={() => setActivateArmed(null)}>
+                      Not yet
+                    </button>
+                  </>
                 )}
               </p>
             </StateCard>

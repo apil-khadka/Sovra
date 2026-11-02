@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ApiError } from './api'
+import { login } from './auth'
 import type { SessionInfo } from './auth'
 import { createSandbox, fetchDiscovery, fetchSandboxAccounts } from './portal'
 import type { CreatedSandbox, PortalDiscovery, SandboxAccount } from './portal'
@@ -64,6 +65,20 @@ export default function DevPortalView({ session }: { session: SessionInfo | null
               ? 'Log in first — sandbox onboarding is visible to tenant members only.'
               : 'This session lacks the tenant member role, so the portal stays hidden.'}
           </p>
+          {session === null && (
+            <>
+              <p>
+                Sandbox onboarding takes four steps and one copy-paste RP:
+                read docs/demo/integrate-age-check.md for the rules, then copy
+                demo/minimal as your starting point.
+              </p>
+              <p>
+                <button type="button" className="primary" onClick={login}>
+                  Log in with Keycloak
+                </button>
+              </p>
+            </>
+          )}
         </StateCard>
       </section>
     )

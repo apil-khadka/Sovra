@@ -8,6 +8,9 @@ import dev.sovra.issuance.IssuerSigner;
 import dev.sovra.issuance.KmsSigner;
 import dev.sovra.vault.KmsVaultKekProvider;
 import dev.sovra.vault.VaultKekProvider;
+import dev.sovra.kms.TestKmsProvider;
+import dev.sovra.planning.AiBudgetProperties;
+import dev.sovra.planning.PlanningProperties;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +37,8 @@ class ProductionModeTests {
     IssuerSigner devDouble = (ref, payload, aad) -> new byte[64];
     ProductionStartupValidator validator = new ProductionStartupValidator(
         new SovraMode("demo"), devDouble, mock(VaultKekProvider.class),
-        mock(DataSource.class), "synthetic", "seed");
+        mock(DataSource.class), "synthetic", "seed", false, "", "", "", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
     validator.run(null);
   }
 
@@ -42,8 +46,9 @@ class ProductionModeTests {
   void productionRefusesTheDevSigner() {
     IssuerSigner devDouble = (ref, payload, aad) -> new byte[64];
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("production"), devDouble, new KmsVaultKekProvider(),
-        mock(DataSource.class), "sdjwt-vc", "");
+        new SovraMode("production"), devDouble, new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        mock(DataSource.class), "sdjwt-vc", "", false, "", "", "", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
     assertThatThrownBy(() -> validator.run(null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("signer must be kms");
@@ -52,8 +57,9 @@ class ProductionModeTests {
   @Test
   void productionRefusesSoftwareWrappingKeys() {
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("production"), new KmsSigner(), mock(VaultKekProvider.class),
-        mock(DataSource.class), "sdjwt-vc", "");
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), mock(VaultKekProvider.class),
+        mock(DataSource.class), "sdjwt-vc", "", false, "", "", "", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
     assertThatThrownBy(() -> validator.run(null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("vault.kek must be kms");
@@ -62,8 +68,9 @@ class ProductionModeTests {
   @Test
   void productionRefusesAConfiguredVaultSeed() {
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("production"), new KmsSigner(), new KmsVaultKekProvider(),
-        mock(DataSource.class), "sdjwt-vc", "c2VlZA==");
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        mock(DataSource.class), "sdjwt-vc", "c2VlZA==", false, "", "", "", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
     assertThatThrownBy(() -> validator.run(null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("vault.seed must be empty");
@@ -72,8 +79,9 @@ class ProductionModeTests {
   @Test
   void productionRefusesTheSyntheticProfile() {
     ProductionStartupValidator validator = new ProductionStartupValidator(
-        new SovraMode("production"), new KmsSigner(), new KmsVaultKekProvider(),
-        mock(DataSource.class), "synthetic", "");
+        new SovraMode("production"), new KmsSigner(TestKmsProvider.local(), "", "", ""), new KmsVaultKekProvider(TestKmsProvider.local(), "", "", ""),
+        mock(DataSource.class), "synthetic", "", false, "", "", "", 8091, false, false, "file", "workload", "digest", "region",
+        new AiBudgetProperties(), new PlanningProperties());
     assertThatThrownBy(() -> validator.run(null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("profile must be sdjwt-vc");

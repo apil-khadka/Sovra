@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Connection, SessionInfo } from '../auth'
 
 /**
@@ -5,6 +6,9 @@ import type { Connection, SessionInfo } from '../auth'
  * optional API base, the session/token choice, and the request id.
  * The token row hides entirely while a session is in use, so the
  * form never shows two live credential paths at once.
+ *
+ * Guided default: a live BFF session collapses the plumbing to one
+ * summary line; the request id always stays visible.
  */
 export default function ConnectionFields({
   session,
@@ -17,43 +21,78 @@ export default function ConnectionFields({
   onChange: (next: Connection) => void
   tokenLabel: string
 }) {
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const sessionActive = session !== null && connection.useSession
+  const simpleSession =
+    session !== null && connection.useSession && connection.base.trim() === '' && !advancedOpen
+
   return (
     <>
-      <label>
-        API base (blank for same origin)
-        <input
-          name="api-base"
-          value={connection.base}
-          onChange={(event) => onChange({ ...connection, base: event.target.value })}
-          placeholder="https://second-origin.example/…"
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </label>
-      {session !== null && (
-        <label className="consent-session">
-          <input
-            type="checkbox"
-            checked={connection.useSession}
-            onChange={(event) => onChange({ ...connection, useSession: event.target.checked })}
-          />
-          Act as {session.displayName} (browser session)
-        </label>
-      )}
-      {!sessionActive && (
-        <label>
-          {tokenLabel}
-          <input
-            name="bearer-token"
-            type="password"
-            value={connection.token}
-            onChange={(event) => onChange({ ...connection, token: event.target.value })}
-            placeholder="Paste a service-account token…"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
+      {simpleSession ? (
+        <p className="connection-summary">
+          Acting as {session.displayName} via browser session · same origin.{' '}
+          <button type="button" className="link-button" onClick={() => setAdvancedOpen(true)}>
+            Use a different origin or token
+          </button>
+        </p>
+      ) : (
+        <>
+          {session !== null ? (
+            <label>
+              API base (blank for same origin)
+              <input
+                name="api-base"
+                value={connection.base}
+                onChange={(event) => onChange({ ...connection, base: event.target.value })}
+                placeholder="https://second-origin.example/…"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+          ) : (
+            <details className="consent-details">
+              <summary>Different origin</summary>
+              <label>
+                API base (blank for same origin)
+                <input
+                  name="api-base"
+                  value={connection.base}
+                  onChange={(event) => onChange({ ...connection, base: event.target.value })}
+                  placeholder="https://second-origin.example/…"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+            </details>
+          )}
+          {session !== null && (
+            <label className="consent-session">
+              <input
+                type="checkbox"
+                checked={connection.useSession}
+                onChange={(event) => onChange({ ...connection, useSession: event.target.checked })}
+              />
+              Act as {session.displayName} (browser session)
+            </label>
+          )}
+          {!sessionActive && (
+            <label>
+              {tokenLabel}
+              <input
+                name="bearer-token"
+                type="password"
+                value={connection.token}
+                onChange={(event) => onChange({ ...connection, token: event.target.value })}
+                placeholder="Paste a service-account token…"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <span className="field-hint">
+                Service-account tokens come from the developer portal or machine setup.
+              </span>
+            </label>
+          )}
+        </>
       )}
       <label>
         Proof request id
@@ -65,6 +104,7 @@ export default function ConnectionFields({
           autoComplete="off"
           spellCheck={false}
         />
+        <span className="field-hint">The request UUID from the relying party.</span>
       </label>
     </>
   )

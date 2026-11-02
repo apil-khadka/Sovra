@@ -83,7 +83,7 @@ class PlanningConfigTests extends SovraAppRoleBase {
     configured.setApiKey("test-only-key");
     configured.setModel("test-only-model");
     LivePlanner explicit =
-        new LivePlanner(configured, tools, java.time.Clock.systemUTC(), mapper);
+        new LivePlanner(configured, tools, java.time.Clock.systemUTC(), mapper, null);
     assertThat(explicit.chatModel()).isNotNull();
   }
 

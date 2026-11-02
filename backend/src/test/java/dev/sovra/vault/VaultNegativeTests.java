@@ -330,9 +330,14 @@ class VaultNegativeTests extends SovraAppRoleBase {
     TestAccount issuer = TestAccounts.create(owner, "vn-outage", Set.of("ISSUER_OPS"));
     ServiceAccountPrincipal caller = new ServiceAccountPrincipal(
         issuer.accountId(), issuer.tenantId(), issuer.name(), issuer.roles());
+    // PROD-005: outage comes from the provider behind the kms
+    // KEK, never from a stub.
+    dev.sovra.kms.TestKmsProvider outage = dev.sovra.kms.TestKmsProvider.local();
+    outage.outage(true);
     VaultService failing = new VaultService(authz, audit, accounts, humans,
-        new KmsVaultKekProvider(), new JdbcTemplate(new TenantDataSource(dataSource)), clock,
-        new dev.sovra.config.DemoProperties());
+        new KmsVaultKekProvider(outage, "w", "i", "l"),
+        new JdbcTemplate(new TenantDataSource(dataSource)), clock,
+        new dev.sovra.config.DemoProperties(), 0);
     // The manual instance has no transaction proxy, so the test wraps
     // the call the way the runtime does: the failed seal must roll
     // the object shell back with it.

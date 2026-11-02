@@ -1,0 +1,17 @@
+{
+  "name": "sovra-kyc-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Zero-dependency mock relying-party demos (NovaBank onboarding, CornerCellar checkout) against the synthetic Sovra stack.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "setup": "node setup.mjs",
+    "start": "node server.mjs",
+    "minimal": "node minimal/server.mjs",
+    "smoke": "node smoke.mjs",
+    "smoke:all": "node smoke.mjs && DEMO_APP=cornercellar node smoke.mjs && DEMO_BASE=http://localhost:5175 DEMO_APP=minimal node smoke.mjs"
+  }
+}
