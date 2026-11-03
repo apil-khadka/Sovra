@@ -89,7 +89,7 @@ jobs:
       - name: Build Java SBOM
         run: cd backend && ./mvnw -q package -DskipTests
       - name: Scan lockfiles and SBOM with OSV
-        uses: google/osv-scanner-action@6ad84ce1ef2d4124ba333b221894c133c4a970ea # v2.7.0
+        uses: google/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
         with:
           scan-args: --lockfile=frontend/pnpm-lock.yaml --lockfile=sdk/typescript/package-lock.json --sbom=backend/target/classes/META-INF/sbom/application.cdx.json
 
