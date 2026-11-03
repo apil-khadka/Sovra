@@ -42,5 +42,8 @@ JAVA_HOME=$HOME/.sdkman/candidates/java/25.0.2-tem \
 `SOVRA_E2E_DB_CONTAINER` (default `sovra-db-1`), and
 `SOVRA_DB_ADMIN_PASSWORD` (default `sovra-dev-only`) point the
 suite at the stack. Tests mint throwaway service accounts through
-the compose database and leave the trust snapshot carrying every
-issuer they found (read-modify-write), so reruns are safe.
+the compose database. The trust test carries every non-test issuer
+and policy forward, refreshes its own test issuer, and repairs the
+sibling SDK's stale test fixture, so reruns are safe on long-lived
+disposable stacks. Run the two SDK suites sequentially: both rotate
+the shared trust snapshot.

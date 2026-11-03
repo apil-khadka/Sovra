@@ -24,6 +24,7 @@ import {
   SovraError,
   mintIdempotencyKey,
 } from "../index.js";
+import type { SnapshotIssuer, SnapshotPolicy } from "../index.js";
 
 /** Issuer/RP quickstart (SOV-021): issue, consent, present, verify. */
 test("issueConsentVerifyQuickstart", async () => {
@@ -337,15 +338,85 @@ test("trustAdminsOnboardThroughMakerChecker", async () => {
   const current = await makerClient.ops.snapshot();
   assert.ok(current && current.issuers.length > 0);
 
-  // Read-modify-write: carry every authorized issuer and policy
-  // forward so the test never evicts the shared stack's issuers.
+  // Read-modify-write with explicit test-fixture ownership. Both SDK
+  // suites own BOTH test issuer ids: each run refreshes its own row
+  // and repairs the sibling's row when stale, so long-lived
+  // disposable stacks stay repeatable whichever suite ran last.
+  // Non-test issuers/policies are always carried forward untouched;
+  // an expired non-test issuer fails loudly instead of being
+  // dropped, preserving historical authority.
+  const OWN_ISSUER = "ts-onboard-issuer";
+  const SIBLING_ISSUER = "sdk-onboard-issuer";
+  const TEST_ISSUERS = new Set([OWN_ISSUER, SIBLING_ISSUER]);
+  const DISPLAY_NAMES: Record<string, string> = {
+    "ts-onboard-issuer": "TS onboard issuer",
+    "sdk-onboard-issuer": "SDK onboard issuer",
+  };
+  const freshTestIssuer = (issuerId: string): Record<string, unknown> => {
+    const prefix = issuerId.startsWith("sdk-") ? "sdk-" : "ts-";
+    const freshKeyId = `${prefix}${mintIdempotencyKey().slice(0, 8)}`;
+    return {
+      issuerId,
+      displayName: DISPLAY_NAMES[issuerId] ?? issuerId,
+      scope: "adult-status",
+      credentialTypes: [ADULT_VCT],
+      keyId: freshKeyId,
+      keyVersion: 1,
+      publicKeyJwk: {
+        kty: "EC",
+        crv: "P-256",
+        kid: freshKeyId,
+        x: "MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4",
+        y: "4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM",
+      },
+      validFrom: new Date(Date.now() - 60_000).toISOString(),
+      validThrough: new Date(Date.now() + 30 * 24 * 3600_000).toISOString(),
+      status: "ACTIVE",
+    };
+  };
   const carried: Record<string, unknown>[] = [];
+  const nonTestExpected = new Map<string, SnapshotIssuer>();
+  let siblingCarried = false;
+  // A repaired sibling row is ACTIVE; a carried sibling keeps the
+  // standing it had — a fresh SUSPENDED row is preserved as-is and
+  // never reactivated merely to satisfy the final assertions.
+  let expectedSiblingStatus = "ACTIVE";
   for (const existing of current.issuers) {
-    // Skip our own test issuer id; a fresh row is appended below so
-    // repeated runs never accumulate duplicate entries.
-    if (existing.issuerId === "ts-onboard-issuer") {
+    // Own row is always replaced below so repeats never duplicate.
+    if (existing.issuerId === OWN_ISSUER) {
       continue;
     }
+    if (TEST_ISSUERS.has(existing.issuerId)) {
+      const siblingFresh =
+        Number.isNaN(Date.parse(existing.validThrough)) === false &&
+        Date.parse(existing.validThrough) > Date.now() &&
+        (existing.status === "ACTIVE" || existing.status === "SUSPENDED");
+      if (!siblingFresh) {
+        continue; // Stale sibling fixture: repaired below.
+      }
+      siblingCarried = true;
+      expectedSiblingStatus = existing.status;
+      carried.push({
+        issuerId: existing.issuerId,
+        displayName: existing.displayName,
+        scope: existing.scope,
+        credentialTypes: existing.credentialTypes,
+        keyId: existing.keyId,
+        keyVersion: existing.keyVersion,
+        publicKeyJwk: existing.publicKeyJwk,
+        validFrom: existing.validFrom,
+        validThrough: existing.validThrough,
+        status: existing.status,
+      });
+      continue;
+    }
+    if (Date.parse(existing.validThrough) <= Date.now()) {
+      assert.fail(
+        `non-test issuer ${existing.issuerId} expired at ${existing.validThrough}; ` +
+          "refusing to drop historical authority — rotate it manually",
+      );
+    }
+    nonTestExpected.set(existing.issuerId, existing);
     carried.push({
       issuerId: existing.issuerId,
       displayName: existing.displayName,
@@ -365,25 +436,10 @@ test("trustAdminsOnboardThroughMakerChecker", async () => {
     allowedTypes: p.allowedTypes,
     maxAssurance: p.maxAssurance,
   }));
-  const keyId = `ts-${mintIdempotencyKey().slice(0, 8)}`;
-  carried.push({
-    issuerId: "ts-onboard-issuer",
-    displayName: "TS onboard issuer",
-    scope: "adult-status",
-    credentialTypes: [ADULT_VCT],
-    keyId,
-    keyVersion: 1,
-    publicKeyJwk: {
-      kty: "EC",
-      crv: "P-256",
-      kid: keyId,
-      x: "MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4",
-      y: "4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM",
-    },
-    validFrom: new Date(Date.now() - 60_000).toISOString(),
-    validThrough: new Date(Date.now() + 3600_000).toISOString(),
-    status: "ACTIVE",
-  });
+  carried.push(freshTestIssuer(OWN_ISSUER));
+  if (!siblingCarried) {
+    carried.push(freshTestIssuer(SIBLING_ISSUER));
+  }
   const proposed = await makerClient.trust.propose(
     carried,
     policies,
@@ -403,8 +459,45 @@ test("trustAdminsOnboardThroughMakerChecker", async () => {
   assert.equal(approved.proposalId, proposed.proposalId);
   const activated = await checkerClient.trust.activate(Number(proposed.version));
   assert.equal(activated.version, proposed.version);
-  assert.equal(
-    (await makerClient.ops.snapshot())?.version,
-    Number(proposed.version),
+  const after = await makerClient.ops.snapshot();
+  assert.ok(after);
+  assert.equal(after.version, Number(proposed.version));
+  // Regression for both test-issuer histories: whichever suite ran
+  // last, both fixtures converge to fresh rows. The own row is always
+  // ACTIVE; the sibling row is ACTIVE when repaired, or keeps its
+  // carried standing (SUSPENDED rows are preserved, never
+  // reactivated by the test).
+  const own: SnapshotIssuer | undefined = after.issuers.find(
+    (i) => i.issuerId === OWN_ISSUER,
   );
+  assert.ok(own, `expected test issuer ${OWN_ISSUER} in the new snapshot`);
+  assert.equal(own.status, "ACTIVE");
+  assert.ok(Date.parse(own.validThrough) > Date.now());
+  const sib: SnapshotIssuer | undefined = after.issuers.find(
+    (i) => i.issuerId === SIBLING_ISSUER,
+  );
+  assert.ok(sib, `expected test issuer ${SIBLING_ISSUER} in the new snapshot`);
+  assert.equal(sib.status, expectedSiblingStatus);
+  assert.ok(Date.parse(sib.validThrough) > Date.now());
+  // Every non-test issuer survives byte-identically (full row
+  // content, not just presence), with no duplicates, and every
+  // policy survives with identical content.
+  assert.equal(
+    after.issuers.filter((i) => nonTestExpected.has(i.issuerId)).length,
+    nonTestExpected.size,
+  );
+  for (const [id, expected] of nonTestExpected) {
+    const row: SnapshotIssuer | undefined = after.issuers.find(
+      (i) => i.issuerId === id,
+    );
+    assert.ok(row, `non-test issuer ${id} must survive the test rotation`);
+    assert.deepEqual(row, expected);
+  }
+  const policyOrder = (ps: SnapshotPolicy[]): SnapshotPolicy[] =>
+    [...ps].sort((a, b) => {
+      const ka = `${a.rpId}\n${a.purpose}`;
+      const kb = `${b.rpId}\n${b.purpose}`;
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+  assert.deepEqual(policyOrder(after.policies), policyOrder(current.policies));
 });
