@@ -6,8 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.sovra.SovraAppRoleBase;
 import dev.sovra.TestAccounts;
 import dev.sovra.TestAccounts.TestAccount;
+import dev.sovra.audit.AuditCursor;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -111,6 +113,12 @@ class LegalHoldArchiveTests extends SovraAppRoleBase {
     UUID tenant = admin.tenantId();
     UUID oldEvent = seedAudit(tenant, Instant.now().minusSeconds(91L * 24 * 3600), "ARCHIVE_ME");
     UUID newEvent = seedAudit(tenant, Instant.now(), "STAY_HOT");
+    // The API page also includes recent platform rows. Make the archived
+    // tenant row fall beyond its first 100-row page so this assertion
+    // exercises the same cursor path under a populated test database.
+    for (int i = 0; i < 101; i++) {
+      seedAudit(null, Instant.now(), "PLATFORM_PAGE_" + i);
+    }
     // Held tenants' rows stay hot.
     TestAccount held =
         TestAccounts.create(owner, "hold-arch-held", Set.of("ISSUER_OPS", "TRUST_ADMIN"));
@@ -128,11 +136,20 @@ class LegalHoldArchiveTests extends SovraAppRoleBase {
     assertThat(eventTable(heldEvent)).isEqualTo("audit_event");
 
     // Reads union both tables: the archived row is still listed.
-    List<Map<String, Object>> events = (List<Map<String, Object>>) (List<?>)
-        client.get().uri("/api/audit/events?limit=100").headers(admin.headers())
-            .retrieve().body(List.class);
-    assertThat(events.stream().map(e -> e.get("id").toString()))
-        .contains(oldEvent.toString(), newEvent.toString());
+    List<String> visibleIds = new ArrayList<>();
+    List<Map<String, Object>> page = auditPage(admin, null);
+    for (int pageNumber = 0; pageNumber < 50 && !page.isEmpty(); pageNumber++) {
+      visibleIds.addAll(page.stream().map(event -> event.get("id").toString()).toList());
+      if (visibleIds.contains(oldEvent.toString()) && visibleIds.contains(newEvent.toString())) {
+        break;
+      }
+      Map<String, Object> last = page.get(page.size() - 1);
+      String cursor =
+          AuditCursor.encode(
+              last.get("occurredAt").toString(), last.get("id").toString());
+      page = auditPage(admin, cursor);
+    }
+    assertThat(visibleIds).contains(oldEvent.toString(), newEvent.toString());
     // Release the hold and the backlog drains next run.
     setHold(held, held.tenantId(), false);
     assertThat(app.queryForObject("SELECT archive_audit_events(1000)", Integer.class))
@@ -221,6 +238,17 @@ class LegalHoldArchiveTests extends SovraAppRoleBase {
       return "audit_event_archive";
     }
     return "missing";
+  }
+
+  @SuppressWarnings("unchecked")
+  private List<Map<String, Object>> auditPage(TestAccount reader, String cursor) {
+    String query = cursor == null ? "?limit=100" : "?limit=100&cursor=" + cursor;
+    return (List<Map<String, Object>>) (List<?>)
+        client.get()
+            .uri("/api/audit/events" + query)
+            .headers(reader.headers())
+            .retrieve()
+            .body(List.class);
   }
 
   private Map<String, Object> post(
