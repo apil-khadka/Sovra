@@ -17,29 +17,54 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * seeds a few thousand rows, runs ANALYZE, then asserts the real
  * feed SQL plans an index path with no sequential scan. A dropped
  * or superseded index fails here instead of in production.
+ *
+ * <p>Quarantine needs a representative multi-tenant fixture. The
+ * worker-claim partial index {@code quarantine_claim_idx} covers
+ * only {@code status = 'QUARANTINED'} ordered by {@code created_at};
+ * a single-tenant probe with identical timestamps makes a backward
+ * scan of that partial index plus a {@code Filter: tenant_id}
+ * look as cheap as the tenant-leading feed index, and the planner
+ * flips between them on trivial stats differences (observed:
+ * full-suite red, isolated green). Production holds many tenants,
+ * so the partial-index path is unbounded per tenant: it must scan
+ * every tenant's recent QUARANTINED rows to find one tenant's
+ * page. The noise tenant below (thousands of recent QUARANTINED
+ * rows, strictly newer than the probe's) reproduces that shape in
+ * miniature and forces the planner to prefer the tenant-leading
+ * {@code quarantine_admission_tenant_status_recent_idx}, whose
+ * {@code Index Cond} bounds the feed to the tenant's own rows.
+ * The claim index stays correct for the worker's global
+ * oldest-first claim ({@code QuarantineWorker}), which is a
+ * different query and is not asserted here.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class QueryPlanTests extends SovraPostgresBase {
 
   static final int ROWS = 3_000;
+  static final int NOISE_ROWS = 3_000;
 
   JdbcTemplate owner;
   UUID tenant;
+  UUID noiseTenant;
 
   @BeforeAll
   void seed() {
     owner = new JdbcTemplate(ownerDataSource());
-    // The container is a JVM singleton shared by every suite, and
-    // earlier quarantine suites leave rows behind: the feed plan
-    // depends on global stats, and no other table references this
-    // one, so it starts empty. Finished suites never re-read.
-    owner.update("DELETE FROM quarantine_admission");
-    owner.update("DELETE FROM tenant WHERE slug = 'query-plan-probe'");
+    // Tenant-scoped reset only: the container is a JVM singleton
+    // shared by every suite, and earlier suites' leftover rows stay
+    // (they add multi-tenant realism). Only our own slugs are
+    // removed, for rerun idempotence after a crashed run.
+    clearProbeRows();
     tenant =
         owner.queryForObject(
             "INSERT INTO tenant (slug, display_name)"
                 + " VALUES ('query-plan-probe', 'Query plan probe') RETURNING id",
+            UUID.class);
+    noiseTenant =
+        owner.queryForObject(
+            "INSERT INTO tenant (slug, display_name)"
+                + " VALUES ('query-plan-noise', 'Query plan noise') RETURNING id",
             UUID.class);
     UUID credential =
         owner.queryForObject(
@@ -66,6 +91,12 @@ class QueryPlanTests extends SovraPostgresBase {
                 + " VALUES (?, 'issuer-1', 'plan-test') RETURNING id",
             UUID.class,
             tenant);
+    UUID noiseVault =
+        owner.queryForObject(
+            "INSERT INTO vault_object (tenant_id, issuer_id, created_by)"
+                + " VALUES (?, 'issuer-1', 'plan-noise') RETURNING id",
+            UUID.class,
+            noiseTenant);
     owner.update(
         "INSERT INTO verification_decision (tenant_id, request_id, credential_id, nonce,"
             + " request_hash, rp_id, audience, outcome, reason_code, response_body,"
@@ -103,13 +134,28 @@ class QueryPlanTests extends SovraPostgresBase {
             + " SELECT ?, 'service', 'plan-agent', 'READ', 'probe', '', 'ALLOW', 'ok', 1"
             + " FROM generate_series(1, ?) g",
         tenant, ROWS);
+    // Probe feed rows: varied timestamps (oldest first by g),
+    // 10% QUARANTINED. All timestamps sit at least two hours in
+    // the past, strictly older than every noise row below.
     owner.update(
         "INSERT INTO quarantine_admission (tenant_id, vault_object_id, actual_type,"
-            + " size_bytes, content_sha256, status, created_by)"
+            + " size_bytes, content_sha256, status, created_by, created_at)"
             + " SELECT ?, ?, 'image/png', 8, decode(md5(g::text), 'hex'),"
-            + " CASE WHEN g % 10 = 0 THEN 'QUARANTINED' ELSE 'SCANNING' END, 'plan-agent'"
+            + " CASE WHEN g % 10 = 0 THEN 'QUARANTINED' ELSE 'SCANNING' END, 'plan-agent',"
+            + " now() - interval '2 hours' - (g || ' seconds')::interval"
             + " FROM generate_series(1, ?) g",
         tenant, vault, ROWS);
+    // Cross-tenant noise: recent QUARANTINED rows that a global
+    // partial-index scan must skip through (up to NOISE_ROWS
+    // filtered rows) before reaching one probe row, while the
+    // tenant-leading index seeks the probe's rows directly.
+    owner.update(
+        "INSERT INTO quarantine_admission (tenant_id, vault_object_id, actual_type,"
+            + " size_bytes, content_sha256, status, created_by, created_at)"
+            + " SELECT ?, ?, 'image/png', 8, decode(md5('n' || g::text), 'hex'),"
+            + " 'QUARANTINED', 'plan-noise', now() - (g || ' seconds')::interval"
+            + " FROM generate_series(1, ?) g",
+        noiseTenant, noiseVault, NOISE_ROWS);
     owner.execute("ANALYZE verification_decision");
     owner.execute("ANALYZE proof_request");
     owner.execute("ANALYZE credential_artifact");
@@ -119,13 +165,30 @@ class QueryPlanTests extends SovraPostgresBase {
 
   @AfterAll
   void cleanup() {
-    owner.update("DELETE FROM verification_decision WHERE tenant_id = ?", tenant);
-    owner.update("DELETE FROM proof_request WHERE tenant_id = ?", tenant);
-    owner.update("DELETE FROM credential_artifact WHERE tenant_id = ?", tenant);
-    owner.update("DELETE FROM audit_event WHERE tenant_id = ?", tenant);
-    owner.update("DELETE FROM quarantine_admission WHERE tenant_id = ?", tenant);
-    owner.update("DELETE FROM vault_object WHERE tenant_id = ?", tenant);
-    owner.update("DELETE FROM tenant WHERE id = ?", tenant);
+    clearProbeRows();
+  }
+
+  /** Deletes only this class's slugs; sibling suites' rows stay. */
+  private void clearProbeRows() {
+    owner.update(
+        "DELETE FROM verification_decision WHERE tenant_id IN"
+            + " (SELECT id FROM tenant WHERE slug IN ('query-plan-probe', 'query-plan-noise'))");
+    owner.update(
+        "DELETE FROM proof_request WHERE tenant_id IN"
+            + " (SELECT id FROM tenant WHERE slug IN ('query-plan-probe', 'query-plan-noise'))");
+    owner.update(
+        "DELETE FROM credential_artifact WHERE tenant_id IN"
+            + " (SELECT id FROM tenant WHERE slug IN ('query-plan-probe', 'query-plan-noise'))");
+    owner.update(
+        "DELETE FROM audit_event WHERE tenant_id IN"
+            + " (SELECT id FROM tenant WHERE slug IN ('query-plan-probe', 'query-plan-noise'))");
+    owner.update(
+        "DELETE FROM quarantine_admission WHERE tenant_id IN"
+            + " (SELECT id FROM tenant WHERE slug IN ('query-plan-probe', 'query-plan-noise'))");
+    owner.update(
+        "DELETE FROM vault_object WHERE tenant_id IN"
+            + " (SELECT id FROM tenant WHERE slug IN ('query-plan-probe', 'query-plan-noise'))");
+    owner.update("DELETE FROM tenant WHERE slug IN ('query-plan-probe', 'query-plan-noise')");
   }
 
   @Test
@@ -178,17 +241,25 @@ class QueryPlanTests extends SovraPostgresBase {
 
   @Test
   void quarantineFeedsUseIndexes() {
+    // Index Cond (not Filter) proves the feed is bounded to the
+    // tenant's rows inside the index; a Filter on tenant_id would
+    // scan other tenants' rows first (the quarantine_claim_idx
+    // failure mode) and grow with total table size.
     assertThat(plan(
             "SELECT id FROM quarantine_admission WHERE tenant_id = '" + tenant + "'"
                 + " ORDER BY created_at DESC, id DESC LIMIT 50"))
         .contains("quarantine_admission_tenant_recent_idx")
-        .doesNotContain("Seq Scan on quarantine_admission");
+        .contains("Index Cond")
+        .doesNotContain("Seq Scan on quarantine_admission")
+        .doesNotContain("Filter:");
     assertThat(plan(
             "SELECT id FROM quarantine_admission WHERE tenant_id = '" + tenant + "'"
                 + " AND status = 'QUARANTINED'"
                 + " ORDER BY created_at DESC, id DESC LIMIT 50"))
         .contains("quarantine_admission_tenant_status_recent_idx")
-        .doesNotContain("Seq Scan on quarantine_admission");
+        .contains("Index Cond")
+        .doesNotContain("Seq Scan on quarantine_admission")
+        .doesNotContain("Filter:");
   }
 
   @Test

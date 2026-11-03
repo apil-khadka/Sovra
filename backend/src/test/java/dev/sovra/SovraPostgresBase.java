@@ -46,7 +46,9 @@ public abstract class SovraPostgresBase {
   /** Least-privilege connection for RLS/grant assertions. */
   protected static synchronized DataSource appRoleDataSource() {
     if (appPool == null) {
-      appPool = roleDataSource(APP_ROLE, APP_ROLE_PASSWORD);
+      // Single-threaded assertions plus one held connection (see
+      // LeastPrivilegeTests: 1 held + 1 borrowed); 3 leaves margin.
+      appPool = roleDataSource(APP_ROLE, APP_ROLE_PASSWORD, 3, "sovra-app-test");
     }
     return appPool;
   }
@@ -54,7 +56,10 @@ public abstract class SovraPostgresBase {
   /** Isolated-worker connection for containment assertions. */
   protected static synchronized DataSource quarantineRoleDataSource() {
     if (quarantinePool == null) {
-      quarantinePool = roleDataSource(QUARANTINE_ROLE, QUARANTINE_ROLE_PASSWORD);
+      // PROD-009: the parallel claim test holds four worker-role
+      // connections at once; 5 keeps that burst plus margin.
+      quarantinePool =
+          roleDataSource(QUARANTINE_ROLE, QUARANTINE_ROLE_PASSWORD, 5, "sovra-quarantine-test");
     }
     return quarantinePool;
   }
@@ -62,19 +67,27 @@ public abstract class SovraPostgresBase {
   /** Owner connection for fixtures and cross-tenant seeding. */
   protected static synchronized DataSource ownerDataSource() {
     if (ownerPool == null) {
-      ownerPool = roleDataSource(POSTGRES.getUsername(), POSTGRES.getPassword());
+      ownerPool =
+          roleDataSource(POSTGRES.getUsername(), POSTGRES.getPassword(), 3, "sovra-owner-test");
     }
     return ownerPool;
   }
 
-  private static HikariDataSource roleDataSource(String user, String password) {
+  private static HikariDataSource roleDataSource(
+      String user, String password, int maxPoolSize, String poolName) {
     HikariConfig config = new HikariConfig();
     config.setJdbcUrl(POSTGRES.getJdbcUrl());
     config.setUsername(user);
     config.setPassword(password);
-    // PROD-009: the parallel claim test holds four worker-role
-    // connections at once; ceiling only, idle count unchanged.
-    config.setMaximumPoolSize(8);
+    // Test-only bounds: the singleton container caps at 100
+    // connections shared with every cached Spring context. One warm
+    // idle connection per static pool; bursts grow to the ceiling
+    // and drain after 30s idle. The default minimumIdle (= max)
+    // would pin 8 idle per pool even when no test runs.
+    config.setMaximumPoolSize(maxPoolSize);
+    config.setMinimumIdle(1);
+    config.setIdleTimeout(30_000);
+    config.setPoolName(poolName);
     config.setConnectionTimeout(10_000);
     config.setMaxLifetime(300_000);
     config.setLeakDetectionThreshold(2_000);

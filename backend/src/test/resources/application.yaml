@@ -19,7 +19,14 @@ spring:
     username: ${SOVRA_DB_USER:sovra}
     password: ${SOVRA_DB_PASSWORD:changeme}
     hikari:
-      maximum-pool-size: 10
+      # Test-only bounds: every cached Spring context holds one pool
+      # against the singleton container (max 100 connections). Tests
+      # drive HTTP sequentially, so 3 covers one request plus margin;
+      # one warm idle per context, bursts drain after 30s. Production
+      # keeps 10 in the main yaml.
+      maximum-pool-size: 3
+      minimum-idle: 1
+      idle-timeout: 30000
       connection-timeout: 5000
   flyway:
     enabled: true

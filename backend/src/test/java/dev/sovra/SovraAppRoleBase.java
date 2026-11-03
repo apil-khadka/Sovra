@@ -44,6 +44,12 @@ public abstract class SovraAppRoleBase {
       config.setUsername(SovraPostgresBase.QUARANTINE_ROLE);
       config.setPassword(SovraPostgresBase.QUARANTINE_ROLE_PASSWORD);
       config.setMaximumPoolSize(2);
+      // Test-only bound: one warm idle, not two pinned; the
+      // singleton container shares its 100 slots with every cached
+      // Spring context.
+      config.setMinimumIdle(1);
+      config.setIdleTimeout(30_000);
+      config.setPoolName("sovra-approle-quarantine-test");
       config.setMaxLifetime(300_000);
       quarantinePool = new HikariDataSource(config);
     }
@@ -58,6 +64,9 @@ public abstract class SovraAppRoleBase {
       config.setUsername(POSTGRES.getUsername());
       config.setPassword(POSTGRES.getPassword());
       config.setMaximumPoolSize(2);
+      config.setMinimumIdle(1);
+      config.setIdleTimeout(30_000);
+      config.setPoolName("sovra-approle-owner-test");
       config.setMaxLifetime(300_000);
       ownerPool = new HikariDataSource(config);
     }
