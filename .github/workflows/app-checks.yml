@@ -141,7 +141,9 @@ jobs:
         run: npm --prefix sdk/typescript ci --no-audit --no-fund && npm --prefix sdk/typescript test
       - name: Show service logs on failure
         if: failure()
-        run: docker compose logs app-a keycloak db-seed
+        run: |
+          docker compose ps -a || true
+          docker compose logs --no-color --tail=100 || true
       - name: Tear down disposable stack
         if: always()
         run: docker compose down -v
@@ -186,7 +188,9 @@ jobs:
         run: pnpm --dir frontend run test:e2e
       - name: Show service logs on failure
         if: failure()
-        run: docker compose logs app-a keycloak db-seed
+        run: |
+          docker compose ps -a || true
+          docker compose logs --no-color --tail=100 || true
       - name: Tear down disposable stack
         if: always()
         run: docker compose down -v

@@ -10,7 +10,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker compose up -d --build
+if ! docker compose up -d --build; then
+  echo "compose stack failed to start; service status and logs follow" >&2
+  docker compose ps -a >&2 || true
+  docker compose logs --no-color --tail=100 >&2 || true
+  exit 1
+fi
 
 for port in 8080 8081; do
   for i in $(seq 1 40); do
