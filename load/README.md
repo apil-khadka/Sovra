@@ -29,6 +29,29 @@ Staging provisions through [accredited
 onboarding](../docs/engineering/accredited-onboarding.md), never
 through `provision.mjs`.
 
+## Spike and instance-loss probes (done, local)
+
+**Spike** ([`spike-2026-11-02.json`](results/spike-2026-11-02.json)):
+3,000 mixed arrivals at 5× the smoke rate included 2,106 issuance attempts and 894 probes.
+There were 360 HTTP-200 verification responses, 1,746 flows stopped by 429 responses, and 258 readiness probes returned 429.
+No recorded request had a transport failure or HTTP 5xx response, and the load generator dropped no arrivals at its in-flight cap (`shed=0`).
+Per-endpoint p99 across all recorded status classes was at most 18 ms; successful-request latency is not reported separately.
+Readiness rejection under load can cause orchestrator health checks to flap.
+The probe bucket needs sizing or a dedicated bounded probe path before capacity qualification; readiness executes persistence checks, so simply exempting it from admission would leave expensive work unbounded.
+
+**Instance loss** ([`instance-loss-2026-11-02.json`](results/instance-loss-2026-11-02.json)):
+The replica was restarted immediately before directing a 60-second run against its port.
+600 mixed arrivals included 413 issuance attempts and 187 probes.
+The run recorded 395 HTTP-200 verification responses, 14 failed issuance calls, 11 failed probes, and four mid-flow 429 denials.
+This demonstrates client-visible startup disruption followed by recovery, not load-balanced failover or a restart during active flows.
+The result aggregates transport errors and HTTP 5xx together, so it cannot independently establish the exact outage duration or absence of HTTP 5xx.
+The demo Compose setup has no load balancer.
+
+**Evidence limits:** filenames retain the original run label, but both JSON `window` timestamps are on 2026-11-03 UTC.
+The harness derives `completedFlows` from HTTP 200 rather than accepted verification outcomes; compare `abortedFlowsByStep` and `flowsByTenant` before interpreting it as acceptance.
+Neither result records raw outcomes, status distributions beyond the listed counters, per-request timestamps, container resources, or an invariant check for mid-flow corruption.
+These probes establish local overload/recovery observations only; staging capacity and correctness qualification remain open.
+
 ## Staged runs (staging, approved)
 
 Each run records its result file, machine resources (captured in

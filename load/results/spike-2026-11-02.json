@@ -1,0 +1,125 @@
+{
+  "harness": "load/harness.mjs",
+  "config": {
+    "base": "http://localhost:8080",
+    "rps": 50,
+    "durationS": 60,
+    "seed": 707,
+    "flowWeight": 0.7,
+    "maxInflight": 200,
+    "tenants": [
+      "load-t0",
+      "load-t1",
+      "load-t2"
+    ],
+    "tenantSkew": [
+      0.545,
+      0.273,
+      0.182
+    ],
+    "holders": 16
+  },
+  "resources": {
+    "node": "v22.23.4",
+    "cpus": 18,
+    "memMB": 24576
+  },
+  "window": {
+    "startedAt": "2026-11-03T07:30:27.985Z",
+    "endedAt": "2026-11-03T07:31:27.987Z"
+  },
+  "offered": 3000,
+  "completedFlows": 360,
+  "abortedFlowsByStep": {
+    "consent.create:denied": 574,
+    "consent.review:denied": 638,
+    "consent.decide:denied": 214,
+    "verify:denied": 61,
+    "issue:denied": 259
+  },
+  "flowsByTenant": {
+    "load-t0": 86,
+    "load-t2": 161,
+    "load-t1": 113
+  },
+  "shed": 0,
+  "endpoints": {
+    "probe.ready": {
+      "n": 437,
+      "ok2xx": 179,
+      "denied429": 258,
+      "denied503": 0,
+      "failed": 0,
+      "p50": 2,
+      "p95": 8,
+      "p99": 11,
+      "max": 43
+    },
+    "issue": {
+      "n": 2106,
+      "ok2xx": 1847,
+      "denied429": 259,
+      "denied503": 0,
+      "failed": 0,
+      "p50": 8,
+      "p95": 14,
+      "p99": 18,
+      "max": 75
+    },
+    "consent.create": {
+      "n": 1847,
+      "ok2xx": 1273,
+      "denied429": 574,
+      "denied503": 0,
+      "failed": 0,
+      "p50": 6,
+      "p95": 11,
+      "p99": 14,
+      "max": 29
+    },
+    "consent.review": {
+      "n": 1273,
+      "ok2xx": 635,
+      "denied429": 638,
+      "denied503": 0,
+      "failed": 0,
+      "p50": 3,
+      "p95": 7,
+      "p99": 9,
+      "max": 17
+    },
+    "consent.decide": {
+      "n": 635,
+      "ok2xx": 421,
+      "denied429": 214,
+      "denied503": 0,
+      "failed": 0,
+      "p50": 6,
+      "p95": 11,
+      "p99": 14,
+      "max": 21
+    },
+    "verify": {
+      "n": 421,
+      "ok2xx": 360,
+      "denied429": 61,
+      "denied503": 0,
+      "failed": 0,
+      "p50": 7,
+      "p95": 12,
+      "p99": 16,
+      "max": 22
+    },
+    "probe.discovery": {
+      "n": 457,
+      "ok2xx": 457,
+      "denied429": 0,
+      "denied503": 0,
+      "failed": 0,
+      "p50": 1,
+      "p95": 3,
+      "p99": 4,
+      "max": 5
+    }
+  }
+}
