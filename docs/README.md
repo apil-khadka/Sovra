@@ -1,6 +1,6 @@
 # Sovra - Documentation Index
 
-**Snapshot:** 2026-11-02 · **Status:** working synthetic Java/React demo with remaining protocol/public-release/production gates and unqualified capacity.
+**Snapshot:** 2026-11-03 · **Status:** working synthetic Java/React demo with fresh source/runtime evidence; wallet responsive fix and both local browser profiles are requalified, the interoperability recording is locally verified, and live/provider qualification plus production gates remain pending.
 
 Sovra explores whether a **Meta-powered, policy-grounded interoperability planner** can discover compatible verification evidence across independently governed identity systems, while keeping user identity source records in local jurisdiction-controlled domains.
 It is a research/demo prototype using **synthetic data** and **simulated jurisdictions**.
@@ -9,8 +9,8 @@ It is a research/demo prototype using **synthetic data** and **simulated jurisdi
 
 ## Reading map
 
-Start implementation work with the [current continuation guide](engineering/continuation-guide.md), reviewed 2026-11-02.
-It reconciles implemented demo features, remaining browser/protocol/public-hosting gates and no-credit verification.
+Start implementation work with the [current continuation guide](engineering/continuation-guide.md), reviewed 2026-11-03.
+It reconciles implemented demo features, fresh source/runtime evidence, remaining browser/protocol/public-hosting gates and no-credit verification.
 
 | Question | Document |
 | --- | --- |
@@ -30,6 +30,9 @@ It reconciles implemented demo features, remaining browser/protocol/public-hosti
 | What would enterprise rigor change? | [Enterprise review](architecture/enterprise-architecture-review.md) (gaps, improvements, new ADRs) |
 | How should AI coding agents execute work? | [First vertical slice](engineering/first-vertical-slice.md), [Implementation plan](engineering/implementation-plan.md), [Coding playbook](engineering/coding-agent-playbook.md) |
 | How will we convince judges? | [Demo script](demo/three-minute-demo.md), [Experiment matrix](demo/evaluation-and-acceptance.md) |
+| How do the two demo issuers run separately? | [Dual-issuer topology](demo/dual-issuer-topology.md) (standalone local synthetic stacks) |
+| How is unfamiliar-schema proof demonstrated? | [Interoperability demo](demo/interoperability.md) (four-schema governed journey) |
+| How is planner discovery scored? | [Planner evaluation](ai/planner-evaluation.md) (frozen corpus v2, guard-adjudicated) |
 | Which dated milestone applies to the hackathon? | [Synthetic milestone schedule](engineering/hackathon-milestone-plan.md) |
 | What can we safely claim publicly? | [Claims boundaries](compliance/claims-and-limitations.md), [Standards and citations](research/standards-and-validation.md) |
 | What are the competition obligations? | [Hackathon rules](hackathon/rules-and-deliverables.md) |
@@ -39,7 +42,8 @@ It reconciles implemented demo features, remaining browser/protocol/public-hosti
 
 The repository contains a Java 25/Spring Boot backend, React application, synthetic identity/document workflows, SDKs, operator/product desks and mock relying-party integration examples.
 The earlier TypeScript prototype was removed; JSON fixtures are preserved as migration evidence.
-The synthetic vertical slice has automated evidence; full profile qualification, deployed production security assessment and capacity qualification remain pending.
+The synthetic vertical slice has automated source and runtime evidence; the wallet's 390px responsive check and both local browser profiles now pass, and a fixture-mode interoperability recording was verified locally.
+Live/provider qualification, external wallet conformance, deployed production security assessment and capacity qualification remain pending.
 Use the [root README](../README.md) for the current setup and validation commands.
 
 ## Local research

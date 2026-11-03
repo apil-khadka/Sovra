@@ -118,6 +118,31 @@ class BffIssuerFlowTests extends SovraAppRoleBase {
   }
 
   @Test
+  void authenticatedBffSessionConsumesPrincipalAndTenantAdmissionBuckets() throws Exception {
+    owner.update("DELETE FROM rate_limit_bucket");
+
+    login(List.of("sovra-ops"));
+
+    List<String> principalBuckets = owner.queryForList(
+        "SELECT bucket FROM rate_limit_bucket WHERE bucket LIKE 'principal:%'",
+        String.class);
+    assertThat(principalBuckets).hasSize(1);
+    Double principalTokens = owner.queryForObject(
+        "SELECT tokens FROM rate_limit_bucket WHERE bucket = ?",
+        Double.class,
+        principalBuckets.getFirst());
+    Double tenantTokens = owner.queryForObject(
+        "SELECT tokens FROM rate_limit_bucket WHERE bucket = ?",
+        Double.class,
+        "tenant:" + demoTenant);
+
+    // BffTestSessions.login performs an authenticated /api/bff/me read.
+    // Both shared admission buckets must therefore exist and be spent.
+    assertThat(principalTokens).isLessThan(300.0);
+    assertThat(tenantTokens).isLessThan(1_000.0);
+  }
+
+  @Test
   void humansReviewCasesThroughMakerChecker() throws Exception {
     TestAccount ops = TestAccounts.createInTenant(
         owner, demoTenant, "desk-ops-" + suffix(), Set.of("ISSUER_OPS"));

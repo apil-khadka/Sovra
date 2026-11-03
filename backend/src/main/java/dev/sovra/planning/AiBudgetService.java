@@ -140,8 +140,12 @@ public class AiBudgetService {
       throw new IllegalArgumentException("token estimate must be positive");
     }
     LocalDate today = LocalDate.now(clock);
+    applyDailyLimitReductions(today);
     return transactions.execute(
         status -> {
+          // Create the first row inside the reservation transaction.
+          // If the first request is denied (for example, a zero budget),
+          // rollback leaves no misleading daily ledger row behind.
           global.update(
               "INSERT INTO ai_budget_day (day, request_limit, token_limit, concurrency_limit)"
                   + " VALUES (?, ?, ?, ?) ON CONFLICT (day) DO NOTHING",
@@ -149,6 +153,18 @@ public class AiBudgetService {
               budgets.dailyRequests(),
               budgets.dailyTokens(),
               budgets.maxConcurrency());
+          // A concurrently inserted row can have come from a replica with
+          // higher limits, so reduce it again while holding this transaction.
+          global.update(
+              "UPDATE ai_budget_day SET"
+                  + " request_limit = LEAST(request_limit, ?),"
+                  + " token_limit = LEAST(token_limit, ?),"
+                  + " concurrency_limit = LEAST(concurrency_limit, ?)"
+                  + " WHERE day = ?",
+              budgets.dailyRequests(),
+              budgets.dailyTokens(),
+              budgets.maxConcurrency(),
+              today);
           DayRow day =
               global.queryForObject(
                   "SELECT request_limit, token_limit, concurrency_limit,"
@@ -191,6 +207,29 @@ public class AiBudgetService {
               today,
               estimatedTokens,
               budgets.leaseSeconds());
+        });
+  }
+
+  /**
+   * Persist limit reductions before the reservation transaction can
+   * reject and roll back. Limits only move downward within a UTC day;
+   * increasing a cap requires the next daily row or an explicit
+   * operator control plane, so one drifted replica cannot raise spend.
+   */
+  private void applyDailyLimitReductions(LocalDate day) {
+    transactions.execute(
+        status -> {
+          global.update(
+              "UPDATE ai_budget_day SET"
+                  + " request_limit = LEAST(request_limit, ?),"
+                  + " token_limit = LEAST(token_limit, ?),"
+                  + " concurrency_limit = LEAST(concurrency_limit, ?)"
+                  + " WHERE day = ?",
+              budgets.dailyRequests(),
+              budgets.dailyTokens(),
+              budgets.maxConcurrency(),
+              day);
+          return null;
         });
   }
 

@@ -18,10 +18,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Legal-hold register desk (PROD-010). Trust admins set and
- * release holds; auditors read the register. A hold suspends
- * vault destruction and audit archival for the tenant — never
- * protocol-state purges, which carry no content.
+ * Tenant-scoped legal-hold desk (PROD-010). Trust admins set and
+ * release their own tenant's hold; auditors read that tenant's
+ * state. A hold suspends vault destruction and audit archival —
+ * never protocol-state purges, which carry no content.
  */
 @RestController
 @RequestMapping("/api/tenants")

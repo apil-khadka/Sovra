@@ -17,10 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Legal-hold register (PROD-010). A hold suspends destruction for
- * a tenant — vault delete/purge refuse and the audit archival job
- * skips the tenant's rows — while protocol-state purges continue.
- * Setting and releasing are trust-admin platform powers, audited
- * with the target tenant in the detail.
+ * the caller's own tenant — vault delete/purge refuse and the audit
+ * archival job skips that tenant's rows — while protocol-state purges
+ * continue. Cross-tenant platform authority is not modeled by tenant
+ * credentials and therefore is deliberately unavailable here.
  */
 @Service
 public class TenantHoldService {
@@ -49,7 +49,7 @@ public class TenantHoldService {
     Decision decision =
         AuditedAuthorizer.require(authz, audit, caller,
             Action.TENANT_SET_HOLD,
-            ResourceRef.tenantScoped("tenant", tenantId.toString(), caller.tenantId()));
+            ResourceRef.tenantScoped("tenant", tenantId.toString(), tenantId));
     int updated =
         tenant.update(
             "UPDATE tenant SET legal_hold = ? WHERE id = ?", held, tenantId);
@@ -58,7 +58,7 @@ public class TenantHoldService {
     }
     audit.record(
         caller, Action.TENANT_SET_HOLD,
-        ResourceRef.tenantScoped("tenant", tenantId.toString(), caller.tenantId()),
+        ResourceRef.tenantScoped("tenant", tenantId.toString(), tenantId),
         decision, "", Map.of("held", String.valueOf(held)));
     return load(tenantId);
   }
@@ -71,11 +71,12 @@ public class TenantHoldService {
             ResourceRef.tenantScoped("tenant", "holds", caller.tenantId()));
     List<HoldView> views =
         tenant.query(
-            "SELECT id, slug, legal_hold FROM tenant ORDER BY slug",
+            "SELECT id, slug, legal_hold FROM tenant WHERE id = ?",
             (rs, n) -> new HoldView(
                 rs.getObject("id", UUID.class),
                 rs.getString("slug"),
-                rs.getBoolean("legal_hold")));
+                rs.getBoolean("legal_hold")),
+            caller.tenantId());
     audit.record(
         caller, Action.TENANT_READ_HOLD,
         ResourceRef.tenantScoped("tenant", "holds", caller.tenantId()),

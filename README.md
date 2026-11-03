@@ -21,6 +21,9 @@ Architecture documents describe intended behavior rather than implemented guaran
 - [Implemented API](docs/engineering/implemented-api.openapi.yaml): exact backend contract with per-operation scopes.
 - [Semantic health](docs/engineering/semantic-health.md): readiness probes, alerts, sanitized telemetry, and canaries.
 - [Acceptance criteria](docs/demo/evaluation-and-acceptance.md): evidence required for the demo.
+- [Dual-issuer demo topology](docs/demo/dual-issuer-topology.md): two separate local synthetic issuer stacks with honest isolation boundaries.
+- [Interoperability demo](docs/demo/interoperability.md): governed unfamiliar-schema proof journey across four issuer schemas.
+- [Planner evaluation](docs/ai/planner-evaluation.md): frozen corpus v2 scoring for scoped discovery through the real guard.
 - [Security validation plan](docs/engineering/security-validation-plan.md): proposed adversarial tests and production evidence gates.
 - [Identity/key-provider architecture](docs/architecture/identity-key-provider-architecture.md): provider recommendation, current architecture findings and development/live-data gates.
 - [Claims and limitations](docs/compliance/claims-and-limitations.md): prototype and standards boundaries.

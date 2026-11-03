@@ -24,7 +24,9 @@ pnpm --dir demo start
 ```
 
 Then open [http://localhost:5174](http://localhost:5174) in a browser and
-pick NovaBank (`/novabank`) or CornerCellar (`/cornercellar`).
+pick NovaBank (`/novabank`), CornerCellar (`/cornercellar`), or the
+unfamiliar-schema journey (`/interoperability`, documented in
+[interoperability.md](../docs/demo/interoperability.md)).
 
 The copy-paste starting point for integrators is `demo/minimal`
 ([quickstart](../docs/demo/integrate-age-check.md)):
@@ -52,6 +54,14 @@ pnpm --dir demo run smoke:all  # NovaBank + CornerCellar + minimal
   the smoke test.
 - `public/novabank.html`, `public/cornercellar.html`: the two mock apps.
   Same engine, different story and copy.
+- `public/interoperability.html` + `interop.mjs`: the four-case
+  unfamiliar-schema journey (known/Fjord/Harbor/employment). All
+  planning goes to the central ledger; issuance/consent/verify route by
+  the returned plan issuer with per-node tokens. `interop.test.mjs`
+  pins the contract against a fake backend. `config.mjs`
+  (`config.test.mjs`) resolves explicit full/interop-only modes with
+  matched credential sources — see the configuration contract in
+  [interoperability.md](../docs/demo/interoperability.md).
 - `setup.mjs`: mints the disposable setup account plus both sandbox RP
   accounts through the real product endpoint.
 - `limit.mjs`: shared origin check plus per-IP token bucket, used by

@@ -57,11 +57,15 @@ public class KmsVaultKekProvider implements VaultKekProvider {
   @Override
   public WrappedDek wrapDek(UUID tenantId, int kekVersion, byte[] dek, byte[] aad) {
     requireProvider();
-    KmsProvider.KmsWrapResult result =
-        provider.wrapDek(
-            new KmsProvider.KmsWrapRequest(
-                context(tenantId, kekVersion, aad), kekVersion, dek, aad));
-    return new WrappedDek(result.wrapped(), result.nonce());
+    try {
+      KmsProvider.KmsWrapResult result =
+          provider.wrapDek(
+              new KmsProvider.KmsWrapRequest(
+                  context(tenantId, kekVersion, aad), kekVersion, dek, aad));
+      return new WrappedDek(result.wrapped(), result.nonce());
+    } catch (KmsDeniedException e) {
+      throw new VaultAuthenticationException("kek provider denied the wrap call");
+    }
   }
 
   @Override

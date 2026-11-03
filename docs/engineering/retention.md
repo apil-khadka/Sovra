@@ -29,9 +29,12 @@
   overwritten on the retention schedule, not resurrected.
 - Legal hold: a `legal_hold` flag per tenant suspends vault
   delete/purge and audit archival for that tenant; purges of
-  protocol state continue (they carry no content). Set and
-  released through `PUT /api/tenants/{id}/legal-hold`
-  (TRUST_ADMIN, audited); the vault service refuses held
+  protocol state continue (they carry no content). A tenant's
+  `TRUST_ADMIN` sets or releases only its own hold through
+  `PUT /api/tenants/{id}/legal-hold`; the register returns only
+  that tenant's state. Tenant credentials do not authorize
+  cross-tenant holds or tenant enumeration; a separate platform
+  principal is not implemented. The vault service refuses held
   destruction with `legal_hold` (409), and the purge function
   backstops direct `EXECUTE`. Hold classes still need counsel
   sign-off before first production use.

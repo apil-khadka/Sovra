@@ -75,9 +75,9 @@ public class AuthorizationService {
               Action.ACCREDIT_READ,
               EnumSet.of(Role.TENANT_MEMBER, Role.ISSUER_OPS, Role.AUDIT_READER,
                   Role.TRUST_ADMIN)),
-          // Legal hold (PROD-010): trust admins set and release
-          // holds on any tenant (platform power, like trust
-          // administration); auditors read the hold register.
+          // Legal hold (PROD-010): tenant-scoped trust admins manage
+          // their own tenant's hold. Tenant credentials never confer
+          // platform-wide hold or tenant-enumeration authority.
           Map.entry(Action.TENANT_SET_HOLD, EnumSet.of(Role.TRUST_ADMIN)),
           Map.entry(
               Action.TENANT_READ_HOLD, EnumSet.of(Role.TRUST_ADMIN, Role.AUDIT_READER)),

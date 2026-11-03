@@ -49,15 +49,16 @@ The cases cover VCI issuance to ACCEPTED, exact encrypted-response replay, denia
 The happy path also checks for horizontal overflow at a 390-pixel viewport and captures desktop/mobile screenshots for local inspection.
 CI runs separate `synthetic` and `sdjwt-vc` profile jobs.
 Profile-specific native/wallet cases are explicitly skipped in the other profile; shared login and consent cases run in both.
-The selected-profile final local run passed 14 applicable cases, including login-before-key creation; four native-binding cases were explicitly skipped.
-The synthetic-profile final run also passed 14 applicable cases, with the four selected-wallet cases explicitly skipped.
-Both runs used the rebuilt container image, and frontend typecheck/build/lint plus repository and whitespace checks passed.
+The 2026-10-30 profile runs below are historical and were superseded by the 2026-11-03 requalification.
+The latest full SD-JWT profile passed 35 cases with four native-verifier skips; the synthetic profile passed 34 with five wallet skips.
+The SD-JWT happy path passed its 390-pixel horizontal-overflow assertion after the responsive fix.
+Both profiles used rebuilt local images with live planning explicitly disabled; frontend typecheck, lint and build passed after the fix.
 These are local results; the hosted CI matrix has not been observed in this session.
 
 ## Remaining qualification
 
-The UI currently implements the pre-authorized issuance grant, not the authorization-code/PKCE wallet journey.
-Offer codes are single-use; a failed or lost credential receipt currently requires a fresh offer rather than persistent issuance recovery.
+The UI implements both the pre-authorized issuance grant and an authorization-code/PKCE journey with a browser-owned verifier.
+Offer codes and authorization codes are single-use; a failed or lost credential receipt currently requires a fresh offer or authorization rather than persistent issuance recovery.
 The browser credential check validates the issuer signature and holder binding; full SD-JWT disclosure, source eligibility, status and trust validation remain server-enforced.
 Full disclosure is intentional for the frozen one-claim G1 profile; broader selective disclosure is unqualified.
 The synthetic verifier key bootstrap is application-local and does not support arbitrary external verifier discovery.
@@ -75,3 +76,10 @@ The verifier is never rendered and never crosses the
 machine setup. `wallet.spec.ts` covers receipt plus
 single-use code refusal (5/5 green on the `sdjwt-vc`
 stack, 2026-10-30).
+
+## 2026-11-03 responsive and profile requalification
+
+The wallet is scoped under `.consent.wallet` so long protocol identifiers and input values can shrink inside a 390-pixel viewport.
+Compose now gives each app replica its own `SOVRA_OPENID_ISSUER_BASE_URL`, matching the absolute URLs in VCI/VP metadata to that replica's published origin.
+The full SD-JWT and synthetic Playwright profile suites pass locally with only the profile-specific skips listed above.
+SOV-036/041 remain open because external wallet interoperability, independent conformance, deployment and production custody evidence are still outstanding.

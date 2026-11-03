@@ -12,9 +12,14 @@ import com.nimbusds.jwt.EncryptedJWT;
 import com.nimbusds.jwt.SignedJWT;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.security.AlgorithmParameters;
 import java.security.KeyFactory;
+import java.security.Signature;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
+import java.security.spec.ECGenParameterSpec;
+import java.security.spec.ECParameterSpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.text.ParseException;
@@ -117,10 +122,16 @@ public class FileVerifierKeys implements VerifierKeys {
             parsed.getHeader().getEncryptionMethod())) {
       throw new InvalidOpenIdRequestException("response transport is out of profile");
     }
-    // Overlap order: current key first, previous keys after. A kid
-    // mismatch is not fatal — wallets may lag rotation — but every
-    // key is tried before the response is refused.
-    for (DecryptionKey key : decryptionKeys) {
+    // Prefer the advertised kid to avoid trying unrelated private
+    // keys. Retain overlap fallback because in-flight wallets may
+    // carry a stale kid while encrypting to a still-configured key.
+    String responseKid = parsed.getHeader().getKeyID();
+    List<DecryptionKey> ordered = new ArrayList<>(decryptionKeys);
+    if (responseKid != null) {
+      ordered.sort((left, right) -> Boolean.compare(
+          !responseKid.equals(left.kid()), !responseKid.equals(right.kid())));
+    }
+    for (DecryptionKey key : ordered) {
       try {
         parsed.decrypt(new ECDHDecrypter(key.jwk()));
         Payload payload = parsed.getPayload();
@@ -174,12 +185,50 @@ public class FileVerifierKeys implements VerifierKeys {
       ECPublicKey publicKey =
           (ECPublicKey)
               factory.generatePublic(new X509EncodedKeySpec(armor(pem, "PUBLIC KEY")));
+      requireMatchingP256Pair(privateKey, publicKey);
       return new ECKey.Builder(Curve.P_256, publicKey).privateKey(privateKey).keyID(kid).build();
     } catch (IllegalStateException e) {
       throw e;
     } catch (Exception e) {
       throw new IllegalStateException("verifier key file is not a P-256 keypair: " + path, e);
     }
+  }
+
+  /** Fail boot if a mounted PEM is not a matching P-256 keypair. */
+  private static void requireMatchingP256Pair(
+      ECPrivateKey privateKey, ECPublicKey publicKey) throws Exception {
+    AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
+    parameters.init(new ECGenParameterSpec("secp256r1"));
+    ECParameterSpec expected = parameters.getParameterSpec(ECParameterSpec.class);
+    if (!sameCurve(privateKey.getParams(), expected)
+        || !sameCurve(publicKey.getParams(), expected)) {
+      throw new IllegalStateException("verifier keys must use the P-256 curve");
+    }
+    byte[] challenge = "sovra-openid-verifier-key-pair-check/v1"
+        .getBytes(StandardCharsets.UTF_8);
+    Signature signature = Signature.getInstance("SHA256withECDSA");
+    signature.initSign(privateKey);
+    signature.update(challenge);
+    byte[] proof = signature.sign();
+    signature.initVerify(publicKey);
+    signature.update(challenge);
+    if (!signature.verify(proof)) {
+      throw new IllegalStateException("verifier public and private keys do not match");
+    }
+  }
+
+  private static boolean sameCurve(ECParameterSpec actual, ECParameterSpec expected) {
+    if (actual == null || actual.getCurve() == null || actual.getGenerator() == null) {
+      return false;
+    }
+    return actual.getCurve().getField().getFieldSize()
+            == expected.getCurve().getField().getFieldSize()
+        && actual.getCurve().getField().equals(expected.getCurve().getField())
+        && actual.getCurve().getA().equals(expected.getCurve().getA())
+        && actual.getCurve().getB().equals(expected.getCurve().getB())
+        && actual.getGenerator().equals(expected.getGenerator())
+        && actual.getOrder().equals(expected.getOrder())
+        && actual.getCofactor() == expected.getCofactor();
   }
 
   private static byte[] armor(String pem, String label) {

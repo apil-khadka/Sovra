@@ -14,6 +14,11 @@ accreditable), at least one exact `https` origin (no wildcards, no
 path), and at least one exact `https` audience. States move
 forward only: `REQUESTED → APPROVED | REJECTED`, `APPROVED →
 REVOKED`; revocation kills the bearer immediately.
+The authenticated requester id is stored with each new request, and
+that principal cannot approve or reject its own accreditation even if
+it also holds `TRUST_ADMIN`.
+Decision transitions lock the request row and use conditional state
+updates, so concurrent decisions cannot mint an unlinked credential.
 
 Enforcement is split honestly by what the server can prove:
 
@@ -50,10 +55,11 @@ automation under the same role, audited with its entry point.
 
 ## Evidence
 
-- `AccreditationFlowTests` (5 tests): audience-bound round trip,
+- `AccreditationFlowTests`: audience-bound round trip,
   foreign-audience refusal, revocation kill, rejection and
   double-decision conflicts, loose-binding validation, role
-  gates, unknown-id 404.
+  gates, unknown-id 404, self-decision refusal, and concurrent
+  approval serialization.
 - `BffAccreditationStepUpTests` (3 tests): fresh hardware session
   approves; aged authentication and downgraded methods get
   `step_up_required` with nothing minted.

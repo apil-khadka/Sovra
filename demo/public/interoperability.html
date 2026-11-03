@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sovra interoperability demo — synthetic unfamiliar schemas</title>
+    <link rel="stylesheet" href="/style.css" />
+    <style>
+      /* Compact status: the mode stays prominent while the full
+         technical table rests behind a disclosure, so consent context
+         fits the viewport once a run starts. */
+      #status-compact { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 0; }
+      #status-flags { color: var(--muted); }
+      #s-status details { margin-top: 8px; }
+      #s-cases, #s-progress, #s-consent, #s-refusal, #s-unavailable, #s-outcome { scroll-margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="banner">Synthetic demo: unfamiliar-schema discovery over synthetic fixtures only</div>
+    <main>
+      <p class="brand">Sovra · interoperability demo</p>
+      <h1>One proof, unfamiliar schemas</h1>
+      <p class="lede">
+        The planner discovers how to prove over-18 from unfamiliar issuer
+        schemas at runtime — the page never names the unfamiliar wire
+        fields up front. Every value below comes from a live backend
+        response; anything the backend cannot do is labeled unavailable,
+        never faked.
+      </p>
+
+      <div class="sovra-head">
+        <span>Planning + guard by Sovra</span>
+        <span class="sovra-chip" title="Sovra performs this age check on synthetic fixtures">SOVRA · <span id="chip-profile">…</span></span>
+        <span class="state-pill" id="state-pill" aria-live="polite">Nothing shared yet</span>
+      </div>
+
+      <div class="card" id="s-status">
+        <h2>Planner status (live from the backend)</h2>
+        <p class="fine" id="status-note">Contacting the planner…</p>
+        <p id="status-compact" role="status">
+          <span class="state-pill" id="mode-pill">…</span>
+          <span id="status-flags"></span>
+        </p>
+        <details id="status-details" open>
+          <summary>Full technical status</summary>
+          <dl id="status-fields"></dl>
+        </details>
+      </div>
+
+      <div class="card" id="s-cases">
+        <h2>Step 1: Pick a case</h2>
+        <p>Each case plans on the central ledger, then issues and verifies against the plan's own issuer.</p>
+        <div class="actions" role="radiogroup" aria-label="Interoperability case">
+          <button type="button" data-case="known" aria-pressed="true">Known schema</button>
+          <button type="button" data-case="fjord" aria-pressed="false">Fjord (unfamiliar)</button>
+          <button type="button" data-case="harbor" aria-pressed="false">Harbor (unfamiliar)</button>
+          <button type="button" data-case="employment" aria-pressed="false">Employment (incompatible)</button>
+        </div>
+        <p id="case-blurb"></p>
+        <p class="actions">
+          <button type="button" class="primary" id="b-start">Plan and check this case</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-progress" hidden>
+        <h2>Working…</h2>
+        <p role="status" id="progress-label">Starting…</p>
+        <ol class="progress-steps" id="progress-steps" aria-label="Check progress"></ol>
+        <p class="actions">
+          <button type="button" class="linkish" id="b-cancel">Cancel this check</button>
+        </p>
+      </div>
+
+      <div class="card" id="s-consent" hidden>
+        <h2>Step 2: Review and decide</h2>
+        <p id="consent-lede">The demo needs one fact to complete this case.</p>
+        <div class="learn-split">
+          <div class="learn-yes">
+            <h3>This demo will learn</h3>
+            <p>You are over 18. That is enough to complete this case.</p>
+          </div>
+          <div class="learn-no">
+            <h3>This demo will not learn</h3>
+            <p>Your birth date, documents, or source profile.</p>
+          </div>
+        </div>
+        <dl id="consent-human"></dl>
+        <details>
+          <summary>Planner provenance (exact backend response)</summary>
+          <dl id="provenance-fields"></dl>
+        </details>
+        <details>
+          <summary>Exact returned plan</summary>
+          <pre id="plan-json" class="mono" aria-label="Returned plan JSON"></pre>
+        </details>
+        <details>
+          <summary>Deterministic guard verdict</summary>
+          <dl id="guard-fields"></dl>
+        </details>
+        <p class="fine">
+          Synthetic evidence only. This demo performs no legal KYC/AML check.
+        </p>
+        <p class="actions">
+          <button type="button" class="primary" id="b-approve">Approve and share</button>
+          <button type="button" id="b-decline">Decline</button>
+          <button type="button" class="linkish" id="b-back">Back without deciding</button>
+        </p>
+        <details>
+          <summary>Exact technical values</summary>
+          <dl id="consent-fields"></dl>
+        </details>
+      </div>
+
+      <div class="card" id="s-refusal" hidden>
+        <p class="verdict warn" role="status">No acceptable path — nothing was shared.</p>
+        <p id="refusal-note"></p>
+        <details>
+          <summary>Planner provenance (exact backend response)</summary>
+          <dl id="refusal-provenance"></dl>
+        </details>
+        <details>
+          <summary>Exact returned plan</summary>
+          <pre id="refusal-plan" class="mono" aria-label="Returned plan JSON"></pre>
+        </details>
+        <p class="actions"><button type="button" id="b-refusal-restart">Try another case</button></p>
+      </div>
+
+      <div class="card" id="s-unavailable" hidden>
+        <p class="verdict warn" role="status">Case unavailable on this backend.</p>
+        <p id="unavailable-note"></p>
+        <p class="actions"><button type="button" id="b-unavailable-restart">Back to cases</button></p>
+      </div>
+
+      <div class="card" id="s-outcome" hidden>
+        <p class="verdict" id="verdict" role="status"></p>
+        <p id="outcome-note"></p>
+        <details>
+          <summary>Receipt detail</summary>
+          <dl id="receipt-fields"></dl>
+        </details>
+        <p class="actions"><button type="button" id="b-restart">Start a new check</button></p>
+      </div>
+
+      <footer>
+        <span><a href="/">All demos</a></span>
+      </footer>
+    </main>
+    <script type="module">
+      import { createRunOwner, fetchDiscovery, fetchInteropStatus, isRunCancelled, runPlannedCheck } from '/shared.js'
+
+      const $ = (id) => document.getElementById(id)
+      const CARDS = ['s-cases', 's-progress', 's-consent', 's-refusal', 's-unavailable', 's-outcome']
+      const show = (id) => {
+        for (const s of CARDS) $(s).hidden = s !== id
+        // The full status table is expanded on the case picker and
+        // collapses to the compact mode line once a run leaves it.
+        $('status-details').open = id === 's-cases'
+        const head = document.querySelector(`#${id} h2, #${id} .verdict`)
+        if (head instanceof HTMLElement) {
+          head.setAttribute('tabindex', '-1')
+          head.focus({ preventScroll: true })
+        }
+        // Bring the active stage to the top of the viewport so its
+        // decision context is visible with its controls.
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        $(id).scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' })
+      }
+
+      // Inert rendering: every backend- or model-supplied string lands in
+      // textContent, never innerHTML. Static labels are element text too.
+      function row(label, value, mono = false) {
+        const dt = document.createElement('dt')
+        dt.textContent = label
+        const dd = document.createElement('dd')
+        if (mono) dd.className = 'mono'
+        dd.textContent = value
+        return [dt, dd]
+      }
+      function fill(id, entries) {
+        const dl = $(id)
+        dl.replaceChildren()
+        for (const [label, value, mono] of entries) dl.append(...row(label, value, mono))
+      }
+      const text = (v) => (v === null || v === undefined || v === '' ? '—' : String(v))
+
+      const BLURBS = {
+        known: 'Known schema: the planner proposes the familiar adult-status credential with no discovery scope.',
+        fjord: 'Unfamiliar compatible schema: the planner must discover the Fjord wire field from approved metadata over a narrowed scope.',
+        harbor: 'Unfamiliar compatible schema: the planner must discover the Harbor wire field from approved metadata over a narrowed scope.',
+        employment: 'Incompatible schema: employment tenure cannot prove age, so an honest run ends in NO_PATH refusal with no credential and no consent.',
+      }
+      let selectedCase = 'known'
+      const caseButtons = [...document.querySelectorAll('[data-case]')]
+      function renderCase() {
+        for (const b of caseButtons) b.setAttribute('aria-pressed', String(b.dataset.case === selectedCase))
+        $('case-blurb').textContent = BLURBS[selectedCase]
+      }
+      for (const b of caseButtons) b.addEventListener('click', () => { selectedCase = b.dataset.case; renderCase() })
+      renderCase()
+
+      const STEPS = [
+        'Asking Sovra to plan…',
+        'Preparing your check…',
+        'Requesting your proof…',
+        'Opening your decision…',
+        'Recording your approval…',
+        'Confirming with Sovra…',
+      ]
+      const DECLINE_LABEL = 'Recording your decline…'
+
+      function resetProgress() {
+        $('progress-steps').replaceChildren()
+        for (const label of STEPS) {
+          const li = document.createElement('li')
+          const dot = document.createElement('span')
+          dot.className = 'progress-dot'
+          dot.setAttribute('aria-hidden', 'true')
+          const state = document.createElement('span')
+          state.className = 'step-state visually-hidden'
+          const name = document.createElement('span')
+          name.className = 'step-label'
+          name.textContent = label
+          li.append(dot, state, name)
+          $('progress-steps').append(li)
+        }
+      }
+
+      function markStep(label) {
+        const rows = [...$('progress-steps').children]
+        const declining = label === DECLINE_LABEL
+        const index = declining ? 4 : STEPS.indexOf(label)
+        rows.forEach((r, i) => {
+          r.classList.toggle('done', i < index)
+          r.classList.toggle('active', i === index)
+          r.querySelector('.step-state').textContent = i < index ? 'done: ' : i === index ? 'current: ' : ''
+          if (i === 4 && declining) r.querySelector('.step-label').textContent = DECLINE_LABEL
+        })
+      }
+
+      function setPill(label, tone = '') {
+        const pill = $('state-pill')
+        pill.textContent = label
+        pill.className = tone === '' ? 'state-pill' : `state-pill ${tone}`
+      }
+
+      function relativeExpiry(iso) {
+        const minutes = Math.max(1, Math.round((new Date(iso) - Date.now()) / 60000))
+        return minutes < 50 ? `expires in ~${minutes} min` : 'expires in about an hour'
+      }
+
+      function provenanceEntries(meta) {
+        return [
+          ['Planner mode', text(meta?.mode), true],
+          ['Live acceptance', text(meta?.liveAcceptance), true],
+          ['Model', text(meta?.model), true],
+          ['Prompt', text(meta?.promptVersion), true],
+          ['Tool contract', text(meta?.toolContractVersion), true],
+          ['Tool calls', text(meta?.toolCalls), true],
+          ['Recommendation', text(meta?.recommendation), true],
+          ['Reason', text(meta?.reason), false],
+          ['Trust snapshot', text(meta?.snapshotVersion), true],
+        ]
+      }
+
+      function guardEntries(guard) {
+        if (!guard) return [['Guard', 'no candidate existed to adjudicate', false]]
+        return [
+          ['Accepted', text(guard.accepted), true],
+          ['Code', text(guard.code), true],
+          ['Reason', text(guard.reason), false],
+          ['Rules', text(guard.rulesVersion), true],
+        ]
+      }
+
+      try {
+        const d = await fetchDiscovery()
+        $('chip-profile').textContent = d.profile
+      } catch {
+        $('chip-profile').textContent = 'unreachable'
+      }
+
+      try {
+        const caps = await fetchInteropStatus()
+        const p = caps?.primary ?? {}
+        const bindings = Array.isArray(p.supportedPolicyBindings)
+          ? p.supportedPolicyBindings.map((b) => `${b.policyId} v${b.policyVersion}`).join(', ')
+          : 'not advertised by this backend'
+        const entries = [
+          ['Planner mode', text(p.mode), true],
+          ['Live enabled (backend)', text(p.liveEnabled), true],
+          ['Model configured (backend)', text(p.modelConfigured), true],
+          ['Prompt', text(p.promptVersion), true],
+          ['Tool contract', text(p.toolContractVersion), true],
+          ['Registry', text(p.schemaRegistryVersion), true],
+          ['Guard rules', text(p.guardRulesVersion), true],
+          ['Policy bindings', bindings, false],
+          ['Discovery scope', p.scopeSupported === true ? 'supported' : p.scopeSupported === false ? 'not supported' : 'unknown', true],
+          ['Second issuer node', caps?.synth2Configured ? (caps?.synth2?.reachable ? 'configured · reachable' : 'configured · unreachable') : 'not configured (single node)', true],
+        ]
+        fill('status-fields', entries)
+        // Compact line: the actual mode stays prominent after the
+        // disclosure collapses; flags summarize the rest in inert text.
+        $('mode-pill').textContent = p.mode ?? (p.reachable ? 'unknown mode' : 'unreachable')
+        const liveFlag = p.liveEnabled === true && p.modelConfigured === true ? 'live armed' : 'live off'
+        const scopeFlag = p.scopeSupported === true ? 'scope supported'
+          : p.scopeSupported === false ? 'scope pending' : 'scope unknown'
+        const nodeFlag = caps?.synth2Configured
+          ? (caps?.synth2?.reachable ? 'two nodes · both reachable'
+            : caps?.synth2?.unconfigured ? 'second node unconfigured' : 'second node unreachable')
+          : 'single node'
+        $('status-flags').textContent = p.reachable
+          ? `${liveFlag} · ${scopeFlag} · ${nodeFlag}`
+          : 'planner unreachable: cases report unavailable'
+        $('status-note').textContent = p.reachable
+          ? 'Live backend answers below. Mode and live flags are backend-global: this page only displays them.'
+          : 'Planner unreachable: cases will report unavailable, never fall back to fixtures.'
+      } catch {
+        $('mode-pill').textContent = 'unreachable'
+        $('status-flags').textContent = 'planner unreachable: cases report unavailable'
+        $('status-note').textContent = 'Planner status unreachable: cases will report unavailable, never fall back to fixtures.'
+      }
+
+      const runs = createRunOwner()
+      const CANCEL_LABEL = 'Cancel this check'
+      const lockCancel = () => {
+        $('b-cancel').disabled = true
+        $('b-cancel').textContent = 'Finishing — cannot be cancelled'
+      }
+      const unlockCancel = () => {
+        $('b-cancel').disabled = false
+        $('b-cancel').textContent = CANCEL_LABEL
+      }
+
+      $('b-cancel').addEventListener('click', () => {
+        runs.cancelActive()
+        $('b-start').disabled = false
+        show('s-cases')
+      })
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return
+        if (!$('s-consent').hidden) $('b-back').click()
+        else if (!$('s-progress').hidden && !$('b-cancel').disabled) $('b-cancel').click()
+      })
+
+      $('b-start').addEventListener('click', () => {
+        const run = runs.begin()
+        if (!run) return
+        $('b-start').disabled = true
+        unlockCancel()
+        show('s-progress')
+        resetProgress()
+        setPill('Nothing shared yet')
+        const settle = () => {
+          run.finish()
+          $('b-start').disabled = false
+        }
+        runPlannedCheck(selectedCase, {
+          signal: run.signal,
+          onStep: (label) => {
+            if (!run.isCurrent()) return
+            if (label.startsWith('Recording') || label === 'Confirming with Sovra…') lockCancel()
+            $('progress-label').textContent = label; markStep(label)
+          },
+          decide: ({ review, plan, meta, guard }) => new Promise((resolve) => {
+            if (run.signal.aborted || !run.isCurrent()) {
+              resolve('back')
+              return
+            }
+            run.signal.addEventListener('abort', () => resolve('back'), { once: true })
+            const claim = plan.claim_paths[0]
+            $('consent-lede').textContent = `Case ${selectedCase}: the demo needs one fact to complete this check.`
+            fill('consent-human', [
+              ['Who asks', 'Interop demo (synthetic)', false],
+              ['What they learn', 'That you are over 18', false],
+              ['Expires', relativeExpiry(review.expiresAt), false],
+            ])
+            fill('provenance-fields', provenanceEntries(meta))
+            $('plan-json').textContent = JSON.stringify(plan, null, 2)
+            fill('guard-fields', guardEntries(guard))
+            fill('consent-fields', [
+              ['Relying party', 'Interop demo (synthetic)', false],
+              ['Purpose', review.purpose, false],
+              ['Exact claims', `${claim}: true`, true],
+              ['Issuer', plan.candidate_issuer_id, true],
+              ['Credential type', plan.credential_type, true],
+              ['Plan', plan.plan_id, true],
+              ['Plan hash', review.planHash, true],
+              ['Expires', review.expiresAt, true],
+            ])
+            show('s-consent')
+            $('b-approve').onclick = () => {
+              if (!run.isCurrent()) return
+              lockCancel()
+              show('s-progress'); resolve('approve')
+            }
+            $('b-decline').onclick = () => {
+              if (!run.isCurrent()) return
+              lockCancel()
+              show('s-progress'); resolve('deny')
+            }
+            $('b-back').onclick = () => { if (run.isCurrent()) resolve('back') }
+          }),
+        }).then((out) => {
+          if (!run.isCurrent()) return
+          settle()
+          if (out.unavailable) {
+            $('unavailable-note').textContent = out.reason === 'backend_mapped_policy_pending'
+              ? 'This backend does not serve the mapped policy binding yet, so unfamiliar-schema cases cannot run here. No fixture was substituted.'
+              : 'This backend does not support discovery scope yet, so unfamiliar-schema cases cannot run here. No fixture was substituted.'
+            show('s-unavailable')
+            return
+          }
+          if (out.refusal) {
+            setPill('Refused — nothing shared', 'warn')
+            $('refusal-note').textContent = out.meta?.reason
+              ? `The planner returned ${out.meta.recommendation ?? 'NO_PATH'}: ${out.meta.reason} No credential was minted and no consent was opened.`
+              : 'The planner found no acceptable path. No credential was minted and no consent was opened.'
+            fill('refusal-provenance', provenanceEntries(out.meta))
+            $('refusal-plan').textContent = out.plan ? JSON.stringify(out.plan, null, 2) : 'No candidate plan (null plan).'
+            show('s-refusal')
+            return
+          }
+          if (out.backedOut) {
+            show('s-cases')
+            return
+          }
+          setPill(
+            out.denied ? 'You declined — nothing shared' : 'You approved — one fact shared',
+            out.denied ? 'warn' : 'ok',
+          )
+          const card = $('s-outcome')
+          card.classList.remove('outcome-ok', 'outcome-bad', 'outcome-warn')
+          if (out.denied) {
+            $('verdict').textContent = 'You declined — nothing was shared.'
+            $('verdict').className = 'verdict warn'
+            card.classList.add('outcome-warn')
+            $('outcome-note').textContent = 'No presentation exists for this request. You can start a new check any time.'
+            fill('receipt-fields', [['Request', out.requestId, true]])
+          } else if (out.decision.outcome === 'ACCEPTED') {
+            $('verdict').textContent = 'Eligibility evidence recorded.'
+            $('verdict').className = 'verdict ok'
+            card.classList.add('outcome-ok')
+            $('outcome-note').textContent = `Case ${out.caseId} completed with the returned ${out.plan.credential_type.split('/').slice(-2).join('/')} plan. The proof expires in about an hour.`
+            fill('receipt-fields', [
+              ['Decision', out.decision.decisionId, true],
+              ['Outcome', out.decision.outcome, true],
+              ['Trust snapshot', `v${out.decision.trustSnapshot}`, true],
+              ['Profile', out.decision.profile, true],
+              ['Plan', out.plan.plan_id, true],
+            ])
+          } else if (out.decision.outcome === 'REJECTED') {
+            $('verdict').textContent = 'Not accepted — case not completed.'
+            $('verdict').className = 'verdict bad'
+            card.classList.add('outcome-bad')
+            $('outcome-note').textContent = `Reason: ${out.decision.reasonCode}. Start a new check to try again with a fresh challenge.`
+            fill('receipt-fields', [['Decision', out.decision.decisionId, true]])
+          } else {
+            $('verdict').textContent = 'Could not be determined — try again.'
+            $('verdict').className = 'verdict warn'
+            card.classList.add('outcome-warn')
+            $('outcome-note').textContent = 'The evidence was stale or a dependency failed. This is never treated as a pass.'
+            fill('receipt-fields', [['Decision', out.decision.decisionId, true]])
+          }
+          show('s-outcome')
+        }).catch((err) => {
+          if (!run.isCurrent()) return
+          settle()
+          if (isRunCancelled(err) || run.signal.aborted) {
+            show('s-cases')
+            return
+          }
+          console.error('planned check failed:', err)
+          const card = $('s-outcome')
+          card.classList.remove('outcome-ok', 'outcome-bad', 'outcome-warn')
+          card.classList.add('outcome-bad')
+          fill('receipt-fields', err?.requestId ? [['Request', err.requestId, true]] : [])
+          if (err?.stage === 'verify') {
+            $('verdict').textContent = 'Approval recorded — confirmation failed.'
+            $('verdict').className = 'verdict warn'
+            $('outcome-note').textContent = 'Your approval was recorded but Sovra confirmation did not complete. The proof may already exist. Start a new check to retry.'
+          } else if (err?.stage === 'decision') {
+            $('verdict').textContent = 'Something went wrong.'
+            $('verdict').className = 'verdict bad'
+            $('outcome-note').textContent = 'The check failed while recording your decision, which may already have been recorded. Retrying never revokes it. Start a new check to retry.'
+          } else if (err?.stage === 'plan') {
+            $('verdict').textContent = 'Planning failed — nothing was shared.'
+            $('verdict').className = 'verdict bad'
+            $('outcome-note').textContent = 'The planner did not return a usable plan, so no credential was minted and nothing was shared. Start a new check to retry.'
+          } else {
+            $('verdict').textContent = 'Something went wrong.'
+            $('verdict').className = 'verdict bad'
+            $('outcome-note').textContent = 'Check failed before any decision. Nothing was shared. Start a new check to retry.'
+          }
+          show('s-outcome')
+        })
+      })
+
+      for (const id of ['b-restart', 'b-refusal-restart', 'b-unavailable-restart']) {
+        $(id).addEventListener('click', () => {
+          setPill('Nothing shared yet')
+          show('s-cases')
+        })
+      }
+    </script>
+  </body>
+</html>

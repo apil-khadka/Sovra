@@ -15,6 +15,10 @@ Related: [system architecture](system-architecture.md),
 [requirements](../requirements/software-requirements-specification.md),
 [evaluation plan](../ai/evaluation-plan.md).
 
+> **Historical scope:** sections 1–8 below preserve the 2026-10-27 assessment of the TypeScript prototype, which has since been removed.
+> They are kept as dated history and must not be read as findings against the current Java/Spring code.
+> The [2026-11-03 delta](#9-2026-11-03-current-state-delta-javaspring) maps each item to its present state, and the [production readiness assessment](../engineering/production-readiness.md) is the current gap record.
+
 ## 1. Existing system analysis
 
 ### Vision and objectives
@@ -228,6 +232,9 @@ flowchart LR
   binds proof → verifier matches nonce, checks challenge freshness, then
   consumes atomically via unique constraint. Double submission returns
   `REPLAY_DETECTED`; the second writer loses, never both.
+  *(2026-11-03 correction: the `REPLAY_DETECTED` sentence describes the October TypeScript contract only.*
+  *The current native contract replays the stored response byte-for-byte on identical resubmission with exactly one decision row, rejects altered bindings without rewriting the stored decision, denies VP cross-session replay, and emits no `REPLAY_DETECTED` code.*
+  *See T04/T04b in the [demo scorecard](../demo/evaluation-and-acceptance.md).)*
 - **Credential lifecycle:** `ISSUED → ACTIVE → REVOKED | EXPIRED`;
   `REVOKED` is terminal and a replacement needs a new ID. Status reads
   record `checked_at` against the R4 freshness bound; unknown status fails
@@ -287,3 +294,27 @@ Statuses are proposals for the demo, using the same shape as
 | 018 Health model | Proposed | `healthz`/`readyz`, per-dependency timeouts, bounded model concurrency, per-RP rate limits | Production SLOs defined |
 | 019 Audit hash chain | Proposed | Append-only records embedding the previous hash; complements, not replaces, log storage | Independent audit review |
 | 020 No event backbone (reaffirmed) | Accepted premise | Poll-based status and trust reads; no Kafka; ADR 009 deferral stands | Async propagation proven necessary |
+
+## 9. 2026-11-03 current-state delta (Java/Spring)
+
+The prototype is now a Java 25/Spring Boot backend with a React frontend, so the October gap list no longer describes the code.
+Each item below states its present disposition without weakening the security requirements or invariants behind it.
+The [production readiness assessment](../engineering/production-readiness.md) carries the full current gap record with evidence.
+
+| October item | Present state |
+| --- | --- |
+| R1 Durable replay/status store | Implemented on the verification path: a unique constraint on `(tenant, request, nonce)` is the atomic consumption, identical retries replay the stored response byte-for-byte, and denial audits are independently durable. Production status distribution itself remains synthetic. |
+| R2 Issuance idempotency keys | Implemented: issuance requires an `Idempotency-Key` header and redelivery returns the original credential instead of minting a duplicate. |
+| R3 Key rotation procedure | Partial: trust-snapshot rotation is exercised by the SDK suites, and file-based verifier keys rotate overlap-first with versioned key IDs. A full issuer-key rotation runbook with rehearsal remains open. |
+| R4 Status freshness configuration | Partial: trust and status freshness bounds are enforced on the verification path, but production status services are still synthetic. |
+| R5 Error envelope and versioning | Implemented in current shape: the implemented API contract is versioned (0.16.0) with stable machine-readable codes and per-operation scopes. |
+| R6 Health model with budgets | Implemented in current shape: semantic readiness probes, sanitized stage telemetry, alert APIs, per-request AI bounds and a fleet cumulative budget ledger. Load qualification of those budgets is still pending. |
+| R7 Glossary and ownership map | Adopted as documentation: the context map above still describes ownership, with the versioned API contracts pinning current vocabulary. |
+| R8 Trust distribution log | Implemented in current shape: versioned trust snapshots with epochs are pinned per decision; poll-based update semantics live in the trust documentation. |
+| R9 Tamper-evident audit trail | Open: audit evidence relies on durable decision and audit rows, not a hash chain. No independent log store or chain verification tooling was adopted. |
+| R10 Backup and compromise runbooks | Partial: recovery design and a dated drill record exist, but backup, failover and key-compromise rehearsal against production-shaped infrastructure remain open. |
+| G11 Model and endpoint spend guardrails | Partial: atomic admission, concurrency and cumulative usage reservation exist, but provider billing-cap controls and grant-key permission tests are still missing. |
+| Rejected: HSM/KMS, observability platform | Position narrowed, not reversed: KMS and verifier-key seams now exist as dispatch interfaces with startup refusal, but no real provider is qualified and no production release is approved. The demo-scale rejections otherwise stand. |
+
+The proposed ADRs 013–019 stay historical proposals from the October review.
+Their subjects are tracked in their implemented form by the current decision records and the PROD work breakdown, not by re-dating this section.

@@ -95,7 +95,7 @@ public class AccreditationController {
     body.put("roles", view.roles().stream().sorted().toList());
     body.put("origins", view.origins());
     body.put("audiences", view.audiences());
-    body.put("state", view.state());
+    body.put("state", view.state().name());
     body.put("requestedBy", view.requestedBy());
     body.put("decidedBy", view.decidedBy());
     body.put(

@@ -116,7 +116,7 @@ class LegalHoldArchiveTests extends SovraAppRoleBase {
         TestAccounts.create(owner, "hold-arch-held", Set.of("ISSUER_OPS", "TRUST_ADMIN"));
     UUID heldEvent =
         seedAudit(held.tenantId(), Instant.now().minusSeconds(91L * 24 * 3600), "HELD_ROW");
-    setHold(admin, held.tenantId(), true);
+    setHold(held, held.tenantId(), true);
     // Platform rows archive by age; no hold can cover them.
     UUID platformEvent = seedAudit(null, Instant.now().minusSeconds(91L * 24 * 3600), "PLATFORM");
 
@@ -134,13 +134,14 @@ class LegalHoldArchiveTests extends SovraAppRoleBase {
     assertThat(events.stream().map(e -> e.get("id").toString()))
         .contains(oldEvent.toString(), newEvent.toString());
     // Release the hold and the backlog drains next run.
-    setHold(admin, held.tenantId(), false);
+    setHold(held, held.tenantId(), false);
     assertThat(app.queryForObject("SELECT archive_audit_events(1000)", Integer.class))
         .isEqualTo(1);
     assertThat(eventTable(heldEvent)).isEqualTo("audit_event_archive");
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   void holdRolesAndUnknownTenant() {
     TestAccount ops = TestAccounts.create(owner, "hold-ops", Set.of("ISSUER_OPS"));
     TestAccount reader = TestAccounts.createInTenant(
@@ -154,10 +155,21 @@ class LegalHoldArchiveTests extends SovraAppRoleBase {
         .isInstanceOf(HttpClientErrorException.Forbidden.class);
     Map<String, Object> register = client.get().uri("/api/tenants/holds")
         .headers(reader.headers()).retrieve().body(Map.class);
-    assertThat(register.get("holds")).isNotNull();
+    assertThat((List<Map<String, Object>>) register.get("holds"))
+        .extracting(row -> row.get("tenantId"))
+        .containsExactly(ops.tenantId().toString());
     TestAccount admin = TestAccounts.createInTenant(
         owner, ops.tenantId(), "hold-admin", Set.of("TRUST_ADMIN"));
     assertThatThrownBy(() -> putHold(admin, UUID.randomUUID(), true))
+        .isInstanceOf(HttpClientErrorException.NotFound.class);
+    TestAccount otherTenantAdmin = TestAccounts.create(
+        owner, "hold-other-admin", Set.of("TRUST_ADMIN"));
+    assertThatThrownBy(() -> putHold(admin, otherTenantAdmin.tenantId(), true))
+        .isInstanceOf(HttpClientErrorException.NotFound.class);
+    assertThat(owner.queryForObject(
+        "SELECT legal_hold FROM tenant WHERE id = ?", Boolean.class,
+        otherTenantAdmin.tenantId())).isFalse();
+    assertThatThrownBy(() -> putHold(otherTenantAdmin, ops.tenantId(), true))
         .isInstanceOf(HttpClientErrorException.NotFound.class);
   }
 

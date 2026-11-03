@@ -61,8 +61,9 @@ public class AccreditationService {
       Set<String> roles,
       List<String> origins,
       List<String> audiences,
-      String state,
+      AccreditationState state,
       String requestedBy,
+      UUID requestedByPrincipalId,
       String decidedBy,
       Instant decidedAt,
       UUID credentialId,
@@ -109,12 +110,13 @@ public class AccreditationService {
     UUID id = UUID.randomUUID();
     tenant.update(
         "INSERT INTO accreditation (id, tenant_id, org_name, roles, origins, audiences,"
-            + " requested_by) VALUES (?, ?, ?, ?::text[], ?::text[], ?::text[], ?)",
+            + " requested_by, requested_by_principal_id)"
+            + " VALUES (?, ?, ?, ?::text[], ?::text[], ?::text[], ?, ?)",
         id, caller.tenantId(), orgName.strip(),
         granted.stream().map(Role::name).toArray(String[]::new),
         cleanOrigins.toArray(String[]::new),
         cleanAudiences.toArray(String[]::new),
-        caller.name());
+        caller.name(), caller.id());
     audit.record(
         caller, Action.ACCREDIT_REQUEST,
         ResourceRef.tenantScoped("accreditation", id.toString(), caller.tenantId()),
@@ -134,9 +136,12 @@ public class AccreditationService {
         AuditedAuthorizer.require(authz, audit, caller,
             Action.ACCREDIT_DECIDE,
             ResourceRef.tenantScoped("accreditation", id.toString(), caller.tenantId()));
-    AccreditationView current = load(caller.tenantId(), id);
-    if (!"REQUESTED".equals(current.state())) {
+    AccreditationView current = loadForUpdate(caller.tenantId(), id);
+    if (current.state() != AccreditationState.REQUESTED) {
       throw new AccreditationConflictException("accreditation is already decided");
+    }
+    if (isRequester(caller, current)) {
+      throw new AccreditationConflictException("self-decision is not permitted");
     }
     Instant expiry = expiresAt == null ? clock.instant().plus(DEFAULT_CREDENTIAL_LIFETIME)
         : expiresAt;
@@ -157,10 +162,11 @@ public class AccreditationService {
         current.origins().toArray(String[]::new),
         current.audiences().toArray(String[]::new),
         created.account().id());
-    tenant.update(
+    int transitioned = tenant.update(
         "UPDATE accreditation SET state = 'APPROVED', decided_by = ?, decided_at = now(),"
-            + " credential_id = ? WHERE id = ?",
-        caller.name(), created.account().id(), id);
+            + " credential_id = ? WHERE id = ? AND tenant_id = ? AND state = 'REQUESTED'",
+        caller.name(), created.account().id(), id, caller.tenantId());
+    requireTransition(transitioned);
     Map<String, String> detail = new LinkedHashMap<>();
     detail.put("credential_id", created.account().id().toString());
     detail.put("roles", String.join(",", current.roles().stream().sorted().toList()));
@@ -177,14 +183,18 @@ public class AccreditationService {
         AuditedAuthorizer.require(authz, audit, caller,
             Action.ACCREDIT_DECIDE,
             ResourceRef.tenantScoped("accreditation", id.toString(), caller.tenantId()));
-    AccreditationView current = load(caller.tenantId(), id);
-    if (!"REQUESTED".equals(current.state())) {
+    AccreditationView current = loadForUpdate(caller.tenantId(), id);
+    if (current.state() != AccreditationState.REQUESTED) {
       throw new AccreditationConflictException("accreditation is already decided");
     }
-    tenant.update(
+    if (isRequester(caller, current)) {
+      throw new AccreditationConflictException("self-decision is not permitted");
+    }
+    int transitioned = tenant.update(
         "UPDATE accreditation SET state = 'REJECTED', decided_by = ?, decided_at = now()"
-            + " WHERE id = ?",
-        caller.name(), id);
+            + " WHERE id = ? AND tenant_id = ? AND state = 'REQUESTED'",
+        caller.name(), id, caller.tenantId());
+    requireTransition(transitioned);
     audit.record(
         caller, Action.ACCREDIT_DECIDE,
         ResourceRef.tenantScoped("accreditation", id.toString(), caller.tenantId()),
@@ -203,15 +213,16 @@ public class AccreditationService {
         AuditedAuthorizer.require(authz, audit, caller,
             Action.ACCREDIT_DECIDE,
             ResourceRef.tenantScoped("accreditation", id.toString(), caller.tenantId()));
-    AccreditationView current = load(caller.tenantId(), id);
-    if (!"APPROVED".equals(current.state()) || current.credentialId() == null) {
+    AccreditationView current = loadForUpdate(caller.tenantId(), id);
+    if (current.state() != AccreditationState.APPROVED || current.credentialId() == null) {
       throw new AccreditationConflictException("accreditation is not revocable");
     }
     accounts.revoke(caller, current.credentialId());
-    tenant.update(
+    int transitioned = tenant.update(
         "UPDATE accreditation SET state = 'REVOKED', decided_by = ?, decided_at = now()"
-            + " WHERE id = ?",
-        caller.name(), id);
+            + " WHERE id = ? AND tenant_id = ? AND state = 'APPROVED' AND credential_id = ?",
+        caller.name(), id, caller.tenantId(), current.credentialId());
+    requireTransition(transitioned);
     audit.record(
         caller, Action.ACCREDIT_DECIDE,
         ResourceRef.tenantScoped("accreditation", id.toString(), caller.tenantId()),
@@ -229,7 +240,7 @@ public class AccreditationService {
     audit.record(
         caller, Action.ACCREDIT_READ,
         ResourceRef.tenantScoped("accreditation", id.toString(), caller.tenantId()),
-        decision, "", Map.of("state", view.state()));
+        decision, "", Map.of("state", view.state().name()));
     return view;
   }
 
@@ -241,8 +252,9 @@ public class AccreditationService {
             ResourceRef.tenantScoped("accreditation", "list", caller.tenantId()));
     List<AccreditationView> views =
         tenant.query(
-            "SELECT id, org_name, roles, origins, audiences, state, requested_by, decided_by,"
-                + " decided_at, credential_id, created_at FROM accreditation"
+            "SELECT id, org_name, roles, origins, audiences, state, requested_by,"
+                + " requested_by_principal_id, decided_by, decided_at, credential_id, created_at"
+                + " FROM accreditation"
                 + " WHERE tenant_id = ? ORDER BY created_at",
             (rs, n) -> mapRow(rs),
             caller.tenantId());
@@ -334,8 +346,9 @@ public class AccreditationService {
   private AccreditationView load(UUID tenantId, UUID id) {
     List<AccreditationView> rows =
         tenant.query(
-            "SELECT id, org_name, roles, origins, audiences, state, requested_by, decided_by,"
-                + " decided_at, credential_id, created_at FROM accreditation"
+            "SELECT id, org_name, roles, origins, audiences, state, requested_by,"
+                + " requested_by_principal_id, decided_by, decided_at, credential_id, created_at"
+                + " FROM accreditation"
                 + " WHERE tenant_id = ? AND id = ?",
             (rs, n) -> mapRow(rs),
             tenantId, id);
@@ -343,6 +356,36 @@ public class AccreditationService {
       throw new AccreditationNotFoundException();
     }
     return rows.get(0);
+  }
+
+  /** Serialize decisions before account creation; conditional updates remain the backstop. */
+  private AccreditationView loadForUpdate(UUID tenantId, UUID id) {
+    List<AccreditationView> rows =
+        tenant.query(
+            "SELECT id, org_name, roles, origins, audiences, state, requested_by,"
+                + " requested_by_principal_id, decided_by, decided_at, credential_id, created_at"
+                + " FROM accreditation WHERE tenant_id = ? AND id = ? FOR UPDATE",
+            (rs, n) -> mapRow(rs),
+            tenantId, id);
+    if (rows.isEmpty()) {
+      throw new AccreditationNotFoundException();
+    }
+    return rows.get(0);
+  }
+
+  private boolean isRequester(ServiceAccountPrincipal caller, AccreditationView current) {
+    // Stable ids protect decisions within an authentication chain.
+    // The exact requester name also bridges machine requests and BFF
+    // membership identities for the same operator, and covers legacy
+    // rows whose request audit event was unavailable during V39.
+    return caller.id().equals(current.requestedByPrincipalId())
+        || caller.name().equals(current.requestedBy());
+  }
+
+  private void requireTransition(int updated) {
+    if (updated != 1) {
+      throw new AccreditationConflictException("accreditation changed concurrently");
+    }
   }
 
   private AccreditationView mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
@@ -356,8 +399,9 @@ public class AccreditationService {
         rolesArray == null ? Set.of() : Set.of((String[]) rolesArray.getArray()),
         originsArray == null ? List.of() : List.of((String[]) originsArray.getArray()),
         audiencesArray == null ? List.of() : List.of((String[]) audiencesArray.getArray()),
-        rs.getString("state"),
+        AccreditationState.valueOf(rs.getString("state")),
         rs.getString("requested_by"),
+        rs.getObject("requested_by_principal_id", UUID.class),
         rs.getString("decided_by"),
         decided == null ? null : decided.toInstant(),
         rs.getObject("credential_id", UUID.class),

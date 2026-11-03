@@ -54,6 +54,21 @@ class PlanningConfigTests extends SovraAppRoleBase {
   }
 
   @Test
+  void blankProviderSettingsNormalizeToUnset() {
+    PlanningProperties blank = new PlanningProperties();
+    blank.setBaseUrl("  ");
+    blank.setApiKey("");
+    blank.setModel("\t");
+
+    assertThat(blank.liveEnabled()).isFalse();
+    assertThat(blank.baseUrl()).isNull();
+    assertThat(blank.apiKey()).isNull();
+    assertThat(blank.model()).isNull();
+    assertThat(blank.credentialsPresent()).isFalse();
+    assertThat(blank.liveReady()).isFalse();
+  }
+
+  @Test
   void noSpringAiChatModelBeanExistsByDefault() {
     assertThat(context.getBeanNamesForType(org.springframework.ai.chat.model.ChatModel.class))
         .isEmpty();

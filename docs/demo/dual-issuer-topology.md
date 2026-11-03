@@ -98,7 +98,7 @@ until those migrated tables exist — app health `UP` is enough, full
 `READY` is not required yet.)
 
 1. `docker compose -f compose.demo-issuers.yaml config --quiet`
-2. `docker compose -f compose.demo-issuers.yaml up -d --build`
+2. `SOVRA_AI_LIVE_ENABLED=false docker compose -f compose.demo-issuers.yaml up -d --build`
 3. `python3 scripts/demo-issuers/bootstrap.py`
    (db accounts, then server-side RP/issuer mint; or run
    `--phase db` and `--phase rp` separately)

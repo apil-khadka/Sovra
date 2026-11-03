@@ -13,6 +13,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +76,10 @@ class AccreditationFlowTests extends SovraAppRoleBase {
         "audiences", List.of(AUDIENCE)));
     assertThat(requested.get("state")).isEqualTo("REQUESTED");
     String accreditationId = requested.get("accreditationId").toString();
+    Object listed = get("/api/accreditations", member.headers()).get("accreditations");
+    assertThat(listed).isInstanceOf(List.class);
+    assertThat((List<?>) listed).anySatisfy(item ->
+        assertThat(((Map<?, ?>) item).get("accreditationId")).isEqualTo(accreditationId));
 
     Map<String, Object> approved = post(
         "/api/accreditations/" + accreditationId + "/approve", admin.headers(), Map.of());
@@ -124,6 +133,99 @@ class AccreditationFlowTests extends SovraAppRoleBase {
     assertThatThrownBy(() -> post(
             "/api/accreditations/" + accreditationId + "/revoke", admin.headers(), Map.of()))
         .isInstanceOf(HttpClientErrorException.Conflict.class);
+  }
+
+  @Test
+  void requesterCannotApproveOrRejectItsOwnAccreditation() {
+    TestAccount requester = TestAccounts.create(
+        owner, "acc-self-" + UUID.randomUUID(), Set.of("TENANT_MEMBER", "TRUST_ADMIN"));
+    Map<String, Object> requested = post("/api/accreditations", requester.headers(), Map.of(
+        "orgName", "Self Approval " + UUID.randomUUID(),
+        "roles", List.of("RP_CLIENT"),
+        "origins", List.of(ORIGIN),
+        "audiences", List.of(AUDIENCE)));
+    String id = requested.get("accreditationId").toString();
+
+    assertThatThrownBy(() -> post("/api/accreditations/" + id + "/approve",
+        requester.headers(), Map.of()))
+        .isInstanceOf(HttpClientErrorException.Conflict.class);
+    assertThatThrownBy(() -> post("/api/accreditations/" + id + "/reject",
+        requester.headers(), Map.of()))
+        .isInstanceOf(HttpClientErrorException.Conflict.class);
+    assertThat(get("/api/accreditations/" + id, requester.headers()).get("state"))
+        .isEqualTo("REQUESTED");
+  }
+
+  @Test
+  void concurrentApprovalsMintOnlyOneLiveCredential() throws Exception {
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    TestAccount requester = TestAccounts.create(
+        owner, "acc-race-maker-" + suffix, Set.of("TENANT_MEMBER"));
+    TestAccount firstAdmin = TestAccounts.createInTenant(
+        owner, requester.tenantId(), "acc-race-admin-a-" + suffix, Set.of("TRUST_ADMIN"));
+    TestAccount secondAdmin = TestAccounts.createInTenant(
+        owner, requester.tenantId(), "acc-race-admin-b-" + suffix, Set.of("TRUST_ADMIN"));
+    Map<String, Object> requested = post("/api/accreditations", requester.headers(), Map.of(
+        "orgName", "Approval Race " + suffix,
+        "roles", List.of("RP_CLIENT"),
+        "origins", List.of(ORIGIN),
+        "audiences", List.of(AUDIENCE)));
+    UUID accreditationId = UUID.fromString(requested.get("accreditationId").toString());
+    assertThat(raceDecisions(
+            accreditationId, firstAdmin, "approve", secondAdmin, "approve"))
+        .containsExactlyInAnyOrder(
+            org.springframework.http.HttpStatus.OK,
+            org.springframework.http.HttpStatus.CONFLICT);
+
+    Integer minted = owner.queryForObject(
+        "SELECT COUNT(*) FROM service_account WHERE tenant_id = ? AND name LIKE ?",
+        Integer.class, requester.tenantId(), "accredited-approval-race-" + suffix + "-%");
+    UUID credentialId = owner.queryForObject(
+        "SELECT credential_id FROM accreditation WHERE id = ?",
+        UUID.class, accreditationId);
+    Integer linked = owner.queryForObject(
+        "SELECT COUNT(*) FROM service_account WHERE id = ? AND tenant_id = ?",
+        Integer.class, credentialId, requester.tenantId());
+    assertThat(minted).isEqualTo(1);
+    assertThat(linked).isEqualTo(1);
+  }
+
+  @Test
+  void concurrentApprovalAndRejectionHaveOneWinner() throws Exception {
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    TestAccount requester = TestAccounts.create(
+        owner, "acc-decision-race-maker-" + suffix, Set.of("TENANT_MEMBER"));
+    TestAccount approver = TestAccounts.createInTenant(
+        owner, requester.tenantId(), "acc-decision-race-approve-" + suffix, Set.of("TRUST_ADMIN"));
+    TestAccount rejecter = TestAccounts.createInTenant(
+        owner, requester.tenantId(), "acc-decision-race-reject-" + suffix, Set.of("TRUST_ADMIN"));
+    Map<String, Object> requested = post("/api/accreditations", requester.headers(), Map.of(
+        "orgName", "Decision Race " + suffix,
+        "roles", List.of("RP_CLIENT"),
+        "origins", List.of(ORIGIN),
+        "audiences", List.of(AUDIENCE)));
+    UUID accreditationId = UUID.fromString(requested.get("accreditationId").toString());
+
+    assertThat(raceDecisions(accreditationId, approver, "approve", rejecter, "reject"))
+        .containsExactlyInAnyOrder(
+            org.springframework.http.HttpStatus.OK,
+            org.springframework.http.HttpStatus.CONFLICT);
+
+    String state = owner.queryForObject(
+        "SELECT state FROM accreditation WHERE id = ?", String.class, accreditationId);
+    Integer minted = owner.queryForObject(
+        "SELECT COUNT(*) FROM service_account WHERE tenant_id = ? AND name LIKE ?",
+        Integer.class, requester.tenantId(), "accredited-decision-race-" + suffix + "-%");
+    UUID credentialId = owner.queryForObject(
+        "SELECT credential_id FROM accreditation WHERE id = ?", UUID.class, accreditationId);
+    assertThat(state).isIn("APPROVED", "REJECTED");
+    if ("APPROVED".equals(state)) {
+      assertThat(minted).isEqualTo(1);
+      assertThat(credentialId).isNotNull();
+    } else {
+      assertThat(minted).isZero();
+      assertThat(credentialId).isNull();
+    }
   }
 
   @Test
@@ -211,5 +313,42 @@ class AccreditationFlowTests extends SovraAppRoleBase {
   private Map<String, Object> post(
       String uri, Consumer<HttpHeaders> headers, Map<String, Object> body) {
     return client.post().uri(uri).headers(headers).body(body).retrieve().body(Map.class);
+  }
+
+  private List<HttpStatusCode> raceDecisions(
+      UUID id,
+      TestAccount firstAdmin,
+      String firstAction,
+      TestAccount secondAdmin,
+      String secondAction) throws Exception {
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try (ExecutorService workers = Executors.newFixedThreadPool(2)) {
+      Future<HttpStatusCode> first = workers.submit(
+          () -> decisionStatus(id, firstAction, firstAdmin, ready, start));
+      Future<HttpStatusCode> second = workers.submit(
+          () -> decisionStatus(id, secondAction, secondAdmin, ready, start));
+      assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      return List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS));
+    }
+  }
+
+  private HttpStatusCode decisionStatus(
+      UUID id,
+      String action,
+      TestAccount admin,
+      CountDownLatch ready,
+      CountDownLatch start) throws Exception {
+    ready.countDown();
+    if (!start.await(10, TimeUnit.SECONDS)) {
+      throw new IllegalStateException("decision race did not start");
+    }
+    try {
+      post("/api/accreditations/" + id + "/" + action, admin.headers(), Map.of());
+      return org.springframework.http.HttpStatus.OK;
+    } catch (HttpClientErrorException e) {
+      return e.getStatusCode();
+    }
   }
 }

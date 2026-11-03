@@ -117,7 +117,7 @@
       </details>
     </main>
     <script type="module">
-      import { fetchDiscovery, fetchOps, runCheck } from '/shared.js'
+      import { createRunOwner, fetchDiscovery, fetchOps, isRunCancelled, runCheck } from '/shared.js'
 
       const $ = (id) => document.getElementById(id)
       const show = (id) => {
@@ -211,12 +211,34 @@
         return 'warn'
       }
 
-      let cancelled = false
+      // Per-run ownership: each Start mints a generation; Cancel retires
+      // it and aborts in-flight fetches, so late callbacks from a
+      // cancelled run fail isCurrent() and cannot overwrite UI owned
+      // by a restarted run. begin() refuses overlaps, so double-clicks
+      // cannot start two runs.
+      const runs = createRunOwner()
+
+      const CANCEL_LABEL = 'Cancel this check'
+      const lockCancel = () => {
+        // Exact commit point: decision signing/submission has begun, so
+        // the stop action is switched off and renamed. Stopping local
+        // follow-up cannot retract the recorded decision, and the UI
+        // must never claim otherwise.
+        $('b-cancel').disabled = true
+        $('b-cancel').textContent = 'Finishing — cannot be cancelled'
+      }
+      const unlockCancel = () => {
+        $('b-cancel').disabled = false
+        $('b-cancel').textContent = CANCEL_LABEL
+      }
 
       $('b-cancel').addEventListener('click', () => {
-        // Stops the flow before any decision is signed. Artefacts
-        // already created expire unused within the hour.
-        cancelled = true
+        // Stops the flow before any decision is signed: the button is
+        // switched off and renamed once signing/submission begins, so
+        // cancelling can never imply revocation of committed sharing.
+        // Artefacts already created expire unused within the hour.
+        runs.cancelActive()
+        $('b-start').disabled = false
         show('s-start')
       })
 
@@ -224,20 +246,38 @@
       document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return
         if (!$('s-consent').hidden) $('b-back').click()
-        else if (!$('s-progress').hidden) $('b-cancel').click()
+        else if (!$('s-progress').hidden && !$('b-cancel').disabled) $('b-cancel').click()
       })
       $('b-start').addEventListener('click', () => {
+        // Single-flight: ignore the click while a run owns the UI.
+        // Cancel (or Back on the consent card) ends the run first.
+        const run = runs.begin()
+        if (!run) return
+        $('b-start').disabled = true
+        unlockCancel()
         show('s-progress')
         resetProgress()
         setPill('Nothing shared yet')
-        cancelled = false
+        const settle = () => {
+          run.finish()
+          $('b-start').disabled = false
+        }
         runCheck('novabank', {
-          onStep: (label) => { $('progress-label').textContent = label; markStep(label) },
+          signal: run.signal,
+          onStep: (label) => {
+            if (!run.isCurrent()) return
+            // Commit labels: signing/submission begins here exactly.
+            if (label.startsWith('Recording') || label === 'Confirming with Sovra…') lockCancel()
+            $('progress-label').textContent = label; markStep(label)
+          },
           decide: ({ review }) => new Promise((resolve) => {
-            if (cancelled) {
+            if (run.signal.aborted || !run.isCurrent()) {
               resolve('back')
               return
             }
+            // If Cancel lands while consent is open, release the
+            // decision as a local back-out: nothing signed or sent.
+            run.signal.addEventListener('abort', () => resolve('back'), { once: true })
             $('consent-human').innerHTML =
               field('Who asks', 'NovaBank (demo)') +
               field('What they learn', 'That you are over 18') +
@@ -249,11 +289,25 @@
               field('Issuer', 'synth-1 (synthetic issuer)') +
               field('Expires', review.expiresAt, true)
             show('s-consent')
-            $('b-approve').onclick = () => { show('s-progress'); resolve('approve') }
-            $('b-decline').onclick = () => { show('s-progress'); resolve('deny') }
-            $('b-back').onclick = () => resolve('back')
+            // Approving or declining starts the commit: switch Cancel
+            // off and rename it at once, so the signing/verification
+            // progress can never suggest that stopping follow-up would
+            // retract the recorded decision.
+            $('b-approve').onclick = () => {
+              if (!run.isCurrent()) return
+              lockCancel()
+              show('s-progress'); resolve('approve')
+            }
+            $('b-decline').onclick = () => {
+              if (!run.isCurrent()) return
+              lockCancel()
+              show('s-progress'); resolve('deny')
+            }
+            $('b-back').onclick = () => { if (run.isCurrent()) resolve('back') }
           }),
         }).then(({ decision, denied, backedOut, requestId, review }) => {
+          if (!run.isCurrent()) return
+          settle()
           if (backedOut) {
             show('s-start')
             return
@@ -297,11 +351,30 @@
           show('s-outcome')
           void refreshOps()
         }).catch((err) => {
+          if (!run.isCurrent()) return
+          settle()
+          if (isRunCancelled(err) || run.signal.aborted) {
+            show('s-start')
+            return
+          }
           console.error('demo check failed:', err)
-          $('verdict').textContent = 'Something went wrong.'
-          $('verdict').className = 'verdict bad'
-          $('outcome-note').textContent = 'Check failed before any decision. Nothing was shared. Start a new check to retry.'
-          $('receipt-fields').innerHTML = ''
+          const card = $('s-outcome')
+          card.classList.remove('outcome-ok', 'outcome-bad', 'outcome-warn')
+          card.classList.add('outcome-bad')
+          $('receipt-fields').innerHTML = err?.requestId ? field('Request', err.requestId, true) : ''
+          if (err?.stage === 'verify') {
+            $('verdict').textContent = 'Approval recorded — confirmation failed.'
+            $('verdict').className = 'verdict warn'
+            $('outcome-note').textContent = 'Your approval was recorded but Sovra confirmation did not complete. The proof may already exist. Check the live decision feed below or start a new check.'
+          } else if (err?.stage === 'decision') {
+            $('verdict').textContent = 'Something went wrong.'
+            $('verdict').className = 'verdict bad'
+            $('outcome-note').textContent = 'The check failed while recording your decision, which may already have been recorded. Retrying never revokes it. Check the feed below or start a new check.'
+          } else {
+            $('verdict').textContent = 'Something went wrong.'
+            $('verdict').className = 'verdict bad'
+            $('outcome-note').textContent = 'Check failed before any decision. Nothing was shared. Start a new check to retry.'
+          }
           show('s-outcome')
         })
       })

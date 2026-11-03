@@ -183,6 +183,35 @@ class AiBudgetTests extends SovraPostgresBase {
   }
 
   @Test
+  void runtimeLimitReductionTakesEffectWithoutAllowingAReplicaToRaiseTheCap() {
+    AiBudgetProperties budgets = new AiBudgetProperties();
+    budgets.setDailyRequests(10);
+    budgets.setDailyTokens(10_000);
+    budgets.setMaxConcurrency(10);
+    budgets.setLeaseSeconds(3_600);
+    AiBudgetService ledger = new AiBudgetService(
+        appRoleDataSource(), Clock.systemUTC(), budgets);
+    ledger.reserve(UUID.randomUUID(), 1_000);
+
+    budgets.setDailyRequests(1);
+    budgets.setDailyTokens(2_000);
+    budgets.setMaxConcurrency(1);
+    assertThatThrownBy(() -> ledger.reserve(UUID.randomUUID(), 1_000))
+        .isInstanceOf(AiBudgetExhaustedException.class)
+        .hasMessageContaining("request budget");
+
+    budgets.setDailyRequests(100);
+    budgets.setDailyTokens(1_000_000);
+    budgets.setMaxConcurrency(100);
+    assertThatThrownBy(() -> ledger.reserve(UUID.randomUUID(), 1_000))
+        .isInstanceOf(AiBudgetExhaustedException.class)
+        .hasMessageContaining("request budget");
+    assertThat(owner.queryForObject(
+        "SELECT request_limit FROM ai_budget_day WHERE day = CURRENT_DATE", Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
   void sweepBurnsAbandonedAndFreesTheSlot() {
     AiBudgetService ledger = ledger(100, 1_000_000, 1);
     UUID abandoned = ledger.reserve(UUID.randomUUID(), 7_000);

@@ -133,17 +133,39 @@ class BffAccreditationStepUpTests extends SovraAppRoleBase {
     assertThat(state(accreditationId)).isEqualTo("REQUESTED");
   }
 
+  @Test
+  void requesterCannotApproveOwnRequestThroughBff() throws Exception {
+    String requesterName = "bff-maker-checker-" + suffix();
+    String accreditationId = requestedAccreditation(requesterName);
+    BffTestSessions.Session session = login(
+        requesterName, List.of("sovra-trust-admins"), List.of("webauthn"));
+
+    HttpResponse<String> refused =
+        postJson("/api/bff/accreditations/" + accreditationId + "/approve", session, Map.of());
+
+    assertThat(refused.statusCode()).isEqualTo(409);
+    assertThat(state(accreditationId)).isEqualTo("REQUESTED");
+    Integer minted = owner.queryForObject(
+        "SELECT COUNT(*) FROM service_account WHERE name LIKE ?",
+        Integer.class, "accredited-" + requesterName + "-%");
+    assertThat(minted).isZero();
+  }
+
   private String requestedAccreditation() {
+    return requestedAccreditation("bff-acc-" + suffix());
+  }
+
+  private String requestedAccreditation(String requesterName) {
     // The requester lives in the BFF demo tenant, so the BFF
     // approver decides a case it can actually see.
     UUID demo = owner.queryForObject(
         "SELECT id FROM tenant WHERE slug = 'sovra-demo'", UUID.class);
     TestAccount member = TestAccounts.createInTenant(
-        owner, demo, "bff-acc-" + suffix(), Set.of("TENANT_MEMBER"));
+        owner, demo, requesterName, Set.of("TENANT_MEMBER"));
     Map<String, Object> requested = client.post().uri("/api/accreditations")
         .headers(member.headers())
         .body(Map.of(
-            "orgName", "Step-Up Shop",
+            "orgName", requesterName,
             "roles", List.of("RP_CLIENT"),
             "origins", List.of("https://shop.example"),
             "audiences", List.of("https://shop.example/rp/callback")))
@@ -153,10 +175,15 @@ class BffAccreditationStepUpTests extends SovraAppRoleBase {
   }
 
   private BffTestSessions.Session login(List<String> groups, List<String> amr) throws Exception {
+    return login("stepup-" + suffix(), groups, amr);
+  }
+
+  private BffTestSessions.Session login(
+      String subject, List<String> groups, List<String> amr) throws Exception {
     return BffTestSessions.login(
         http, mapper, BASE, STUB,
         new StubOpenIdProvider.Script(
-            "stepup-" + suffix(), groups, "sovra-demo", amr));
+            subject, subject, groups, "sovra-demo", amr, null, null));
   }
 
   private void backdateAuthTime(String jsessionid, Instant at) throws Exception {

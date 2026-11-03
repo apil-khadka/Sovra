@@ -88,7 +88,7 @@ public class PlanningProperties {
   }
 
   public void setBaseUrl(String baseUrl) {
-    this.baseUrl = baseUrl;
+    this.baseUrl = optionalValue(baseUrl);
   }
 
   public String apiKey() {
@@ -96,7 +96,7 @@ public class PlanningProperties {
   }
 
   public void setApiKey(String apiKey) {
-    this.apiKey = apiKey;
+    this.apiKey = optionalValue(apiKey);
   }
 
   public String model() {
@@ -104,7 +104,7 @@ public class PlanningProperties {
   }
 
   public void setModel(String model) {
-    this.model = model;
+    this.model = optionalValue(model);
   }
 
   public int maxToolCalls() {
@@ -192,5 +192,9 @@ public class PlanningProperties {
     return baseUrl != null && !baseUrl.isBlank()
         && apiKey != null && !apiKey.isBlank()
         && model != null && !model.isBlank();
+  }
+
+  private static String optionalValue(String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 }

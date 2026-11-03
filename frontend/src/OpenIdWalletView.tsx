@@ -71,7 +71,7 @@ export default function OpenIdWalletView({ session }: { session: SessionInfo | n
   }
 
   return (
-    <section className="consent" aria-label="OpenID demo wallet">
+    <section className="consent wallet" aria-label="OpenID demo wallet">
       <h1 className="view-title">OpenID demo wallet</h1>
       <p className="view-lede">For the SD-JWT synthetic demo: receive a credential, review consent, then share an encrypted presentation.</p>
       <p className="view-hint">This tab keeps your key and credential in memory only. Leaving this view or reloading loses them. Use synthetic data only.</p>

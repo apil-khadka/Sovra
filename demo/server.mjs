@@ -8,28 +8,34 @@
 //
 // Refuses to boot unless Sovra reports the synthetic profile.
 
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRateLimiter, originAllowed } from './limit.mjs'
+import { parseEnvFile, resolveDemoConfig } from './config.mjs'
+import {
+  ISSUER_SYNTH1,
+  OUTCOME,
+  POLICY_LEGACY,
+  POLICY_VERSION,
+  VCT_ADULT,
+  canonicalPlanHash,
+  checkPlanShape,
+  claimsForPlan,
+  createInteropService,
+  scopeAllows,
+} from './interop.mjs'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
 const PUBLIC = join(ROOT, 'public')
-const SOVRA = process.env.SOVRA_BASE ?? 'http://localhost:8080'
 const PORT = Number(process.env.PORT ?? 5174)
 // PROD-006: coarse per-IP abuse protection (600 burst, 600/min
 // sustained) and a hard upstream deadline. Not a production WAF —
 // just enough that a stray loop cannot melt the sandbox.
 const apiLimiter = createRateLimiter({ capacity: 600, refillPerSec: 10 })
 const UPSTREAM_TIMEOUT_MS = 10_000
-
-const ISSUER_ID = 'https://sovra.example/issuers/synth-1'
-const VCT = 'https://sovra.example/vct/adult-status/1'
-const POLICY_ID = 'sovra-synthetic-policy/age-check'
-const POLICY_VERSION = '1'
-const SECTION_ID = 'age_eligibility'
 
 const APPS = {
   novabank: {
@@ -44,56 +50,60 @@ const APPS = {
   },
 }
 
-function loadEnv() {
-  const tokens = {}
-  for (const line of readFileSync(join(ROOT, '.env.local'), 'utf-8').split('\n')) {
-    const match = line.match(/^([A-Z_]+)=(.*)$/)
-    if (match !== null) tokens[match[1]] = match[2].trim()
+// Secure config seam: process environment wins, demo/.env.local (ignored,
+// mode 0600) supplies the rest, per-node token files apply ONLY when
+// SOVRA_DEMO_TOKENS_DIR is explicitly set. No token is ever committed,
+// printed, or sent to a browser. Names only are logged on boot.
+function loadEnvFileOptional() {
+  try {
+    return parseEnvFile(readFileSync(join(ROOT, '.env.local'), 'utf-8'))
+  } catch {
+    return {}
   }
-  const required = ['SETUP_TOKEN', 'NOVABANK_RP_TOKEN', 'CORNERCELLAR_RP_TOKEN']
-  for (const key of required) {
-    if (!tokens[key]) throw new Error(`demo/.env.local lacks ${key} (run: pnpm --dir demo run setup)`)
-  }
-  return tokens
 }
 
-const TOKENS = loadEnv()
+const ENV_FILE = loadEnvFileOptional()
+function readTokenByName(name) {
+  const dir = process.env.SOVRA_DEMO_TOKENS_DIR ?? ENV_FILE.SOVRA_DEMO_TOKENS_DIR ?? ''
+  if (dir === '') return ''
+  try {
+    return readFileSync(join(dir, name), 'utf-8').trim()
+  } catch {
+    return ''
+  }
+}
+
+const CONFIG = resolveDemoConfig({ env: process.env, envFile: ENV_FILE, readToken: readTokenByName })
+if (CONFIG.mode === 'unconfigured') {
+  throw new Error('demo config unconfigured: need legacy .env.local (run: pnpm --dir demo run setup) or explicit interop SOVRA_BASE + node tokens')
+}
+
+// Central ledger (node A) plus optional second issuer node (node B).
+// Single-node default keeps the legacy :8080 behavior; the dual-issuer
+// topology sets SOVRA_BASE=http://127.0.0.1:8280 and
+// SOVRA_BASE_SYNTH2=http://127.0.0.1:8281 with explicit
+// SOVRA_DEMO_TOKENS_DIR (or inline SOVRA_A/B_* tokens).
+const SOVRA = CONFIG.sovraBase
+const SOVRA_SYNTH2 = CONFIG.sovraSynth2
+const LEGACY_AVAILABLE = CONFIG.legacy.configured
+const INTEROP_AVAILABLE = CONFIG.nodeA.configured
+
+const TOKENS = {
+  SETUP_TOKEN: CONFIG.legacy.setupToken,
+  NOVABANK_RP_TOKEN: CONFIG.legacy.novabankToken,
+  CORNERCELLAR_RP_TOKEN: CONFIG.legacy.cornercellarToken,
+}
 const RP_TOKEN = { novabank: TOKENS.NOVABANK_RP_TOKEN, cornercellar: TOKENS.CORNERCELLAR_RP_TOKEN }
 
 function isoPlus(hours) {
   return new Date(Date.now() + hours * 3600_000).toISOString().replace('.000Z', 'Z')
 }
 
-function planHash(planId) {
-  const canonical = [
-    'sovra-plan/v1',
-    planId,
-    'age_over_18',
-    ISSUER_ID,
-    VCT,
-    'adultOver18',
-    `${POLICY_ID}#${SECTION_ID}`,
-    POLICY_ID,
-    POLICY_VERSION,
-    'CANDIDATE_ONLY',
-    '',
-  ].join('\n')
-  return createHash('sha256').update(canonical, 'utf-8').digest('hex')
-}
-
-function planWire(planId) {
-  return {
-    plan_id: planId,
-    requested_outcome: 'age_over_18',
-    candidate_issuer_id: ISSUER_ID,
-    credential_type: VCT,
-    claim_paths: ['adultOver18'],
-    evidence: [{ document_id: POLICY_ID, section_id: SECTION_ID }],
-    policy_id: POLICY_ID,
-    policy_version: POLICY_VERSION,
-    recommendation: 'CANDIDATE_ONLY',
-  }
-}
+// Legacy RP paths below request the ACTUAL planner + deterministic
+// guard for the known case and bind the RETURNED plan and its canonical
+// hash (canonicalPlanHash, byte-identical to the old fixed planHash for
+// legacy plans). No fixed plan template remains anywhere: planner
+// failure is an honest 502, never a silent fallback.
 
 async function sovra(method, path, token, body) {
   let res
@@ -122,6 +132,43 @@ async function sovra(method, path, token, body) {
   }
   return { status: res.status, json }
 }
+
+// Per-node upstream adapter for the interop service: same deadline and
+// idempotency shape as sovra(), but addressed per node so synth-2 flows
+// reach node B with node B's own tokens.
+async function interopCall(node, method, path, token, body) {
+  let res
+  try {
+    res = await fetch(node.base + path, {
+      method,
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...(body?.idem ? { 'Idempotency-Key': body.idem } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify({ ...body, idem: undefined }),
+    })
+  } catch {
+    return { status: 0, json: null }
+  }
+  const text = await res.text()
+  let json = null
+  try {
+    json = text === '' ? null : JSON.parse(text)
+  } catch {
+    json = null
+  }
+  return { status: res.status, json }
+}
+
+const interop = INTEROP_AVAILABLE ? createInteropService({
+  nodes: {
+    default: { base: SOVRA, rpToken: CONFIG.nodeA.rpToken, issuerToken: CONFIG.nodeA.issuerToken },
+    synth2: { base: SOVRA_SYNTH2, rpToken: CONFIG.nodeB.rpToken, issuerToken: CONFIG.nodeB.issuerToken },
+  },
+  call: interopCall,
+}) : null
 
 function send(res, status, value, headers = {}) {
   const body = JSON.stringify(value)
@@ -159,10 +206,156 @@ function publicJwk(value) {
   return { kty, crv, x, y }
 }
 
+function interopHttpForSetup(error) {
+  if (error === 'issuance_failed' || error === 'issuance_uncertain') return 502
+  if (error === 'tx_issuance_in_progress' || error === 'tx_issuance_conflict'
+    || error === 'issuance_conflict' || error === 'tx_issuance_bound') return 409
+  if (error === 'issuer_node_unconfigured' || error === 'tx_issuance_uncertain') return 503
+  return 400
+}
+
+function interopHttpForRequest(error) {
+  if (error === 'request_failed' || error === 'request_uncertain'
+    || error === 'request_review_unavailable' || error === 'consent_echo_mismatch') return 502
+  if (error === 'request_not_found') return 404
+  if (error === 'issuer_node_unconfigured') return 503
+  return 400
+}
+
+async function handleInterop(req, res, segments) {
+  const action = segments[1]
+  if (!INTEROP_AVAILABLE || !interop) {
+    send(res, 503, { ok: false, error: 'interop_unconfigured' })
+    return
+  }
+
+  if (req.method === 'GET' && action === 'status') {
+    // Read-only capability probe: the service only GETs /api/plans/status
+    // here and never POSTs /propose, so opening the page spends no
+    // model call even with live armed.
+    const caps = await interop.getStatus()
+    send(res, 200, { ok: true, status: caps })
+    return
+  }
+
+  if (req.method === 'POST' && action === 'plan') {
+    const body = await readBody(req, res)
+    if (body === null) return
+    if (typeof body.case !== 'string') {
+      send(res, 400, { ok: false, error: 'invalid_plan_body' })
+      return
+    }
+    const result = await interop.postPlan(body.case)
+    if (!result.ok) {
+      const http = result.error === 'unknown_case' ? 400
+        : result.error === 'planner_unavailable' ? 503 : 502
+      send(res, http, { ok: false, ...result })
+      return
+    }
+    send(res, 200, { ok: true, ...result })
+    return
+  }
+
+  if (req.method === 'POST' && action === 'setup') {
+    const body = await readBody(req, res)
+    if (body === null) return
+    const holderJwk = publicJwk(body.holderJwk)
+    if (holderJwk === null || typeof body.holderProof !== 'string'
+      || typeof body.idem !== 'string' || typeof body.tx !== 'string') {
+      send(res, 400, { ok: false, error: 'invalid_setup_body' })
+      return
+    }
+    const result = await interop.postSetup({
+      tx: body.tx, holderJwk, holderProof: body.holderProof, idem: body.idem,
+    })
+    if (!result.ok) {
+      send(res, interopHttpForSetup(result.error), { ok: false, ...result })
+      return
+    }
+    send(res, 200, { ok: true, ...result })
+    return
+  }
+
+  if (req.method === 'POST' && action === 'request') {
+    const body = await readBody(req, res)
+    if (body === null) return
+    if (typeof body.tx !== 'string'
+      || typeof body.credentialId !== 'string' || !UUID.test(body.credentialId)) {
+      send(res, 400, { ok: false, error: 'invalid_request_body' })
+      return
+    }
+    const result = await interop.postRequest({ tx: body.tx, credentialId: body.credentialId })
+    if (!result.ok) {
+      send(res, interopHttpForRequest(result.error), { ok: false, ...result })
+      return
+    }
+    send(res, 200, { ok: true, ...result })
+    return
+  }
+
+  if (req.method === 'POST' && action === 'decision') {
+    const body = await readBody(req, res)
+    if (body === null) return
+    const holderJwk = publicJwk(body.holderJwk)
+    if (
+      typeof body.tx !== 'string'
+      || typeof body.requestId !== 'string' || !UUID.test(body.requestId)
+      || (body.decision !== 'approve' && body.decision !== 'deny')
+      || holderJwk === null || typeof body.consentProof !== 'string'
+    ) {
+      send(res, 400, { ok: false, error: 'invalid_decision_body' })
+      return
+    }
+    const result = await interop.postDecision({
+      tx: body.tx, requestId: body.requestId, decision: body.decision,
+      holderJwk, consentProof: body.consentProof,
+    })
+    if (!result.ok && result.error) {
+      const http = result.error === 'issuer_node_unconfigured' ? 503 : 400
+      send(res, http, { ok: false, ...result })
+      return
+    }
+    send(res, 200, { ...result })
+    return
+  }
+
+  if (req.method === 'POST' && action === 'verify') {
+    const body = await readBody(req, res)
+    if (body === null) return
+    const holderJwk = publicJwk(body.holderJwk)
+    if (
+      typeof body.tx !== 'string'
+      || typeof body.requestId !== 'string' || !UUID.test(body.requestId)
+      || typeof body.nonce !== 'string' || holderJwk === null
+      || typeof body.bindingProof !== 'string'
+    ) {
+      send(res, 400, { ok: false, error: 'invalid_verify_body' })
+      return
+    }
+    const result = await interop.postVerify({
+      tx: body.tx, requestId: body.requestId, nonce: body.nonce,
+      holderJwk, bindingProof: body.bindingProof,
+    })
+    if (!result.ok && result.error) {
+      const http = result.error === 'issuer_node_unconfigured' ? 503 : 400
+      send(res, http, { ok: false, ...result })
+      return
+    }
+    send(res, 200, { ...result })
+    return
+  }
+
+  send(res, 404, { ok: false, error: 'unknown_interop_action' })
+}
+
 async function handleApi(req, res, segments) {
   const [app] = segments
   if (!(app in APPS)) {
     send(res, 404, { ok: false, error: 'unknown_demo_app' })
+    return
+  }
+  if (!LEGACY_AVAILABLE) {
+    send(res, 503, { ok: false, error: 'legacy_unconfigured' })
     return
   }
   const config = APPS[app]
@@ -180,8 +373,8 @@ async function handleApi(req, res, segments) {
       return
     }
     const issued = await sovra('POST', '/api/issuance/credentials', TOKENS.SETUP_TOKEN, {
-      issuerId: ISSUER_ID,
-      vct: VCT,
+      issuerId: ISSUER_SYNTH1,
+      vct: VCT_ADULT,
       holderJwk,
       holderProof: body.holderProof,
       claims: { adultOver18: true },
@@ -203,18 +396,85 @@ async function handleApi(req, res, segments) {
       send(res, 400, { ok: false, error: 'invalid_credential_id' })
       return
     }
-    const planId = `pln_demo_${randomBytes(6).toString('hex')}`
+    // Honest planning for the known case: propose on the central
+    // ledger (legacy-pinned scope once the backend supports it),
+    // validate the RETURNED plan with the deterministic guard, and
+    // bind the returned plan + canonical hash into consent. Any
+    // planner/guard failure is an honest 502 — the old fixed plan is
+    // gone and is never substituted back.
+    const caps = INTEROP_AVAILABLE && interop ? await interop.getStatus() : null
+    const legacyScope = caps?.primary?.scopeSupported === true
+      ? { scopeIssuerIds: [ISSUER_SYNTH1], scopeCredentialTypes: [VCT_ADULT] }
+      : {}
+    const proposed = await sovra('POST', '/api/plans/propose', rpToken, {
+      rpId: config.rpId,
+      audience: config.audience,
+      purpose: config.purpose,
+      outcome: OUTCOME,
+      policyId: POLICY_LEGACY,
+      policyVersion: POLICY_VERSION,
+      requestedClaims: ['adultOver18'],
+      ...legacyScope,
+    })
+    if (proposed.status === 503 || proposed.status === 0) {
+      send(res, 502, { ok: false, error: 'planner_unavailable', status: proposed.status })
+      return
+    }
+    if (proposed.status !== 200 || !proposed.json) {
+      send(res, 502, { ok: false, error: 'proposal_failed', status: proposed.status })
+      return
+    }
+    const returned = proposed.json.plan ?? null
+    if (returned === null || proposed.json.recommendation !== 'CANDIDATE_ONLY') {
+      send(res, 502, { ok: false, error: 'no_plan_path' })
+      return
+    }
+    let plan
+    try {
+      plan = checkPlanShape(returned)
+    } catch {
+      send(res, 502, { ok: false, error: 'proposal_malformed' })
+      return
+    }
+    if (legacyScope.scopeIssuerIds !== undefined && !scopeAllows(legacyScope, plan)) {
+      send(res, 502, { ok: false, error: 'no_plan_path' })
+      return
+    }
+    if (plan.policy_id !== POLICY_LEGACY || plan.policy_version !== POLICY_VERSION) {
+      send(res, 502, { ok: false, error: 'proposal_policy_mismatch' })
+      return
+    }
+    const guarded = await sovra('POST', '/api/guard/validate', rpToken, {
+      plan, policyId: POLICY_LEGACY, policyVersion: POLICY_VERSION,
+    })
+    if (guarded.status !== 200 || !guarded.json) {
+      send(res, 502, { ok: false, error: 'guard_unavailable', status: guarded.status })
+      return
+    }
+    if (!guarded.json.accepted) {
+      send(res, 502, { ok: false, error: 'guard_rejected', code: guarded.json.code ?? null })
+      return
+    }
+    let planHashValue
+    let planClaims
+    try {
+      planHashValue = canonicalPlanHash(plan)
+      planClaims = claimsForPlan(plan)
+    } catch {
+      send(res, 502, { ok: false, error: 'proposal_unusable' })
+      return
+    }
     const challenge = randomBytes(24).toString('base64url')
     const created = await sovra('POST', '/api/consent/requests', rpToken, {
       rpId: config.rpId,
       audience: config.audience,
       purpose: config.purpose,
       credentialId: body.credentialId,
-      claims: { adultOver18: true },
-      plan: planWire(planId),
-      policyId: POLICY_ID,
+      claims: planClaims,
+      plan,
+      policyId: POLICY_LEGACY,
       policyVersion: POLICY_VERSION,
-      planHash: planHash(planId),
+      planHash: planHashValue,
       challenge,
       expiresAt: isoPlus(1),
     })
@@ -304,6 +564,7 @@ const STATIC = {
   '/': 'index.html',
   '/novabank': 'novabank.html',
   '/cornercellar': 'cornercellar.html',
+  '/interoperability': 'interoperability.html',
   '/shared.js': null,
   '/style.css': null,
 }
@@ -343,7 +604,12 @@ createServer(async (req, res) => {
         send(res, 429, { ok: false, error: 'rate_limited' }, { 'Retry-After': String(quota.retryAfterSec) })
         return
       }
-      await handleApi(req, res, url.pathname.slice('/api/'.length).split('/'))
+      const segments = url.pathname.slice('/api/'.length).split('/')
+      if (segments[0] === 'interop') {
+        await handleInterop(req, res, segments)
+        return
+      }
+      await handleApi(req, res, segments)
       return
     }
     const file = STATIC[url.pathname]
@@ -364,5 +630,15 @@ createServer(async (req, res) => {
     console.error(`refusing to boot: ${SOVRA} does not report the synthetic profile`)
     process.exit(1)
   }
-  console.log(`demo up on http://localhost:${PORT} (novabank, cornercellar) → ${SOVRA} [${upstream.profile}]`)
+  if (SOVRA_SYNTH2 !== SOVRA && CONFIG.nodeB.configured) {
+    const upstream2 = await fetch(`${SOVRA_SYNTH2}/api/discovery`).then((r) => r.json()).catch(() => null)
+    if (upstream2?.profile !== 'synthetic') {
+      console.error(`refusing to boot: ${SOVRA_SYNTH2} does not report the synthetic profile`)
+      process.exit(1)
+    }
+  }
+  const second = SOVRA_SYNTH2 === SOVRA ? 'single-node'
+    : CONFIG.nodeB.configured ? `+ synth2 ${SOVRA_SYNTH2}` : `+ synth2 ${SOVRA_SYNTH2} (unconfigured)`
+  const mode = `mode=${CONFIG.mode}`
+  console.log(`demo up on http://localhost:${PORT} (novabank, cornercellar, interoperability) → ${SOVRA} [${upstream.profile}] ${second} ${mode}`)
 })

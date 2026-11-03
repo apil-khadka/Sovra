@@ -166,6 +166,33 @@ class FileVerifierKeysTests {
         .hasMessageContaining("PUBLIC KEY");
   }
 
+  @Test
+  void mismatchedPemKeyPairFailsBeforeServingJwks() throws Exception {
+    KeyPair privateHalf = signingKeyPair();
+    KeyPair unrelatedPublicHalf = signingKeyPair();
+    Path mismatched = keys.resolve("mismatched.pem");
+    Files.writeString(mismatched,
+        privatePem(privateHalf) + publicPem((ECPublicKey) unrelatedPublicHalf.getPublic()));
+
+    assertThatThrownBy(() -> FileVerifierKeys.load(mismatched, "mismatched-v1"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("public and private keys do not match");
+  }
+
+  @Test
+  void nonP256PemKeyPairFailsBeforeServingJwks() throws Exception {
+    KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+    generator.initialize(new ECGenParameterSpec("secp384r1"));
+    KeyPair p384 = generator.generateKeyPair();
+    Path wrongCurve = keys.resolve("wrong-curve.pem");
+    Files.writeString(wrongCurve,
+        privatePem(p384) + publicPem((ECPublicKey) p384.getPublic()));
+
+    assertThatThrownBy(() -> FileVerifierKeys.load(wrongCurve, "wrong-curve-v1"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("P-256 curve");
+  }
+
   private Path writeKey(String name) throws Exception {
     KeyPair pair = signingKeyPair();
     Path file = keys.resolve(name + ".pem");

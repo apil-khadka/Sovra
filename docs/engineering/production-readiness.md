@@ -1,9 +1,21 @@
 # Production readiness and capacity assessment
 
-**Reviewed:** 2026-11-02.
-**Scope:** current working tree at base commit `6c52a05`, including uncommitted backend, frontend and mock RP demo changes.
+**Reviewed:** 2026-11-02; 2026-11-03 verification refresh appended.
+**Scope:** synthetic implementation and rebuilt local containers checked on 2026-11-03.
+The local evidence below does not certify hosted CI, a public deployment or production operation.
 **Verdict:** a working synthetic prototype with useful security and consistency foundations; production operation and capacity for large user populations are not yet demonstrated.
 This assessment updates development tasks, not deployment authorization.
+
+## 2026-11-03 delta
+
+The verdict is unchanged: production operation and capacity for large user populations are not demonstrated.
+The registry now records 13 done, 3 in progress (PROD-001 capacity contract, PROD-014 release pipeline, PROD-016 staged measurement) and 1 pending (PROD-017 independent release); those labels record implementation scope, never release approval.
+The current backend source gate passed 860 tests with zero failures, errors or skips and produced an SBOM with 336 components; the repository check passed with 790 public files.
+The root app pair was rebuilt, both instances reached `READY`, and migration 39 was applied with live planning disabled and provider settings empty.
+Synthetic and SD-JWT browser profiles passed 34/35 tests respectively, with five and four profile-specific skips; the SD-JWT run exercised encrypted VP, tampering, ciphertext retry, denial and authorization-code/PKCE.
+The fresh dual-issuer browser verifier passed 18/18 checks, demo smoke passed 45 checks, and TypeScript and Java SDKs passed 13/13 each in sequence; see the [continuation guide](continuation-guide.md) for the full dated record.
+Three findings changed state and carry dated notes below: F-01 (KMS seams now dispatch to an optional provider; no real provider qualified), F-02 (JDBC shared sessions landed with tests; deployment and recovery qualification open) and F-12 (cumulative ledger landed; it is not a billing cap).
+No representative load, failover, restore, deployed TLS, external wallet, live provider or real KMS test was performed in this delta either.
 
 ## What has been done
 
@@ -11,12 +23,12 @@ This assessment updates development tasks, not deployment authorization.
 | --- | --- | --- |
 | Application | Java 25/Spring Boot backend, React frontend packaged into the application origin, two-instance Compose harness, PostgreSQL and Flyway | Reproducible production deployment, infrastructure failure isolation and rolling upgrades |
 | Authorization | Tenant-scoped JDBC, database row-level security, service-level action/object checks, separate machine and browser authentication chains | Deployed IAM/network assessment, production organization onboarding and privileged authentication |
-| Identity | Keycloak OIDC login with S256 PKCE, Secure/HttpOnly session cookie, CSRF protection, membership revocation checked on requests | Production Keycloak database/clustering, shared BFF sessions and operational lifecycle |
+| Identity | Keycloak OIDC login with S256 PKCE, Secure/HttpOnly session cookie, CSRF protection, membership revocation checked on requests, JDBC shared BFF sessions | Production Keycloak database/clustering, shared-session deployment/recovery qualification and operational lifecycle |
 | Evidence flow | Issuance, explicit holder consent, verification, durable nonce/idempotency records, atomic decision/audit writes and denial audits | Production issuer authority, key custody, complete profile qualification and restore safety |
 | Protocols | SD-JWT VC/key-binding adapters, VCI/VP/DCQL and encrypted response flows, browser demo wallet with pre-authorized and authorization-code/PKCE grants | External interoperability, production verifier keys, production status distribution and remaining profile qualification |
 | Documents | Software-key envelope encryption, purpose-bound grants, purge/tombstones, isolated PNG/JPEG quarantine worker, synthetic extraction and enrollment review | Production key provider, production extraction/admission pipeline, storage growth, retention and backup lifecycle |
 | Product surfaces | Issuer, holder, federation, security, developer and RP desks; Java/TypeScript SDKs; NovaBank, CornerCellar and minimal integration examples | Production onboarding, durable device custody/recovery and operational product flows |
-| AI | Fixture/baseline planners, live adapter, deterministic final guard, bounded tools/tokens and provider deadline | Shared cumulative budget, concurrency admission, verified provider terms and live evaluation |
+| AI | Fixture/baseline planners, live adapter, deterministic final guard, bounded tools/tokens, provider deadline and fleet cumulative budget ledger | Verified provider terms, grant-key permissions, billing-cap controls and live evaluation |
 | Operations | Semantic readiness, sanitized stage telemetry, alert APIs, non-root application image, CI builds/browser/SDK checks and dependency/SBOM scans | Durable fleet observability, paging, load qualification, backup/failover drills and artifact admission |
 
 The existing 41-task registry records 12 `demo_implemented`, 24 `partial` and five `deferred_production` tasks.
@@ -28,21 +40,32 @@ Extraction, enrollment, custody, SDKs and dashboards need promotion and qualific
 
 | Check | Fresh result | What it establishes |
 | --- | --- | --- |
-| `cd backend && ./mvnw verify` using installed Temurin 25.0.2 | Passed: 738 tests, 127 report suites, zero failures/errors/skips | Current backend builds and its automated synthetic tests pass |
+| `cd backend && ./mvnw verify` using installed Temurin 25.0.2 | Passed: 860 tests, zero failures/errors/skips | Current backend builds and its automated synthetic tests pass |
 | `pnpm --dir frontend run typecheck`, `run lint`, `run build` | Passed | Current frontend type checks, lints and builds |
-| `pnpm --dir frontend run test:e2e` | Passed: 34 passed, 5 skipped | Browser holder/RP journeys work against the synthetic stack |
+| `pnpm --dir frontend run test:e2e` with synthetic and SD-JWT profiles | Passed: native 34/5 skipped; SD-JWT 35/4 skipped | Browser holder/RP and encrypted-wallet journeys work against the matching synthetic profile |
 | `pnpm --dir demo run smoke:all` | Passed: 45 checks | Running mock RP flows work against the current local synthetic stack |
 | `GET /api/health/ready` on ports 8080 and 8081 | Both returned `READY` | Both existing local containers answered their configured probes |
 | `GET /api/discovery` | `synthetic`, contract `0.16.0` | Running environment is a synthetic deployment |
-| Cross-instance BFF session probe | App A `200`, app B `401`, app A again `200`; probe session logged out | Browser sessions are currently local to an instance |
+| Cross-instance BFF session probe (historical) | Earlier image: app A `200`, app B `401`, app A again `200`; probe session logged out | Superseded by JDBC shared-session implementation and backend cross-instance tests; no fresh container-pair probe in this refresh |
 | Repository validation and whitespace checks | Passed after documentation changes | Public links/syntax/private-file boundaries and diff whitespace pass |
 
-The session probe reused the repository's HTTP login helper with its existing synthetic member fixture, then requested `/api/bff/me` through the same cookie jar on both ports.
-It did not restart services, change infrastructure or access real identities.
-Existing containers were not rebuilt during this assessment, so their runtime results are separate from the fresh source build.
-Earlier browser recordings and Playwright runs remain historical evidence; the browser suite was not rerun for this documentation-only change.
+The historical session probe reused the repository's HTTP login helper with its synthetic member fixture, then requested `/api/bff/me` through the same cookie jar on both ports.
+The current refresh rebuilt the root containers and reran both wallet profiles; its browser and SDK data remains synthetic.
 No representative load, failover, restore, deployed TLS, external wallet, live provider or real KMS test was performed.
 The installed JDK used for this audit is not an endorsement of its release patch level.
+
+### 2026-11-03 verification refresh (local synthetic evidence)
+
+The local backend `verify` gate passed 860 tests with zero failures, errors or skips; SBOM generation reported 336 components.
+The focused BFF issuer-flow suite passed 8/8, including authenticated-session principal and tenant bucket consumption.
+Frontend typecheck, lint and build passed, and `scripts/check_repository.py` reported 790 public files.
+Both root synthetic profile runs passed: native 34 with 5 intended skips; SD-JWT VC 35 with 4 intended native-verifier skips, including the 390px wallet-layout check and encrypted response flow.
+The root app pair was rebuilt and returned `READY` on both ports, with migration 39 applied; environment inspection confirmed `SOVRA_AI_LIVE_ENABLED=false` and empty AI key, URL and model.
+The separate dual-issuer fixture pair was rebuilt with distinct databases and passed 18/18 browser checks, including exact consent visibility, accepted Fjord/Harbor, employment NO_PATH, cancellation and secret hygiene.
+NovaBank, CornerCellar and minimal relying-party smoke passed all 45 checks; TypeScript and Java SDK suites each passed 13/13 in sequence.
+A synthetic captioned H.264 recording was created locally at 1440x900 for 132.52 seconds; it is not a hosted release artifact.
+No production KMS/HSM, provider-backed planning, external wallet conformance, deployed HTTPS, restore or load qualification was performed.
+The earlier direct container-pair session probe was not repeated; cross-instance session behavior remains covered by backend tests but not a fresh root-container browser probe.
 
 ## Findings that change the development plan
 
@@ -57,6 +80,11 @@ The installed JDK used for this audit is not an endorsement of its release patch
 Implement issuer signing, vault wrapping, verifier request signing/response decryption, status and worker key-use seams with production-mode rejection of every synthetic fallback.
 Do not enable synthetic flags to make a production boot succeed.
 Track this under PROD-005 and PROD-015.
+**2026-11-03 correction:** [KmsSigner](../../backend/src/main/java/dev/sovra/issuance/KmsSigner.java) no longer throws on every call; it dispatches to an optionally registered [KmsProvider](../../backend/src/main/java/dev/sovra/kms/KmsProvider.java) with an attested call context and fails unavailable only when no G2 provider is registered, while kms-mode boot refuses by design at the startup gate.
+[KmsVaultKekProvider](../../backend/src/main/java/dev/sovra/vault/KmsVaultKekProvider.java) follows the same shape for wrap and unwrap.
+[FileVerifierKeys](../../backend/src/main/java/dev/sovra/openid/FileVerifierKeys.java) adds a production-shape PEM-mounted verifier-key implementation with versioned key IDs and overlap-first rotation.
+What has not changed: no real KMS, HSM or TEE provider is qualified, and no ASVS assessment or production release is approved.
+The synthetic status path and the quarantine non-demo refusal remain as described above.
 
 ### F-02: Browser sessions do not survive routing between replicas
 
@@ -70,6 +98,9 @@ Preserve single-use challenge consumption atomically across replicas, including 
 Sticky routing can reduce immediate disruption but does not close the availability task.
 Spring documents both the default in-memory distribution problem and the shared-store approach in its [Spring Session reference](https://docs.spring.io/spring-session/reference/index.html).
 Track this under PROD-003.
+**2026-11-03 update:** the backend now depends on `spring-session-jdbc` for shared server-side sessions, and PROD-003 is recorded done with tests.
+This documentation pass ran no fresh cross-instance session probe, so the 2026-11-02 probe result stays historical rather than re-verified.
+Deployment and recovery qualification remains open, including restart/rollout behavior, the production Keycloak lifecycle and unlock-challenge races under real routing.
 
 ### F-03: Deployment and identity infrastructure remain development-shaped
 
@@ -181,6 +212,9 @@ Track this under PROD-013, PROD-014 and PROD-017.
 **Impact:** public requests could consume shared provider/issuer budgets or mistake a synthetic RP demonstration for a customer application.
 **Confidence:** high for inspected paths; no exploit or metered call was attempted.
 AI has request-level bounds but no shared cumulative reservation/usage ledger; keep the public-demo live-planning disarm until PROD-012 passes.
+**2026-11-03 update:** the shared ledger is now implemented in PostgreSQL with atomic reserve/settle, per-round funding, unknown-usage burn, finite caps, zero retries and lease expiry, and PROD-012 is recorded done.
+The ledger is defense in depth, not a billing cap: no authenticated billing API access was verified for the grant and grant-key permissions were never tested.
+Keep the public-demo live-planning disarm until the conditional live gate passes with a verified no-charge budget.
 [The mock RP server](../../demo/server.mjs) deliberately holds setup/RP credentials and forwards fixture issuance/consent/verification without a visitor account/session boundary; its upstream fetches have no explicit application deadline.
 Those servers are useful synthetic integration examples, not a production bank/shop or production identity frontend.
 Before public synthetic hosting, restrict privileges and origins/actions, enforce quotas/deadlines and separate fixture issuance from visitor authority.
@@ -230,6 +264,7 @@ Do not provision paid capacity or change the existing synthetic-only/no-new-paym
 The [production work breakdown](implementation-backlog.md#production-readiness-work-breakdown) and machine-readable `production_work_items` in the [task registry](implementation-tasks.json) define PROD-001 through PROD-017 with owners, dependencies and acceptance checks.
 They refine existing SOV tasks and do not replace their acceptance criteria or close their remote issues.
 
+**2026-11-03 note:** PROD-003, PROD-006, PROD-007, PROD-008 and PROD-011 are recorded done since this ordering was written; the remaining sequence runs through PROD-001, PROD-014, PROD-016 and the PROD-017 release gate.
 1. **Next development batch:** PROD-001 capacity contract, PROD-003 shared sessions, PROD-006 admission controls, PROD-007 JDBC budgets, PROD-008 query/cache profiling and PROD-011 fleet instrumentation.
    Prepare PROD-002/004 deployment and identity definitions alongside them using synthetic data.
 2. **Synthetic staging qualification:** add PROD-009 workers, PROD-010 lifecycle, PROD-013 recovery and PROD-014 release pipeline, then execute PROD-016 against an isolated representative environment.

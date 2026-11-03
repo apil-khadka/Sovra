@@ -94,6 +94,9 @@ services:
       # Credential profile: synthetic (default) or sdjwt-vc
       # (walt-id SD-JWT VC, qualified under SOV-036).
       SOVRA_PROFILE: ${SOVRA_PROFILE:-synthetic}
+      # OID4VP/VCI metadata and request objects contain absolute URLs.
+      # Keep them aligned with this replica's published host port.
+      SOVRA_OPENID_ISSUER_BASE_URL: http://localhost:8080
       SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
       SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
       # Smoke/dev only: synthetic vault KEK seed (base64, non-secret
@@ -203,6 +206,9 @@ services:
       # Credential profile: synthetic (default) or sdjwt-vc
       # (walt-id SD-JWT VC, qualified under SOV-036).
       SOVRA_PROFILE: ${SOVRA_PROFILE:-synthetic}
+      # This replica is published on :8081; protocol URLs must not point
+      # at app-a's :8080 origin or browser wallets will reject its requests.
+      SOVRA_OPENID_ISSUER_BASE_URL: http://localhost:8081
       SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
       SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
       # Smoke/dev only: synthetic vault KEK seed (base64, non-secret

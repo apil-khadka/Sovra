@@ -78,6 +78,15 @@ class KmsDelegationTests {
   }
 
   @Test
+  void kekWrapDenialUsesVaultFailureTranslation() {
+    TestKmsProvider provider = TestKmsProvider.local();
+    provider.revokeKekVersion(1);
+    KmsVaultKekProvider kek = new KmsVaultKekProvider(provider, WORKLOAD, IMAGE, LOCATION);
+    assertThatThrownBy(() -> kek.wrapDek(UUID.randomUUID(), 1, new byte[32], new byte[] {1}))
+        .isInstanceOf(VaultAuthenticationException.class);
+  }
+
+  @Test
   void kekOutagePassesThrough() {
     TestKmsProvider provider = TestKmsProvider.local();
     provider.outage(true);

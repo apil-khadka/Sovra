@@ -20,6 +20,8 @@ public final class VaultCrypto {
   static final int GCM_NONCE_BYTES = 12;
   static final int GCM_TAG_BITS = 128;
   static final int DEK_BYTES = 32;
+  static final int HKDF_SHA256_HASH_BYTES = 32;
+  static final int HKDF_SHA256_MAX_BYTES = 255 * HKDF_SHA256_HASH_BYTES;
 
   private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -55,9 +57,21 @@ public final class VaultCrypto {
    * given info). Labels domain-separate every derivation.
    */
   public static byte[] hkdfSha256(byte[] ikm, byte[] salt, byte[] info, int length) {
+    if (ikm == null) {
+      throw new IllegalArgumentException("HKDF input keying material is required");
+    }
+    if (length < 0 || length > HKDF_SHA256_MAX_BYTES) {
+      throw new IllegalArgumentException("HKDF-SHA256 output must be 0..8160 bytes");
+    }
+    if (length == 0) {
+      return new byte[0];
+    }
+    byte[] effectiveSalt =
+        salt == null || salt.length == 0 ? new byte[HKDF_SHA256_HASH_BYTES] : salt;
+    byte[] effectiveInfo = info == null ? new byte[0] : info;
     try {
       Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(new SecretKeySpec(salt, "HmacSHA256"));
+      mac.init(new SecretKeySpec(effectiveSalt, "HmacSHA256"));
       byte[] prk = mac.doFinal(ikm);
       byte[] output = new byte[length];
       byte[] previous = new byte[0];
@@ -66,7 +80,7 @@ public final class VaultCrypto {
       while (filled < length) {
         mac.init(new SecretKeySpec(prk, "HmacSHA256"));
         mac.update(previous);
-        mac.update(info);
+        mac.update(effectiveInfo);
         mac.update((byte) counter);
         previous = mac.doFinal();
         int take = Math.min(previous.length, length - filled);
