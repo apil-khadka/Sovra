@@ -1,0 +1,24 @@
+{
+  "plan_id": "pln_demo_mapped_001",
+  "requested_outcome": "age_over_18",
+  "candidate_issuer_id": "https://sovra.example/issuers/synth-2",
+  "credential_type": "https://sovra.example/vct/fjord-adult/1",
+  "claim_paths": [
+    "isAdult"
+  ],
+  "evidence": [
+    {
+      "document_id": "sovra-synthetic-policy/age-check-mapped",
+      "section_id": "mapped_age_eligibility"
+    },
+    {
+      "document_id": "sovra-schema/fjord-adult-v1",
+      "section_id": "adult_eligibility"
+    }
+  ],
+  "unresolved_issues": [],
+  "needs_holder_consent": true,
+  "policy_id": "sovra-synthetic-policy/age-check-mapped",
+  "policy_version": "1",
+  "recommendation": "CANDIDATE_ONLY"
+}

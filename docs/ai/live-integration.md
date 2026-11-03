@@ -34,9 +34,22 @@ explicitly-labeled fixture candidates (`mode: FIXTURE`,
 `liveAcceptance: false`, `model: none (fixture)`).
 
 Optional budgets (defaults in parentheses): `SOVRA_AI_MAX_TOOL_CALLS`
-(8), `SOVRA_AI_TIMEOUT` (10s), `SOVRA_AI_MAX_RETRIES` (1),
+(8), `SOVRA_AI_TIMEOUT` (10s), `SOVRA_AI_MAX_RETRIES` (0; metered
+calls refuse any other value at admission),
 `SOVRA_AI_MAX_TOKENS` (8000: reasoning consumes the output budget), `SOVRA_AI_MAX_PROMPT_CHARS` (8000),
-`SOVRA_AI_TEMPERATURE` (0.0), `SOVRA_AI_SEED` (7).
+`SOVRA_AI_TEMPERATURE` (0.0), `SOVRA_AI_SEED` (7),
+`SOVRA_AI_MAX_TRANSCRIPT_BYTES` (32768: per-attempt wire cap),
+`SOVRA_AI_ALLOWED_MODELS` (empty: denies every live call until the
+operator lists a model id — an operator control, not qualification
+evidence).
+
+Fleet spend envelope (`SOVRA_AI_BUDGET_DAILY_REQUESTS`,
+`SOVRA_AI_BUDGET_DAILY_TOKENS`, `SOVRA_AI_BUDGET_MAX_CONCURRENCY`,
+all `0` by default; `SOVRA_AI_BUDGET_LEASE_SECONDS`, `120`): live
+spending needs the arming flag AND funded limits AND an allowlisted
+model. See [ai-budgets.md](../engineering/ai-budgets.md) for the
+ledger, the per-round funding envelope, and what it cannot
+guarantee.
 
 ## Hackathon endpoint (Baseten, OD-02 candidate)
 
@@ -57,8 +70,13 @@ Local wiring:
 
 1. Values live in the root `.env` (gitignored, never committed;
    shape documented in `.env.example`); `compose.yaml` passes the
-   four `SOVRA_AI_*` variables into both app instances with empty
-   defaults, so a missing `.env` still boots keyless.
+   `SOVRA_AI_*` arming/credential variables, the nine
+   bound/timeout/tool/output variables (allowlist, retries,
+   transcript cap, tool calls, timeout, tokens, prompt chars,
+   temperature, seed), plus the four `SOVRA_AI_BUDGET_*` budget
+   variables into both app instances with keyless, deny-by-default,
+   zero-budget values, so a missing `.env` still boots keyless and
+   spend-denied.
 2. Paste the key into `.env`, `docker compose up -d` to recycle the
    app containers, and confirm `GET /api/plans/status` still reports
    fixture mode (`liveEnabled: false`).
@@ -144,7 +162,13 @@ response. Fixture runs stay labeled fixture runs.
 ## Smoke evidence (2026-10-29, Baseten hackathon grant)
 
 Reproducible via `scripts/smoke-live-planning.py` (spends credits;
-exits 2 without spending when unarmed). Synthetic inputs only.
+exits 2 without spending when unarmed). Synthetic inputs only. A
+script PASS requires a LIVE candidate, 400-before-contact, and guard
+acceptance with the expected code (strict by default;
+`--adjudication-only` records a non-accepting verdict without
+passing as accepted). PASS is proposal/adjudication evidence only:
+decision proof stays separate and the frozen-corpus comparison is
+its own step below.
 
 - Status reported `LIVE` / `liveEnabled` / `modelConfigured` with
   `sovra-planner-prompts/2`, `sovra-planner-tools/1`, baseline
@@ -202,21 +226,40 @@ proof text recorded.
 - Planning backend suite: 33/33 green (Canary 3, Config 6,
   Evaluation 5, LiveFailure 3, Mode 4, ToolBounds 12).
 
-## Spend visibility and cap/alert guidance
+## Cumulative spend envelope (PROD-012)
 
-Spend visibility is console-only: the OpenAI-compatible inference
-endpoint returns usage tokens but no cost field (every run records
-cost `unreported`), and no provider spend API was verified from this
-environment. Per-call budgets (`SOVRA_AI_MAX_TOKENS` 8000,
-`SOVRA_AI_MAX_TOOL_CALLS` 8, `SOVRA_AI_TIMEOUT` 10s,
-`SOVRA_AI_MAX_RETRIES` 1, `SOVRA_AI_MAX_PROMPT_CHARS` 8000) bound
-each request and fail closed, but no application-level cumulative
-usage ledger exists across the two app instances — per-call limits
-and alerts are not a total spend cap.
+Spend visibility: no authenticated billing API access was verified
+for this grant; the proposal response carries usage tokens but no
+cost field (every run records cost `unreported`). Public Baseten
+changelogs document management billing endpoints ([daily Model API
+subtotals](https://www.baseten.co/resources/changelog/model-api-costs/)
+2026-09-11, [`usage_summary`](https://www.baseten.co/resources/changelog/retrieve-billing-usage-via-api/)
+2026-03-04), but grant-key permissions were never tested and daily
+account totals cannot attribute one planning run when callers share
+the account. Application-level cumulative control now exists across
+both app instances: the PostgreSQL budget ledger
+([ai-budgets.md](../engineering/ai-budgets.md)) reserves requests,
+tokens, and a concurrency slot atomically before any provider
+contact, funds each tool round's worst case before its bytes leave,
+and settles exact provider-reported usage — or burns the funded
+reservation when a call fails, times out, or omits usage. Per-call
+budgets (`SOVRA_AI_MAX_TOKENS` 8000, `SOVRA_AI_MAX_TOOL_CALLS` 8,
+`SOVRA_AI_TIMEOUT` 10s, `SOVRA_AI_MAX_RETRIES` 0,
+`SOVRA_AI_MAX_PROMPT_CHARS` 8000, `SOVRA_AI_MAX_TRANSCRIPT_BYTES`
+32768) bound each attempt and fail closed; the ledger bounds the
+fleet's daily total to the funded budget under the documented
+per-model sizing assumptions.
 
-Before any further live run, the owner must capture in the Baseten
-console and keep out of the repo (account screens carry
-identifiers; never commit them):
+The ledger is defense in depth, not a billing cap: no authenticated
+billing API access was verified for this grant, so monetary spend
+caps, no-overage / no-auto-charge behavior, and rate/retention terms
+remain unconfirmed for this account. The published Model API
+zero-retention posture ([Security Practices](https://www.baseten.co/security-practices/),
+updated 2026-09-15, with customer-config exceptions) is a public
+service term, not proof of which agreement governs the grant — live
+stays off until account-specific evidence exists. Before any live run,
+the owner must capture in the Baseten console and keep out of the repo
+(account screens carry identifiers; never commit them):
 
 1. Credit/grant balance immediately before and after the run date,
    with the grant expiry date.
@@ -227,9 +270,9 @@ identifiers; never commit them):
 4. Any available per-key or per-account spend alert / budget
    setting, with its threshold and notification channel.
 
-Operating rule until cumulative controls land: keep
-`SOVRA_AI_LIVE_ENABLED=false` by default, arm only for a bounded
-manual session with a pre-declared call/token budget, disarm (and
-recycle) immediately after, and rotate or revoke the key when an
-evaluation window closes. Spend alerts stay supplementary
-notifications, never the cap.
+Operating rule: keep `SOVRA_AI_LIVE_ENABLED=false` and budgets at
+zero by default, arm only for a bounded manual session with a
+pre-declared call/token budget funded in `SOVRA_AI_BUDGET_*`,
+disarm and zero the funding (then recycle) immediately after, and
+rotate or revoke the key when an evaluation window closes. Spend
+alerts stay supplementary notifications, never the cap.

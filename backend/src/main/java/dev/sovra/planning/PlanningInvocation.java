@@ -19,10 +19,46 @@ public final class PlanningInvocation {
   private final ServiceAccountPrincipal caller;
   private final AtomicInteger usedCalls = new AtomicInteger();
   private final int maxToolCalls;
+  private final java.util.List<String> scopeIssuerIds;
+  private final java.util.List<String> scopeCredentialTypes;
+  private final java.util.List<String> scopeJurisdictions;
 
   public PlanningInvocation(ServiceAccountPrincipal caller, int maxToolCalls) {
+    this(caller, maxToolCalls, java.util.List.of(), java.util.List.of(), java.util.List.of());
+  }
+
+  public PlanningInvocation(
+      ServiceAccountPrincipal caller,
+      int maxToolCalls,
+      java.util.List<String> scopeIssuerIds,
+      java.util.List<String> scopeCredentialTypes,
+      java.util.List<String> scopeJurisdictions) {
     this.caller = caller;
     this.maxToolCalls = maxToolCalls;
+    this.scopeIssuerIds = scopeIssuerIds == null ? java.util.List.of() : java.util.List.copyOf(scopeIssuerIds);
+    this.scopeCredentialTypes = scopeCredentialTypes == null
+        ? java.util.List.of() : java.util.List.copyOf(scopeCredentialTypes);
+    this.scopeJurisdictions = scopeJurisdictions == null
+        ? java.util.List.of() : java.util.List.copyOf(scopeJurisdictions);
+  }
+
+  /** Discovery scope narrowing this invocation; empty lists mean unscoped. */
+  public java.util.List<String> scopeIssuerIds() {
+    return scopeIssuerIds;
+  }
+
+  public java.util.List<String> scopeCredentialTypes() {
+    return scopeCredentialTypes;
+  }
+
+  public java.util.List<String> scopeJurisdictions() {
+    return scopeJurisdictions;
+  }
+
+  /** True when any scope list narrows visible metadata. */
+  public boolean scoped() {
+    return !scopeIssuerIds.isEmpty() || !scopeCredentialTypes.isEmpty()
+        || !scopeJurisdictions.isEmpty();
   }
 
   /** Installs the invocation for the current thread; caller must clear it. */

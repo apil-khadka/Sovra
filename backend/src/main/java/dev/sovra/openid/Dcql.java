@@ -24,7 +24,11 @@ public final class Dcql {
 
   private Dcql() {}
 
-  /** Verifier query for the G1 adult-status credential. */
+    /**
+   * Verifier query for the G1 adult-status credential. Legacy
+   * {@code adultOver18}-only; new registry schemas are
+   * synthetic-profile-only and are never queried here.
+   */
   public static Map<String, Object> queryFor(String vct) {
     Map<String, Object> claim = new LinkedHashMap<>();
     claim.put("id", CLAIM_ID);

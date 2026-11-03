@@ -6,9 +6,14 @@ import dev.sovra.guard.PlanParser;
 import dev.sovra.issuance.TrustUnavailableException;
 import java.time.Clock;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -29,6 +34,14 @@ public class LivePlanner {
 
   private static final Logger log = LoggerFactory.getLogger(LivePlanner.class);
 
+  /**
+   * Local processing margin inside the lease adequacy check: one
+   * provider timeout plus this many seconds must fit in the
+   * configured lease, covering tool execution, parsing, and the
+   * next heartbeat top-up between provider attempts.
+   */
+  static final long LEASE_PROCESSING_MARGIN_SECONDS = 30;
+
   private final PlanningProperties properties;
   private final PlanningTools tools;
   private final Clock clock;
@@ -36,6 +49,13 @@ public class LivePlanner {
   private final AiBudgetService budgets;
 
   private volatile OpenAiChatModel cached;
+
+  /**
+   * Test seam: when non-null, the guard records its per-round byte
+   * estimates here so tests can prove each estimate met or beat the
+   * real request body. Production leaves it null.
+   */
+  volatile List<Long> estimateLogSink;
 
   public LivePlanner(
       PlanningProperties properties,
@@ -85,43 +105,82 @@ public class LivePlanner {
    * Runs one live planning call with the bounded read-only tools. The
    * caller must have installed a {@link PlanningInvocation}; the raw
    * model output is strictly parsed and bounded (SEC-18) before it
-   * becomes a candidate. The provider call runs inside a fleet-wide
-   * budget reservation (PROD-012): failures before the reserve spend
-   * nothing; anything after it — including pre-HTTP validation
-   * inside the call, which cannot prove no charge — burns the
-   * estimate as uncertain.
+   * becomes a candidate. The session runs inside a fleet-wide budget
+   * reservation (PROD-012): the first round's worst case is funded up
+   * front, each further round pre-funds its own worst case through the
+   * per-attempt guard, and pre-call aborts settle exact spend. Only
+   * failures after provider contact — which cannot prove no charge —
+   * burn the funded estimate as uncertain.
    */
   public PlanningResult plan(PlanningIntent intent, String toolHash) {
     if (!properties.liveReady()) {
       throw new PlanningUnavailableException("live planning is not configured");
+    }
+    if (!properties.allowedModels().contains(properties.model())) {
+      throw new PlanningUnavailableException("live planning model is not qualified");
+    }
+    if (properties.maxRetries() != 0) {
+      // SDK retries fire below the per-attempt guard with unknowable
+      // server-side billing; metered runs refuse them. Plan-level
+      // retry stays available as an honest re-reserved 503.
+      throw new PlanningUnavailableException("live planning requires maxRetries=0");
+    }
+    long leastLease = properties.timeout().toSeconds() + LEASE_PROCESSING_MARGIN_SECONDS;
+    if (budgets.leaseSeconds() < leastLease) {
+      // The guard heartbeats the lease before every round, so the
+      // lease must outlive one full provider timeout plus local
+      // tool execution, parsing, and the next top-up — never the
+      // whole session. A shorter lease would let the sweeper burn
+      // a healthy in-flight call as uncertain.
+      throw new PlanningUnavailableException(
+          "live-AI lease is shorter than one provider timeout plus processing margin");
     }
     String system = PlanningPrompts.system();
     String user = PlanningPrompts.user(intent);
     if (system.length() + user.length() > properties.maxPromptChars()) {
       throw new PlanningUnavailableException("planning prompt exceeds its bound");
     }
+    long firstBytes =
+        BudgetGuardedChatModel.estimateBytes(
+            List.of(new SystemMessage(system), new UserMessage(user)), tools.callbacks());
+    if (firstBytes > properties.maxTranscriptBytes()) {
+      throw new PlanningUnavailableException("planning transcript exceeds its bound");
+    }
     PlanningInvocation invocation =
         PlanningInvocation.current()
             .orElseThrow(
                 () -> new IllegalStateException("live planning outside an authorized invocation"));
-    // Conservative estimate: full completion cap plus the prompt
-    // ceiling at four chars per token. The settle step replaces it
-    // with provider-reported usage when present.
-    long estimatedTokens =
-        (long) properties.maxTokens() + properties.maxPromptChars() / 4;
+    // First-round worst case at the measured prompt size; later rounds
+    // top up from the same measurer inside the guard. The settle step
+    // replaces the funding with provider-reported usage when every
+    // round reported it.
+    long firstBound =
+        BudgetGuardedChatModel.roundBound(
+            firstBytes, properties.maxTokens(), properties.maxRetries());
+    AtomicReference<UUID> lease = new AtomicReference<>();
+    BudgetGuardedChatModel.SessionUsage sessionUsage = new BudgetGuardedChatModel.SessionUsage();
     try {
       return budgets.execute(
           invocation.caller().tenantId(),
-          estimatedTokens,
-          new AiBudgetService.AiCall<PlanningResult>() {
+          firstBound,
+          new AiBudgetService.LeaseAwareCall<PlanningResult>() {
+            @Override
+            public void lease(UUID leaseId) {
+              lease.set(leaseId);
+            }
+
             @Override
             public PlanningResult invoke() {
-              return doPlan(intent, toolHash, invocation, system, user);
+              return doPlan(intent, toolHash, invocation, system, user, lease, sessionUsage,
+                  firstBound);
             }
 
             @Override
             public long usageOf(PlanningResult result) {
-              return result.usageTokens() == null ? -1 : result.usageTokens();
+              if (!sessionUsage.complete() || result.usageTokens() == null) {
+                return -1;
+              }
+              return result.usageTokens();
             }
           });
     } catch (AiBudgetExhaustedException e) {
@@ -140,10 +199,17 @@ public class LivePlanner {
       String toolHash,
       PlanningInvocation invocation,
       String system,
-      String user) {
+      String user,
+      AtomicReference<UUID> lease,
+      BudgetGuardedChatModel.SessionUsage sessionUsage,
+      long admittedBound) {
     long started = clock.millis();
     try {
-      ChatClient client = ChatClient.create(chatModel());
+      ChatModel guarded =
+          new BudgetGuardedChatModel(
+              chatModel(), budgets, lease, properties, tools.callbacks(), sessionUsage,
+              admittedBound, estimateLogSink);
+      ChatClient client = ChatClient.create(guarded);
       ChatResponse response =
           client
               .prompt()
@@ -176,7 +242,20 @@ public class LivePlanner {
     } catch (PlanningUnavailableException | ForbiddenException
         | InvalidPlanningException | TrustUnavailableException e) {
       throw e;
+    } catch (AiBudgetService.BudgetAbort abort) {
+      // Pre-call refusals carry their exact settle value to the
+      // ledger step; wrapping them here would burn the funded
+      // estimate as uncertain instead of settling completed spend.
+      throw abort;
     } catch (RuntimeException e) {
+      // The tool loop may wrap a guard refusal in a framework
+      // exception; unwrap it so the ledger still settles exact
+      // completed spend instead of burning the funding.
+      for (Throwable t = e; t != null; t = t.getCause()) {
+        if (t instanceof AiBudgetService.BudgetAbort abort) {
+          throw abort;
+        }
+      }
       // Provider faults of every kind — timeouts, throttles, refused
       // connections, truncated streams — end the run as unavailable.
       // The detail is logged, never returned (no upstream text leaks).
@@ -212,7 +291,10 @@ public class LivePlanner {
         return null;
       }
       Integer total = response.getMetadata().getUsage().getTotalTokens();
-      return total == null ? null : total.longValue();
+      // Adapter-zero means the provider omitted usage (a completed
+      // call always spends prompt tokens); report unreported so the
+      // settle step burns the funded reservation, never an exact zero.
+      return total == null || total == 0 ? null : total.longValue();
     } catch (RuntimeException e) {
       return null;
     }

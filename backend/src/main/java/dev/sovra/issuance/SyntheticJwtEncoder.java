@@ -13,7 +13,7 @@ import tools.jackson.databind.ObjectMapper;
  * G1 synthetic credential encoder. Emits a compact ES256 JWS that is
  * deliberately NOT an SD-JWT VC: {@code typ} names it synthetic, the
  * body carries {@code synthetic: true} plus the profile label, and only
- * the SOV-001 claim allowlist ({@code adultOver18: true}) survives.
+ * registry-approved {@code (vct, claim=true)} pairs survive.
  * Verifiers must reject this content type outside synthetic use.
  */
 @Service
@@ -71,13 +71,21 @@ public class SyntheticJwtEncoder implements CredentialEncoder {
     }
   }
 
-  /** Defense in depth: the allowlist holds even if a caller skips checks. */
+  /**
+   * Defense in depth: the registry allowlist holds even if a caller skips
+   * checks. Exactly one boolean-true claim approved FOR THAT TYPE; the
+   * legacy adult-status pair behaves identically to before.
+   */
   static void allowlistClaims(String vct, Map<String, Object> claims) {
-    if (!ADULT_VCT.equals(vct)) {
-      throw new InvalidIssuanceException("credential type is not permitted");
-    }
-    if (claims == null || claims.size() != 1 || !Boolean.TRUE.equals(claims.get("adultOver18"))) {
+    if (claims == null || claims.size() != 1) {
       throw new InvalidIssuanceException("claims are not permitted for this type");
+    }
+    Map.Entry<String, Object> entry = claims.entrySet().iterator().next();
+    if (!Boolean.TRUE.equals(entry.getValue())) {
+      throw new InvalidIssuanceException("claims are not permitted for this type");
+    }
+    if (!dev.sovra.guard.ApprovedSchemas.allows(vct, entry.getKey())) {
+      throw new InvalidIssuanceException("credential type is not permitted");
     }
   }
 

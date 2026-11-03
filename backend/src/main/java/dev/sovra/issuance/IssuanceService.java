@@ -188,7 +188,7 @@ public class IssuanceService {
     IssuanceEvidence evidence =
         new IssuanceEvidence(
             credentialId, request.issuerId(), authorization.keyRef(), request.vct(),
-            Map.of("adultOver18", Boolean.TRUE), validated.thumbprint(),
+            Map.copyOf(request.claims()), validated.thumbprint(),
             now, request.expiresAt(), snapshot.version(), statusUri,
             request.holderJwk());
     CredentialEncoder.EncodedCredential encoded = encoder.encode(evidence);
@@ -320,7 +320,8 @@ public class IssuanceService {
         request.issuerId() + "\n" + request.vct() + "\n"
             + holderKey.getW().getAffineX().toString(16) + "\n"
             + holderKey.getW().getAffineY().toString(16) + "\n"
-            + "adultOver18=true\n" + request.expiresAt().toString();
+            + dev.sovra.guard.ApprovedSchemas.canonicalClaims(request.claims()) + "\n"
+            + request.expiresAt().toString();
     try {
       byte[] digest =
           MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8));
@@ -337,7 +338,7 @@ public class IssuanceService {
    */
   static String proofMessage(String idempotencyKey, IssueRequest request, String thumbprint) {
     return PROOF_LABEL + "\n" + idempotencyKey + "\n" + request.vct() + "\n" + thumbprint + "\n"
-        + "adultOver18=true";
+        + dev.sovra.guard.ApprovedSchemas.canonicalClaims(request.claims());
   }
 
   private record Validated(ECPublicKey holderKey, String thumbprint) {}

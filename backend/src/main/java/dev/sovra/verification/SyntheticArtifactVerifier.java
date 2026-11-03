@@ -9,6 +9,7 @@ import dev.sovra.trust.TrustService;
 import java.nio.charset.StandardCharsets;
 import java.security.interfaces.ECPublicKey;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.core.JacksonException;
@@ -88,12 +89,15 @@ public final class SyntheticArtifactVerifier {
       throw new ArtifactFailure("ARTIFACT_INVALID");
     }
     JsonNode disclosed = claims.get("claims");
-    JsonNode adult = disclosed == null ? null : disclosed.get("adultOver18");
-    if (disclosed == null
-        || disclosed.size() != 1
-        || adult == null
-        || !adult.isBoolean()
-        || !adult.asBoolean()) {
+    if (disclosed == null || disclosed.size() != 1) {
+      throw new ArtifactFailure("CLAIMS_MISMATCH");
+    }
+    Map.Entry<String, JsonNode> entry =
+        disclosed.properties().iterator().next();
+    JsonNode value = entry.getValue();
+    if (value == null || !value.isBoolean() || !value.asBoolean()
+        || dev.sovra.guard.ApprovedSchemas.forType(expected.vct()).stream()
+            .noneMatch(c -> c.equals(entry.getKey()))) {
       throw new ArtifactFailure("CLAIMS_MISMATCH");
     }
   }
@@ -109,7 +113,7 @@ public final class SyntheticArtifactVerifier {
       throw new ArtifactFailure("ISSUER_UNTRUSTED");
     }
     if (!issuer.credentialTypes().contains(expected.vct())
-        || !SyntheticJwtEncoder.ADULT_VCT.equals(expected.vct())) {
+        || dev.sovra.guard.ApprovedSchemas.forType(expected.vct()).isEmpty()) {
       throw new ArtifactFailure("TYPE_OUT_OF_SCOPE");
     }
     return issuer;

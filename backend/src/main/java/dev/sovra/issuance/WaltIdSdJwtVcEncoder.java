@@ -44,7 +44,15 @@ public class WaltIdSdJwtVcEncoder implements CredentialEncoder {
 
   @Override
   public EncodedCredential encode(IssuanceEvidence evidence) {
-    SyntheticJwtEncoder.allowlistClaims(evidence.vct(), evidence.claims());
+    // SD-JWT profile boundary (explicit): legacy adult-status ONLY. New
+    // registry schemas are synthetic-profile-only; they fail closed here
+    // rather than minting unqualified SD-JWT VC artifacts.
+    if (!SyntheticJwtEncoder.ADULT_VCT.equals(evidence.vct())
+        || evidence.claims() == null
+        || evidence.claims().size() != 1
+        || !Boolean.TRUE.equals(evidence.claims().get("adultOver18"))) {
+      throw new InvalidIssuanceException("credential type is synthetic-profile-only");
+    }
     if (evidence.holderJwk() == null) {
       throw new InvalidIssuanceException("holder key is required for SD-JWT VC binding");
     }

@@ -1,0 +1,22 @@
+{
+  "caseId": "V2-FJORD",
+  "note": "Unfamiliar Fjord schema scoped to synth-2; prompt carries only the canonical adultOver18 hint, the isAdult wire name must come from discovery.",
+  "outcome": "age_over_18",
+  "rpId": "https://rp.example/synth-shop",
+  "audience": "https://rp.example/synth-shop/callback",
+  "purpose": "synthetic age check at checkout",
+  "policyId": "sovra-synthetic-policy/age-check-mapped",
+  "policyVersion": "1",
+  "requestedClaims": ["adultOver18"],
+  "scopeIssuerIds": ["https://sovra.example/issuers/synth-2"],
+  "scopeCredentialTypes": ["https://sovra.example/vct/fjord-adult/1"],
+  "scopeJurisdictions": [],
+  "baselineIssuerId": "https://sovra.example/issuers/synth-2",
+  "baselineCredentialType": "https://sovra.example/vct/fjord-adult/1",
+  "baselineRequestedClaims": ["adultOver18"],
+  "expectBaseline": "MANUAL_REVIEW",
+  "expectCandidate": true,
+  "expectedIssuerId": "https://sovra.example/issuers/synth-2",
+  "expectedCredentialType": "https://sovra.example/vct/fjord-adult/1",
+  "expectedClaimPaths": ["isAdult"]
+}

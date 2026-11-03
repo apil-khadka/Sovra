@@ -309,13 +309,20 @@ public class ConsentService {
   /**
    * Canonical consent message. The holder signs what the review screen
    * shows: every bound field plus the explicit decision. Changing any
-   * bound value — or the decision word itself — breaks the proof.
+   * bound value — or the decision word itself — breaks the proof. The
+   * claims line is the canonical form of the STORED claims, so legacy
+   * {@code adultOver18=true} bytes are unchanged while mapped schemas
+   * bind their own wire spelling.
    */
-  static String consentMessage(Stored row, String decision) {
+  String consentMessage(Stored row, String decision) {
     return CONSENT_LABEL + "\n" + row.id() + "\n" + decision + "\n" + row.rpId() + "\n"
-        + row.audience() + "\n" + row.purpose() + "\n" + CLAIMS_CANONICAL + "\n"
+        + row.audience() + "\n" + row.purpose() + "\n" + canonicalStoredClaims(row) + "\n"
         + row.planHash() + "\n" + row.challenge() + "\n" + row.expiresAt() + "\n"
         + row.holderThumbprint();
+  }
+
+  private String canonicalStoredClaims(Stored row) {
+    return dev.sovra.guard.ApprovedSchemas.canonicalClaims(claimsMap(row.claimsJson()));
   }
 
   private record Validated(String claimsJson, String holderThumbprint) {}
@@ -353,6 +360,29 @@ public class ConsentService {
         request.planHash().getBytes(StandardCharsets.UTF_8),
         PlanGuard.canonicalHash(plan).getBytes(StandardCharsets.UTF_8))) {
       throw new InvalidConsentException("plan hash does not match the approved plan");
+    }
+    // Claims must name exactly the plan's wire paths, each approved FOR
+    // THE PLAN'S TYPE; the credential's stored issuer AND type must equal
+    // the plan's. Any cross-issuer or cross-type substitution fails here,
+    // not at verification — including two issuers attesting the same type.
+    if (request.claims() == null
+        || request.claims().size() != plan.claimPaths().size()
+        || !request.claims().keySet().containsAll(plan.claimPaths())) {
+      throw new InvalidConsentException("claims do not match the approved plan");
+    }
+    for (String claim : plan.claimPaths()) {
+      if (!Boolean.TRUE.equals(request.claims().get(claim))
+          || !dev.sovra.guard.ApprovedSchemas.allows(plan.credentialType(), claim)) {
+        throw new InvalidConsentException("claims do not match the approved plan");
+      }
+    }
+    Credential bound = credentialRow(request.credentialId())
+        .orElseThrow(() -> new InvalidConsentException("credential is not usable for this request"));
+    if (!plan.candidateIssuerId().equals(bound.issuerId())) {
+      throw new InvalidConsentException("credential issuer does not match the approved plan");
+    }
+    if (!plan.credentialType().equals(bound.vct())) {
+      throw new InvalidConsentException("credential type does not match the approved plan");
     }
   }
 
@@ -395,15 +425,29 @@ public class ConsentService {
     return value == null || value.isBlank();
   }
 
-  /** G1 synthetic allowlist, matching issuance: exactly adultOver18 true. */
+  /**
+   * G1 synthetic allowlist, matching issuance: exactly one boolean-true
+   * claim approved for the age_over_18 semantic. Type-specific binding
+   * against the plan happens in {@link #requireGuardAccepted}.
+   */
   private static void allowlistClaims(Map<String, Object> claims) {
-    if (claims.size() != 1 || !Boolean.TRUE.equals(claims.get("adultOver18"))) {
+    if (claims == null || claims.size() != 1) {
+      throw new InvalidConsentException("claims are not permitted for this request");
+    }
+    Map.Entry<String, Object> entry = claims.entrySet().iterator().next();
+    if (!Boolean.TRUE.equals(entry.getValue())
+        || !dev.sovra.guard.ApprovedSchemas.approvedClaimsForOutcome("age_over_18")
+            .contains(entry.getKey())) {
       throw new InvalidConsentException("claims are not permitted for this request");
     }
   }
 
   private record Credential(
-      String holderThumbprint, CredentialStatus status, Instant expiresAt) {}
+      String holderThumbprint,
+      CredentialStatus status,
+      Instant expiresAt,
+      String issuerId,
+      String vct) {}
 
   private Credential requireUsableCredential(UUID credentialId) {
     Credential credential = credentialRow(credentialId)
@@ -418,13 +462,15 @@ public class ConsentService {
   private Optional<Credential> credentialRow(UUID credentialId) {
     List<Credential> rows =
         tenant.query(
-            "SELECT holder_thumbprint, status, expires_at FROM credential_artifact"
-                + " WHERE id = ?",
+            "SELECT holder_thumbprint, status, expires_at, issuer_id, vct"
+                + " FROM credential_artifact WHERE id = ?",
             (rs, row) ->
                 new Credential(
                     rs.getString("holder_thumbprint"),
                     CredentialStatus.from(rs.getString("status")),
-                    rs.getTimestamp("expires_at").toInstant()),
+                    rs.getTimestamp("expires_at").toInstant(),
+                    rs.getString("issuer_id"),
+                    rs.getString("vct")),
             credentialId);
     return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
   }

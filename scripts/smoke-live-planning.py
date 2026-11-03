@@ -7,6 +7,14 @@ any model contact, and adjudicates the live candidate with the
 deterministic guard. Synthetic inputs only; prints sanitized fields
 only (no keys, prompts, or proofs); exits nonzero on any failure.
 
+PASS is strict by default: the known-valid age candidate must be
+guard-ACCEPTED with the expected code (`--expect-guard`, default
+`GUARD_ACCEPTED`), or the run FAILs. `--adjudication-only` instead
+records a non-accepting verdict and exits 3 with an explicit
+ADJUDICATION-ONLY banner — endpoint-adjudication evidence only, not
+accepted guarded execution. A PASS never establishes decision proof
+(that stays separate) or the full frozen-corpus comparison.
+
 COST WARNING: every run spends provider credits (about 11k tokens
 observed on Muse Spark Open via Baseten). Run only against
 verified no-charge capacity with SOVRA_AI_LIVE_ENABLED=true. When
@@ -22,6 +30,7 @@ and no fixture fallback, then restore. It was exercised live on
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import json
@@ -41,6 +50,7 @@ DB_ADMIN_PASSWORD = os.environ.get("SOVRA_DB_ADMIN_PASSWORD", "sovra-dev-only")
 TOKEN_PREFIX = "sovra_test_"
 POLICY_ID = "sovra-synthetic-policy/age-check"
 POLICY_VERSION = "1"
+EXPECTED_GUARD_CODE = "GUARD_ACCEPTED"
 
 
 def fail(message: str) -> "typing.NoReturn":
@@ -97,7 +107,31 @@ def mint_account(name: str) -> str:
     return token
 
 
+def guard_mismatch(verdict: object, expected_code: str) -> str | None:
+    """Strict positive gate for the smoke's guard step.
+
+    Returns None only when the verdict accepts with the expected
+    code; otherwise a mismatch reason. Pure (no network) so the
+    regression test pins it without touching any stack.
+    """
+    if not isinstance(verdict, dict):
+        return "guard verdict is not a JSON object"
+    if verdict.get("accepted") is not True:
+        return (f"guard did not accept: accepted={verdict.get('accepted')!r} "
+                f"code={verdict.get('code')!r}")
+    if verdict.get("code") != expected_code:
+        return f"guard code {verdict.get('code')!r} != expected {expected_code!r}"
+    return None
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Live-planning OD-02 smoke procedure.")
+    parser.add_argument("--expect-guard", default=EXPECTED_GUARD_CODE,
+                        help="Required guard acceptance code (default %(default)s).")
+    parser.add_argument("--adjudication-only", action="store_true",
+                        help="Record a non-accepting verdict and exit 3 instead of "
+                             "requiring acceptance. Adjudication evidence only.")
+    args = parser.parse_args()
     token = mint_account("smoke-live")
     status, body = http("GET", "/api/plans/status", token=token)
     if status != 200:
@@ -139,17 +173,29 @@ def main() -> int:
         fail(f"invalid intent responded {status}, want 400 before model contact")
     check("invalid intent refused before any model contact")
 
+    print(f"smoke live-planning: expect guard accepted=true "
+          f"code={args.expect_guard}", flush=True)
     status, verdict = http("POST", "/api/guard/validate",
                            {"plan": plan, "policyId": POLICY_ID,
                             "policyVersion": POLICY_VERSION}, token)
     if status != 200:
         fail(f"guard validate responded {status}")
-    print(f"smoke live-planning: guard accepted={verdict.get('accepted')} "
-          f"code={verdict.get('code')} rules={verdict.get('rulesVersion')} "
-          f"snapshot={verdict.get('snapshotVersion')}", flush=True)
-    check("deterministic guard adjudicated the live candidate")
+    accepted = verdict.get("accepted") if isinstance(verdict, dict) else None
+    code = verdict.get("code") if isinstance(verdict, dict) else None
+    rules = verdict.get("rulesVersion") if isinstance(verdict, dict) else None
+    snapshot = verdict.get("snapshotVersion") if isinstance(verdict, dict) else None
+    print(f"smoke live-planning: guard accepted={accepted} "
+          f"code={code} rules={rules} snapshot={snapshot}", flush=True)
+    mismatch = guard_mismatch(verdict, args.expect_guard)
+    if mismatch is not None and not args.adjudication_only:
+        fail(f"guard verdict mismatch: {mismatch}")
+    if mismatch is not None:
+        print("smoke live-planning: ADJUDICATION-ONLY: verdict recorded; "
+              "NOT accepted guarded execution.", flush=True)
+        return 3
+    check(f"deterministic guard accepted the live candidate ({code})")
 
-    print("smoke live-planning: PASS (LIVE candidate, 400-before-contact, guard verdict)")
+    print("smoke live-planning: PASS (LIVE candidate, 400-before-contact, guard accepted)")
     return 0
 
 

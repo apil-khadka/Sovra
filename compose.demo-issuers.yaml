@@ -1,0 +1,200 @@
+# Standalone synthetic dual-issuer demo topology (local only, non-production).
+#
+# Two genuinely separate issuer stacks for the unfamiliar-schema demo:
+# node A serves synth-1 from database A, node B serves synth-2 from
+# database B. This file is INDEPENDENT of the root compose.yaml harness
+# (whose app-a/app-b share one PostgreSQL): separate project name,
+# separate Postgres services/volumes, separate per-node networks,
+# distinct credentials with no cross-DB grants, and distinct vault
+# seeds. It never touches the root stack's containers, tokens, or
+# volumes.
+#
+# Ports (all localhost-only; no clash with root 8080/8081, Keycloak
+# 18080, or demo 5174/5175):
+#   node A app  127.0.0.1:8280 -> 8080   (synth-1)
+#   node B app  127.0.0.1:8281 -> 8080   (synth-2)
+# Postgres instances publish NO host ports; operators reach them with
+# `docker exec` only (see scripts/demo-issuers/).
+#
+# Usage (start the full stacks FIRST so boot runs Flyway migrations,
+# then bootstrap accounts — see docs/demo/dual-issuer-topology.md):
+#
+#   docker compose -f compose.demo-issuers.yaml config --quiet   # validate
+#   docker compose -f compose.demo-issuers.yaml up -d db-a db-b  # DBs only
+#   docker compose -f compose.demo-issuers.yaml up -d --build    # full stacks
+#   python3 scripts/demo-issuers/bootstrap.py                    # accounts
+#   python3 scripts/demo-issuers/provision-trust.py               # trust
+#   python3 scripts/demo-issuers/qualify-runtime.py               # qualify
+#
+# Honesty boundary: the host operator can reach both stacks (this is one
+# developer machine). Separation evidence is local and operational —
+# independent stores, per-node key selection, distinct credentials —
+# never a claim of host/root isolation, production sovereignty, or an
+# inability of the host admin to access both sides.
+name: sovra-demo-issuers
+
+services:
+  db-a:
+    image: postgres:17.7
+    container_name: sovra-demo-issuers-db-a
+    environment:
+      POSTGRES_DB: sovra
+      POSTGRES_USER: sovra
+      POSTGRES_PASSWORD: ${SOVRA_DEMO_A_DB_ADMIN_PASSWORD:-sovra-demo-a-admin-dev-only}
+      SOVRA_APP_DB_PASSWORD: ${SOVRA_DEMO_A_APP_DB_PASSWORD:-sovra-demo-a-app-dev-only}
+    volumes:
+      - sovra-demo-issuers-pgdata-a:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sovra -d sovra"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - sovra-demo-a-net
+
+  db-b:
+    image: postgres:17.7
+    container_name: sovra-demo-issuers-db-b
+    environment:
+      POSTGRES_DB: sovra
+      POSTGRES_USER: sovra
+      POSTGRES_PASSWORD: ${SOVRA_DEMO_B_DB_ADMIN_PASSWORD:-sovra-demo-b-admin-dev-only}
+      SOVRA_APP_DB_PASSWORD: ${SOVRA_DEMO_B_APP_DB_PASSWORD:-sovra-demo-b-app-dev-only}
+    volumes:
+      - sovra-demo-issuers-pgdata-b:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sovra -d sovra"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - sovra-demo-b-net
+
+  app-node-a:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: sovra-demo-issuers-app:local
+    container_name: sovra-demo-issuers-app-a
+    ports:
+      - "127.0.0.1:8280:8080"
+    environment:
+      SOVRA_DB_URL: jdbc:postgresql://db-a:5432/sovra
+      SOVRA_DB_USER: sovra_app
+      SOVRA_DB_PASSWORD: ${SOVRA_DEMO_A_APP_DB_PASSWORD:-sovra-demo-a-app-dev-only}
+      SOVRA_DB_ADMIN_USER: sovra
+      SOVRA_DB_ADMIN_PASSWORD: ${SOVRA_DEMO_A_DB_ADMIN_PASSWORD:-sovra-demo-a-admin-dev-only}
+      # Synthetic demo only. Production sets SOVRA_SIGNER=kms and
+      # leaves the synthetic flags off.
+      SOVRA_SIGNER: local-dev
+      SOVRA_PROFILE: synthetic
+      SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
+      SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+      # This node holds ONLY the synth-1 key (P-256 scalar 1) and
+      # refuses synth-2 signing requests.
+      SOVRA_SYNTHETIC_ISSUERS_LOCAL_ISSUER: synth-1
+      # Demo-only vault KEK seed (base64, non-secret literal, distinct
+      # per node). Production sets SOVRA_VAULT_KEK=kms, leaves the seed
+      # empty, and refuses to boot otherwise.
+      SOVRA_VAULT_KEK: software
+      SOVRA_VAULT_SEED: ${SOVRA_DEMO_A_VAULT_SEED:-c292cmEtZGVtby1pc3N1ZXJzLWEtdmF1bHQtc2VlZC1OT04tUFJPRFVDVElPTiE=}
+      # No Keycloak on this topology: the main application.yaml always
+      # registers an oauth2 client provider whose issuer-uri Spring
+      # resolves eagerly via OIDC discovery at startup, even with the
+      # BFF chains disabled (nothing consumes the repository then, but
+      # the fetch still runs and fails boot). Excluding that
+      # auto-configuration (Boot 4 package) lets these nodes boot
+      # Keycloak-free.
+      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration
+      SOVRA_VAULT_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+      # Standalone topology: no Keycloak dependency. Machine Bearer
+      # tokens (scripts/demo-issuers/) are the only auth chain here.
+      SOVRA_BFF_ENABLED: 'false'
+      # Live AI stays OFF on both demo nodes regardless of shell/.env.
+      SOVRA_AI_LIVE_ENABLED: 'false'
+      SOVRA_AI_BASE_URL: ''
+      SOVRA_AI_MODEL: ''
+      SOVRA_AI_API_KEY: ''
+      # Fleet scrape/health port. Deliberately unpublished: reachable
+      # only inside sovra-demo-a-net, never from the host.
+      SOVRA_MANAGEMENT_PORT: 8091
+    depends_on:
+      db-a:
+        condition: service_healthy
+    networks:
+      - sovra-demo-a-net
+
+  app-node-b:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: sovra-demo-issuers-app:local
+    container_name: sovra-demo-issuers-app-b
+    ports:
+      - "127.0.0.1:8281:8080"
+    environment:
+      SOVRA_DB_URL: jdbc:postgresql://db-b:5432/sovra
+      SOVRA_DB_USER: sovra_app
+      SOVRA_DB_PASSWORD: ${SOVRA_DEMO_B_APP_DB_PASSWORD:-sovra-demo-b-app-dev-only}
+      SOVRA_DB_ADMIN_USER: sovra
+      SOVRA_DB_ADMIN_PASSWORD: ${SOVRA_DEMO_B_DB_ADMIN_PASSWORD:-sovra-demo-b-admin-dev-only}
+      # Synthetic demo only. Production sets SOVRA_SIGNER=kms and
+      # leaves the synthetic flags off.
+      SOVRA_SIGNER: local-dev
+      SOVRA_PROFILE: synthetic
+      SOVRA_SYNTHETIC_ISSUERS_ENABLED: 'true'
+      SOVRA_SYNTHETIC_ISSUERS_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+      # This node holds ONLY the synth-2 key (P-256 scalar 3) and
+      # refuses synth-1 signing requests.
+      SOVRA_SYNTHETIC_ISSUERS_LOCAL_ISSUER: synth-2
+      # Demo-only vault KEK seed (base64, non-secret literal, distinct
+      # per node). Production sets SOVRA_VAULT_KEK=kms, leaves the seed
+      # empty, and refuses to boot otherwise.
+      SOVRA_VAULT_KEK: software
+      SOVRA_VAULT_SEED: ${SOVRA_DEMO_B_VAULT_SEED:-c292cmEtZGVtby1pc3N1ZXJzLWItdmF1bHQtc2VlZC1OT04tUFJPRFVDVElPTiE=}
+      # No Keycloak on this topology: the main application.yaml always
+      # registers an oauth2 client provider whose issuer-uri Spring
+      # resolves eagerly via OIDC discovery at startup, even with the
+      # BFF chains disabled (nothing consumes the repository then, but
+      # the fetch still runs and fails boot). Excluding that
+      # auto-configuration (Boot 4 package) lets these nodes boot
+      # Keycloak-free.
+      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration
+      SOVRA_VAULT_ACKNOWLEDGE_NON_PRODUCTION: 'true'
+      # Standalone topology: no Keycloak dependency. Machine Bearer
+      # tokens (scripts/demo-issuers/) are the only auth chain here.
+      SOVRA_BFF_ENABLED: 'false'
+      # Live AI stays OFF on both demo nodes regardless of shell/.env.
+      SOVRA_AI_LIVE_ENABLED: 'false'
+      SOVRA_AI_BASE_URL: ''
+      SOVRA_AI_MODEL: ''
+      SOVRA_AI_API_KEY: ''
+      # Fleet scrape/health port. Deliberately unpublished: reachable
+      # only inside sovra-demo-b-net, never from the host.
+      SOVRA_MANAGEMENT_PORT: 8091
+    depends_on:
+      db-b:
+        condition: service_healthy
+    networks:
+      - sovra-demo-b-net
+
+volumes:
+  sovra-demo-issuers-pgdata-a:
+  sovra-demo-issuers-pgdata-b:
+
+# Explicit subnets, disjoint from each other and from the root harness
+# (10.244.0.0/24), so host daemons with many project networks cannot
+# exhaust the auto-allocation pools.
+networks:
+  sovra-demo-a-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.245.0.0/24
+  sovra-demo-b-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.246.0.0/24

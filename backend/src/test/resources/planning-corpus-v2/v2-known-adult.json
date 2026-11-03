@@ -1,0 +1,22 @@
+{
+  "caseId": "V2-KNOWN",
+  "note": "Known trusted adult credential, unscoped legacy flow; both baseline and live must resolve the exact synth-1 plan.",
+  "outcome": "age_over_18",
+  "rpId": "https://rp.example/synth-shop",
+  "audience": "https://rp.example/synth-shop/callback",
+  "purpose": "synthetic age check at checkout",
+  "policyId": "sovra-synthetic-policy/age-check",
+  "policyVersion": "1",
+  "requestedClaims": ["adultOver18"],
+  "scopeIssuerIds": [],
+  "scopeCredentialTypes": [],
+  "scopeJurisdictions": [],
+  "baselineIssuerId": "https://sovra.example/issuers/synth-1",
+  "baselineCredentialType": "https://sovra.example/vct/adult-status/1",
+  "baselineRequestedClaims": ["adultOver18"],
+  "expectBaseline": "CANDIDATE_ONLY",
+  "expectCandidate": true,
+  "expectedIssuerId": "https://sovra.example/issuers/synth-1",
+  "expectedCredentialType": "https://sovra.example/vct/adult-status/1",
+  "expectedClaimPaths": ["adultOver18"]
+}

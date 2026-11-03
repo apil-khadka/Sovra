@@ -26,8 +26,16 @@ import java.util.regex.Pattern;
  */
 public final class PlanGuard {
 
-  /** Guard rules version; carried in every verdict and audit row. */
-  public static final String RULES_VERSION = "sovra-guard/1";
+  /**
+   * Guard rules version; carried in every verdict and audit row.
+   * {@code sovra-guard/1} is frozen history (union-budget checks only).
+   * {@code sovra-guard/2} adds type-specific binding (each
+   * {@code (credentialType, claim)} must be registry-approved for THAT type)
+   * plus semantic-outcome binding (each mapping's registry semantic must
+   * equal {@code requestedOutcome}). New behavior is never reported under
+   * the old string.
+   */
+  public static final String RULES_VERSION = "sovra-guard/2";
 
   /**
    * Frozen G1 outcome set (FR-06). Only age_over_18 has a trusted
@@ -119,6 +127,10 @@ public final class PlanGuard {
     if (budget != null) {
       return budget;
     }
+    GuardVerdict binding = checkTypeBindingAndSemantics(plan);
+    if (binding != null) {
+      return binding;
+    }
     GuardVerdict citations = checkCitations(plan, context);
     if (citations != null) {
       return citations;
@@ -183,6 +195,34 @@ public final class PlanGuard {
         return GuardVerdict.reject(
             GuardOutcome.GUARD_OVERBROAD_DISCLOSURE,
             "Claim '" + claim + "' exceeds the relying party's approved disclosure budget.");
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Type-specific and semantic binding (rules v2). Union membership in the
+   * issuer's {@code allowedClaims} never authorizes by itself: each wire
+   * pair must be registry-approved FOR THE PLAN'S TYPE, and each pair's
+   * registry semantic must equal the requested outcome. Cross-type
+   * substitution (right claim, wrong type) and semantic mismatch (tenure
+   * for age) both fail here, after the budget check so overbroad
+   * disclosures keep their distinct code.
+   */
+  private static GuardVerdict checkTypeBindingAndSemantics(CandidatePlan plan) {
+    for (String claim : plan.claimPaths()) {
+      if (!ApprovedSchemas.allows(plan.credentialType(), claim)) {
+        return GuardVerdict.reject(
+            GuardOutcome.GUARD_UNTRUSTED_CLAIM,
+            "Claim '" + claim + "' is not attestable for credential type '"
+                + plan.credentialType() + "'.");
+      }
+      String semantic = ApprovedSchemas.semanticFor(plan.credentialType(), claim).orElse(null);
+      if (!plan.requestedOutcome().equals(semantic)) {
+        return GuardVerdict.reject(
+            GuardOutcome.GUARD_UNSUPPORTED_OUTCOME,
+            "Claim '" + claim + "' on type '" + plan.credentialType()
+                + "' does not satisfy semantic '" + plan.requestedOutcome() + "'.");
       }
     }
     return null;

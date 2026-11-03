@@ -7,6 +7,7 @@ import dev.sovra.authz.AuthorizationService;
 import dev.sovra.authz.Decision;
 import dev.sovra.authz.ForbiddenException;
 import dev.sovra.authz.ResourceRef;
+import dev.sovra.guard.ApprovedSchemas;
 import dev.sovra.guard.GuardClaims;
 import dev.sovra.guard.GuardPolicies;
 import dev.sovra.guard.PolicyDocument;
@@ -266,7 +267,7 @@ public class PlanningTools {
   }
 
   private String listTrustedIssuers(String input, ToolContext context) {
-    authorizeToolCall();
+    PlanningInvocation invocation = authorizeToolCall();
     Map<String, String> arguments = args(input, Set.of("outcome", "jurisdiction"));
     TrustService.SnapshotView snapshot = activeSnapshot();
     InstantView now = new InstantView(clock.instant());
@@ -275,6 +276,16 @@ public class PlanningTools {
       // First row wins per issuer, matching the guard and verifier.
       if (!IssuerKeys.usable(issuer, now.value())
           || issuers.stream().anyMatch(row -> issuer.issuerId().equals(row.get("issuerId")))) {
+        continue;
+      }
+      // Invocation scope narrows; unscoped invocations see everything usable.
+      if (!invocation.scopeIssuerIds().isEmpty()
+          && !invocation.scopeIssuerIds().contains(issuer.issuerId())) {
+        continue;
+      }
+      if (!invocation.scopeJurisdictions().isEmpty()
+          && invocation.scopeJurisdictions().stream()
+              .noneMatch(hint -> issuer.scope() != null && issuer.scope().contains(hint))) {
         continue;
       }
       // Hints filter; they never widen beyond usable snapshot issuers.
@@ -299,12 +310,20 @@ public class PlanningTools {
 
   private String getCredentialSchema(
       String input, ToolContext context) {
-    authorizeToolCall();
+    PlanningInvocation invocation = authorizeToolCall();
     Map<String, String> arguments = args(input, Set.of("issuerId", "credentialType"));
     String issuerId = arguments.get("issuerId");
     String credentialType = arguments.get("credentialType");
     if (issuerId == null || credentialType == null) {
       throw new InvalidPlanningException("issuerId and credentialType are required");
+    }
+    if (!invocation.scopeIssuerIds().isEmpty()
+        && !invocation.scopeIssuerIds().contains(issuerId)) {
+      return errorJson("unknown_issuer");
+    }
+    if (!invocation.scopeCredentialTypes().isEmpty()
+        && !invocation.scopeCredentialTypes().contains(credentialType)) {
+      return errorJson("unknown_issuer");
     }
     TrustService.SnapshotView snapshot = activeSnapshot();
     TrustService.IssuerView issuer =
@@ -315,17 +334,41 @@ public class PlanningTools {
     if (issuer == null) {
       return errorJson("unknown_issuer");
     }
-    // Attestable claims come from the shared G1 allowlist; unfamiliar
-    // schemas attest nothing and fail closed without code changes.
-    List<String> claims =
-        issuer.credentialTypes().contains(credentialType)
-            ? GuardClaims.forType(credentialType)
-            : List.of();
+    if (!invocation.scopeJurisdictions().isEmpty()
+        && invocation.scopeJurisdictions().stream()
+            .noneMatch(hint -> issuer.scope() != null && issuer.scope().contains(hint))) {
+      return errorJson("unknown_issuer");
+    }
+    // Attestable claims come from the shared versioned registry;
+    // unfamiliar schemas attest nothing and fail closed without code
+    // changes. Output is additive metadata (old fields preserved).
+    boolean inScope = issuer.credentialTypes().contains(credentialType);
+    List<String> claims = inScope ? GuardClaims.forType(credentialType) : List.of();
+    var meta = inScope ? ApprovedSchemas.metadataFor(credentialType) : Optional.<ApprovedSchemas.SchemaEntry>empty();
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("issuerId", issuer.issuerId());
     result.put("credentialType", credentialType);
     result.put("claims", claims);
     result.put("snapshotVersion", snapshot.version());
+    result.put("schemaRegistryVersion", ApprovedSchemas.version());
+    result.put("semantic", meta.map(ApprovedSchemas.SchemaEntry::semantic).orElse(null));
+    result.put("compatible", meta.map(ApprovedSchemas.SchemaEntry::compatible).orElse(false)
+        && !claims.isEmpty());
+    List<Map<String, Object>> claimSchemas = new ArrayList<>();
+    meta.ifPresent(entry -> {
+      Map<String, Object> schema = new LinkedHashMap<>();
+      schema.put("name", entry.claim());
+      schema.put("semantic", entry.semantic());
+      schema.put("type", entry.claimType());
+      schema.put("meaning", entry.meaning());
+      schema.put("predicate", entry.predicate());
+      claimSchemas.add(schema);
+    });
+    result.put("claimSchemas", claimSchemas);
+    List<Map<String, String>> citations = new ArrayList<>();
+    meta.ifPresent(entry -> citations.add(
+        Map.of("document_id", entry.schemaId(), "section_id", entry.sectionId())));
+    result.put("citations", citations);
     return toJson(result);
   }
 
@@ -340,6 +383,9 @@ public class PlanningTools {
       throw new InvalidPlanningException("policyId and version are required");
     }
     PolicyDocument document = GuardPolicies.documents().get(policyId);
+    if (document == null) {
+      document = ApprovedSchemas.documents().get(policyId);
+    }
     if (document == null || !document.version().equals(version)) {
       return errorJson("unknown_policy");
     }
@@ -353,11 +399,15 @@ public class PlanningTools {
 
   private String getIssuerCapabilities(
       String input, ToolContext context) {
-    authorizeToolCall();
+    PlanningInvocation invocation = authorizeToolCall();
     Map<String, String> arguments = args(input, Set.of("issuerId"));
     String issuerId = arguments.get("issuerId");
     if (issuerId == null) {
       throw new InvalidPlanningException("issuerId is required");
+    }
+    if (!invocation.scopeIssuerIds().isEmpty()
+        && !invocation.scopeIssuerIds().contains(issuerId)) {
+      return errorJson("unknown_issuer");
     }
     TrustService.SnapshotView snapshot = activeSnapshot();
     TrustService.IssuerView issuer =
@@ -366,6 +416,11 @@ public class PlanningTools {
             .findFirst()
             .orElse(null);
     if (issuer == null) {
+      return errorJson("unknown_issuer");
+    }
+    if (!invocation.scopeJurisdictions().isEmpty()
+        && invocation.scopeJurisdictions().stream()
+            .noneMatch(hint -> issuer.scope() != null && issuer.scope().contains(hint))) {
       return errorJson("unknown_issuer");
     }
     Map<String, Object> result = new LinkedHashMap<>();
@@ -381,7 +436,7 @@ public class PlanningTools {
 
   private String compareEvidence(
       String input, ToolContext context) {
-    authorizeToolCall();
+    PlanningInvocation invocation = authorizeToolCall();
     JsonNode root;
     try {
       root = mapper.readTree(input);
@@ -419,7 +474,7 @@ public class PlanningTools {
       if (!candidate.isString() || candidate.asText().length() > MAX_ARG_CHARS) {
         throw new InvalidPlanningException("candidate id exceeds its bound");
       }
-      hints.add(hint(snapshot, now.value(), outcome.asText(), candidate.asText()));
+      hints.add(hint(snapshot, now.value(), outcome.asText(), candidate.asText(), invocation));
     }
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("snapshotVersion", snapshot.version());
@@ -433,7 +488,8 @@ public class PlanningTools {
    * guard remains the only authority that accepts a plan.
    */
   private Map<String, String> hint(
-      TrustService.SnapshotView snapshot, java.time.Instant now, String outcome, String id) {
+      TrustService.SnapshotView snapshot, java.time.Instant now, String outcome, String id,
+      PlanningInvocation invocation) {
     int sep = id.indexOf('|');
     String issuerId = sep < 0 ? "" : id.substring(0, sep);
     String credentialType = sep < 0 ? "" : id.substring(sep + 1);
@@ -447,19 +503,35 @@ public class PlanningTools {
     if (issuer == null || issuerId.isEmpty() || credentialType.isEmpty()) {
       verdict = "unknown";
       detail = "candidate is not pinned registry metadata";
+    } else if (!invocation.scopeIssuerIds().isEmpty()
+        && !invocation.scopeIssuerIds().contains(issuerId)) {
+      verdict = "unknown";
+      detail = "candidate is outside the requested discovery scope";
+    } else if (!invocation.scopeCredentialTypes().isEmpty()
+        && !invocation.scopeCredentialTypes().contains(credentialType)) {
+      verdict = "unknown";
+      detail = "candidate is outside the requested discovery scope";
     } else if (!PlanningIntents.OUTCOME.equals(outcome)) {
       verdict = "unsupported";
       detail = "outcome is outside the G1 allowlist";
     } else if (!IssuerKeys.usable(issuer, now)) {
       verdict = "unusable";
       detail = "issuer is not currently usable";
-    } else if (!issuer.credentialTypes().contains(credentialType)
-        || GuardClaims.forType(credentialType).isEmpty()) {
+    } else if (!issuer.credentialTypes().contains(credentialType)) {
+      verdict = "incompatible";
+      detail = "credential type is outside issuer scope";
+    } else if (GuardClaims.forType(credentialType).isEmpty()) {
       verdict = "incompatible";
       detail = "credential type attests no supported claim";
+    } else if (ApprovedSchemas.forType(credentialType).stream()
+        .noneMatch(c -> outcome.equals(
+            ApprovedSchemas.semanticFor(credentialType, c).orElse(null)))) {
+      verdict = "incompatible";
+      detail = "credential type does not satisfy semantic " + outcome;
     } else {
       verdict = "compatible";
-      detail = "credential type attests a supported claim";
+      detail = "credential type attests " + outcome + " via "
+          + String.join(",", ApprovedSchemas.forType(credentialType));
     }
     Map<String, String> row = new LinkedHashMap<>();
     row.put("candidateId", id);

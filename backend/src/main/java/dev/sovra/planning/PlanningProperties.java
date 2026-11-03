@@ -32,8 +32,13 @@ public class PlanningProperties {
   /** Single provider-call deadline (SEC-19, SEC-22). */
   private Duration timeout = Duration.ofSeconds(10);
 
-  /** Bounded provider retries, not tool retries (SEC-19). */
-  private int maxRetries = 1;
+  /**
+   * Provider retries, not tool retries (SEC-19). Defaults to zero:
+   * SDK retries fire below the budget guard with unknowable
+   * server-side billing, so metered live calls require
+   * {@code maxRetries=0} and refuse anything else at admission.
+   */
+  private int maxRetries = 0;
 
   /**
    * Provider-side output token cap (NFR-03). Reasoning models spend
@@ -51,6 +56,24 @@ public class PlanningProperties {
 
   /** Fixed seed recorded with every live run (NFR-10). */
   private int seed = 7;
+
+  /**
+   * Model ids qualified for metered live planning (PROD-012). The
+   * token envelope's byte ratio, per-request overhead, and completion-cap
+   * assumptions are stated per qualified model, never universal: an
+   * empty list denies every live call, and a model joins only after its
+   * tokenizer behavior and max-tokens completion cap are observed.
+   */
+  private java.util.List<String> allowedModels = java.util.List.of();
+
+  /**
+   * Outward byte cap per provider attempt (PROD-012). The budget guard
+   * serializes the full prompt — messages, tool definitions, and JSON
+   * framing allowance — before each outbound call and fails the run
+   * closed past this bound, so unbounded tool results can never grow a
+   * request without limit. No extra model request fires on breach.
+   */
+  private int maxTranscriptBytes = 32768;
 
   public boolean liveEnabled() {
     return liveEnabled;
@@ -138,6 +161,22 @@ public class PlanningProperties {
 
   public void setSeed(int seed) {
     this.seed = seed;
+  }
+
+  public java.util.List<String> allowedModels() {
+    return allowedModels;
+  }
+
+  public void setAllowedModels(java.util.List<String> allowedModels) {
+    this.allowedModels = allowedModels == null ? java.util.List.of() : allowedModels;
+  }
+
+  public int maxTranscriptBytes() {
+    return maxTranscriptBytes;
+  }
+
+  public void setMaxTranscriptBytes(int maxTranscriptBytes) {
+    this.maxTranscriptBytes = maxTranscriptBytes;
   }
 
   /** True only when the operator armed live planning with full credentials. */

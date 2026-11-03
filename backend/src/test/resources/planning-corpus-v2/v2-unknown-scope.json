@@ -1,0 +1,19 @@
+{
+  "caseId": "V2-UNKNOWN-SCOPE",
+  "note": "Well-formed scope naming an unknown issuer; intent validation passes and planning yields an actual NO_PATH refusal, never 400.",
+  "outcome": "age_over_18",
+  "rpId": "https://rp.example/synth-shop",
+  "audience": "https://rp.example/synth-shop/callback",
+  "purpose": "synthetic age check at checkout",
+  "policyId": "sovra-synthetic-policy/age-check-mapped",
+  "policyVersion": "1",
+  "requestedClaims": ["adultOver18"],
+  "scopeIssuerIds": ["https://sovra.example/issuers/retired-9"],
+  "scopeCredentialTypes": [],
+  "scopeJurisdictions": [],
+  "baselineIssuerId": "https://sovra.example/issuers/retired-9",
+  "baselineCredentialType": "https://sovra.example/vct/adult-status/1",
+  "baselineRequestedClaims": ["adultOver18"],
+  "expectBaseline": "NO_PATH",
+  "expectCandidate": false
+}

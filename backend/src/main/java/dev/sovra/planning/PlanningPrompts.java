@@ -44,6 +44,9 @@ public final class PlanningPrompts {
    * User prompt for one approved intent. Every field is an allowlisted
    * identifier validated before any model contact; nothing here can
    * carry holder PII, secrets, or credential bytes by construction.
+   * Unscoped intents render byte-identically to prompts/2; scoped intents
+   * append a generic discovery-scope section naming only the RP-supplied
+   * hints (never fixture-specific guidance).
    */
   public static String user(PlanningIntent intent) {
     if (intent.rpId().length() > PlanningIntents.MAX_ID_CHARS
@@ -51,7 +54,7 @@ public final class PlanningPrompts {
         || intent.audience().length() > PlanningIntents.MAX_ID_CHARS) {
       throw new InvalidPlanningException("planning intent text exceeds its bound");
     }
-    return """
+    String base = """
         Plan for outcome %s for relying party %s (purpose: %s, audience: %s).
         Approved policy binding: %s version %s. Requested claims: %s.
         Discover a minimal supported evidence path with exact citations, or report
@@ -65,11 +68,40 @@ public final class PlanningPrompts {
             intent.policyId(),
             intent.policyVersion(),
             String.join(", ", intent.requestedClaims()));
+    if (!intent.scoped()) {
+      return base;
+    }
+    StringBuilder scope = new StringBuilder(base);
+    scope.append("Discovery scope (RP hints; narrow only, never authority):");
+    if (!intent.scopeIssuerIds().isEmpty()) {
+      scope.append(" consider only issuer ids ")
+          .append(String.join(", ", intent.scopeIssuerIds())).append(";");
+    }
+    if (!intent.scopeCredentialTypes().isEmpty()) {
+      scope.append(" consider only credential types ")
+          .append(String.join(", ", intent.scopeCredentialTypes())).append(";");
+    }
+    if (!intent.scopeJurisdictions().isEmpty()) {
+      scope.append(" consider only jurisdiction hints ")
+          .append(String.join(", ", intent.scopeJurisdictions())).append(";");
+    }
+    scope.append(" if no scoped source attests the outcome, return NO_PATH"
+        + " or MANUAL_REVIEW with a reason; never invent an out-of-scope path.\n");
+    return scope.toString();
   }
 
-  /** G1 binds exactly one frozen synthetic policy document. */
+  /**
+   * G1 binds exactly two frozen synthetic RP policy documents: the legacy
+   * age-check v1 (budget adultOver18 only, unchanged) and the mapped
+   * age-check-mapped v1 (every registry-approved spelling of the same
+   * semantic). Schema docs are citable evidence, never selectable here.
+   * Prompt TEXT is frozen at sovra-planner-prompts/3 with no fixture
+   * names; this binding list is code, not model output.
+   */
   public static boolean approvedPolicy(String policyId, String policyVersion) {
-    return GuardPolicies.POLICY_ID.equals(policyId)
-        && GuardPolicies.POLICY_VERSION.equals(policyVersion);
+    return (GuardPolicies.POLICY_ID.equals(policyId)
+            && GuardPolicies.POLICY_VERSION.equals(policyVersion))
+        || (GuardPolicies.MAPPED_POLICY_ID.equals(policyId)
+            && GuardPolicies.MAPPED_POLICY_VERSION.equals(policyVersion));
   }
 }

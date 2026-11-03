@@ -54,19 +54,76 @@ public class AiBudgetService {
   }
 
   /**
+   * A metered call that tops up its reservation as the session grows.
+   * The lease id is injected after the initial reserve and before
+   * {@link #invoke}, so each further outbound attempt can pre-fund its
+   * own worst case through {@link #topUp} before any bytes leave.
+   */
+  public interface LeaseAwareCall<T> extends AiCall<T> {
+
+    void lease(UUID leaseId);
+  }
+
+  /**
+   * A pre-call abort: the guard refused another outbound attempt, so no
+   * provider contact happened in the refused round. Carries the failure
+   * the caller sees plus the spend to settle: exact accumulated usage
+   * when every completed round reported it, else the funded reservation
+   * (never burned, never hidden).
+   */
+  public static final class BudgetAbort extends RuntimeException {
+
+    private final long knownActual;
+    private final RuntimeException failure;
+
+    public BudgetAbort(long knownActual, RuntimeException failure) {
+      super(failure.getMessage(), failure);
+      this.knownActual = knownActual;
+      this.failure = failure;
+    }
+
+    long knownActual() {
+      return knownActual;
+    }
+
+    RuntimeException failure() {
+      return failure;
+    }
+  }
+
+  /**
    * Runs a metered call. Success settles actual usage (or the
-   * estimate when the provider omits usage); any failure after the
-   * reservation burns the estimate as UNCERTAIN, because a failed
-   * call may still have spent server-side.
+   * estimate when the provider omits usage); a pre-call abort settles
+   * the exact accumulated spend of the completed rounds; any other
+   * failure after the reservation burns the estimate as UNCERTAIN,
+   * because a failed call may still have spent server-side.
    */
   public <T> T execute(UUID tenantId, long estimatedTokens, AiCall<T> call) throws Exception {
     UUID lease = reserve(tenantId, estimatedTokens);
+    if (call instanceof LeaseAwareCall<T> aware) {
+      aware.lease(lease);
+    }
     try {
       T result = call.invoke();
       long actual = call.usageOf(result);
-      settle(lease, actual < 0 ? estimatedTokens : actual);
+      // Unknown usage settles the live reservation — the topped-up
+      // total for sessions that grew — never just the first bound.
+      settle(lease, actual < 0 ? currentEstimate(lease) : actual);
       return result;
+    } catch (BudgetAbort abort) {
+      settle(lease, abort.knownActual());
+      throw abort.failure();
     } catch (Exception e) {
+      // Framework backstop: the tool loop may wrap a guard refusal
+      // in its own exception type. A wrapped abort still means no
+      // provider contact in the refused round, so it settles exact
+      // completed spend instead of burning the funding.
+      for (Throwable t = e; t != null; t = t.getCause()) {
+        if (t instanceof BudgetAbort abort) {
+          settle(lease, abort.knownActual());
+          throw abort.failure();
+        }
+      }
       burnUncertain(lease);
       throw e;
     }
@@ -137,6 +194,88 @@ public class AiBudgetService {
         });
   }
 
+  /**
+   * Grows a held lease's token reservation before another outbound
+   * attempt, or throws {@link AiBudgetExhaustedException} when the
+   * growth would pass the day's token limit (the caller aborts the
+   * session without further provider contact). Zero growth only
+   * heartbeats: every round renews the lease expiry, so a progressing
+   * session never trips the sweeper while a stalled one still does.
+   * Lock order matches {@link #reserve} (day row, then lease).
+   */
+  public void topUp(UUID leaseId, long additionalTokens) {
+    if (additionalTokens < 0) {
+      throw new IllegalArgumentException("top-up cannot be negative");
+    }
+    List<LocalDate> days =
+        global.query(
+            "SELECT day FROM ai_call_lease WHERE id = ?",
+            (rs, n) -> rs.getObject(1, LocalDate.class),
+            leaseId);
+    if (days.isEmpty()) {
+      throw new IllegalStateException("AI lease is not held: " + leaseId);
+    }
+    LocalDate day = days.get(0);
+    transactions.execute(
+        status -> {
+          DayRow row =
+              global.queryForObject(
+                  "SELECT request_limit, token_limit, concurrency_limit,"
+                      + " requests_used, tokens_used, requests_reserved, tokens_reserved"
+                      + " FROM ai_budget_day WHERE day = ? FOR UPDATE",
+                  (rs, n) ->
+                      new DayRow(
+                          rs.getInt(1),
+                          rs.getLong(2),
+                          rs.getInt(3),
+                          rs.getInt(4),
+                          rs.getLong(5),
+                          rs.getInt(6),
+                          rs.getLong(7)),
+                  day);
+          String state =
+              global.queryForObject(
+                  "SELECT state FROM ai_call_lease WHERE id = ? FOR UPDATE",
+                  String.class,
+                  leaseId);
+          if (!"HELD".equals(state)) {
+            throw new IllegalStateException("AI lease is not held: " + leaseId);
+          }
+          if (row.tokensUsed() + row.tokensReserved() + additionalTokens > row.tokenLimit()) {
+            throw new AiBudgetExhaustedException("daily live-AI token budget exhausted");
+          }
+          global.update(
+              "UPDATE ai_budget_day SET tokens_reserved = tokens_reserved + ? WHERE day = ?",
+              additionalTokens,
+              day);
+          global.update(
+              "UPDATE ai_call_lease SET estimated_tokens = estimated_tokens + ?,"
+                  + " expires_at = now() + (? || ' seconds')::interval WHERE id = ?",
+              additionalTokens,
+              budgets.leaseSeconds(),
+              leaseId);
+          return null;
+        });
+  }
+
+  /** Configured lease lifetime in seconds, for admission adequacy checks. */
+  public int leaseSeconds() {
+    return budgets.leaseSeconds();
+  }
+
+  /** Live reservation of a lease, grown by {@link #topUp}. */
+  public long currentEstimate(UUID leaseId) {
+    List<Long> estimates =
+        global.query(
+            "SELECT estimated_tokens FROM ai_call_lease WHERE id = ?",
+            (rs, n) -> rs.getLong(1),
+            leaseId);
+    if (estimates.isEmpty()) {
+      throw new IllegalStateException("AI lease is not held: " + leaseId);
+    }
+    return estimates.get(0);
+  }
+
   /** Settles a held lease with actual provider usage. */
   public void settle(UUID leaseId, long actualTokens) {
     if (actualTokens < 0) {
@@ -161,6 +300,21 @@ public class AiBudgetService {
                     actualTokens));
     if (updated == 0) {
       throw new IllegalStateException("AI lease is not held: " + leaseId);
+    }
+    // Bound-violation signal: actual spend past the funded reservation
+    // means a sizing assumption broke. Recorded honestly above, never
+    // hidden — and always loud, so operators re-size before re-arming.
+    long[] pair =
+        global.queryForObject(
+            "SELECT estimated_tokens, settled_tokens FROM ai_call_lease WHERE id = ?",
+            (rs, n) -> new long[] {rs.getLong(1), rs.getLong(2)},
+            leaseId);
+    if (pair != null && pair[1] > pair[0]) {
+      log.warn(
+          "live-AI lease {} settled {} tokens past its {} reservation",
+          leaseId,
+          pair[1],
+          pair[0]);
     }
   }
 

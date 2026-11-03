@@ -77,6 +77,98 @@ public final class ConsentFixtures {
         Recommendation.CANDIDATE_ONLY);
   }
 
+  /** Guard-accepted mapped-policy plan for an unfamiliar-schema wire pair. */
+  public static CandidatePlan mappedPlan(String issuerId, String vct, String claim) {
+    String planId = "pln_test_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+    return new CandidatePlan(
+        planId,
+        "age_over_18",
+        issuerId,
+        vct,
+        List.of(claim),
+        List.of(new EvidenceCitation(
+            GuardPolicies.MAPPED_POLICY_ID, GuardPolicies.MAPPED_SECTION_ID)),
+        GuardPolicies.MAPPED_POLICY_ID,
+        GuardPolicies.MAPPED_POLICY_VERSION,
+        Recommendation.CANDIDATE_ONLY);
+  }
+
+  /** Consent create body for an explicit plan/claims pair (mapped flows). */
+  public static Map<String, Object> createBodyFor(
+      UUID credentialId, CandidatePlan plan, Map<String, Object> claims) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("rpId", RP_ID);
+    body.put("audience", AUDIENCE);
+    body.put("purpose", PURPOSE);
+    body.put("credentialId", credentialId.toString());
+    body.put("claims", claims);
+    body.put("plan", planBody(plan));
+    body.put("policyId", plan.policyId());
+    body.put("policyVersion", plan.policyVersion());
+    body.put("planHash", PlanGuard.canonicalHash(plan));
+    body.put("challenge", challenge());
+    body.put("expiresAt", Instant.now().plusSeconds(3600).toString());
+    return body;
+  }
+
+  /** Canonical consent message over an explicit claims line (mapped flows). */
+  public static String consentMessageFor(
+      Map<String, Object> review, String decision, String claimsCanonical) {
+    return ConsentService.CONSENT_LABEL + "\n" + review.get("requestId") + "\n" + decision + "\n"
+        + review.get("rpId") + "\n" + review.get("audience") + "\n" + review.get("purpose") + "\n"
+        + claimsCanonical + "\n" + review.get("planHash") + "\n"
+        + review.get("challenge") + "\n" + review.get("expiresAt") + "\n"
+        + review.get("holderThumbprint");
+  }
+
+  /** Holder-signed decision proof over an explicit claims line. */
+  public static String consentProofFor(
+      IssuanceFixtures.HolderKeys holder,
+      Map<String, Object> review,
+      String decision,
+      String claimsCanonical,
+      ObjectMapper mapper) throws Exception {
+    return IssuanceFixtures.proofOver(
+        holder, consentMessageFor(review, decision, claimsCanonical), mapper);
+  }
+
+  /** Issues a credential for an explicit issuer/vct/claims triple. */
+  @SuppressWarnings("unchecked")
+  public static String issueCredentialFor(
+      RestClient client,
+      TestAccount issuer,
+      IssuanceFixtures.HolderKeys holder,
+      String issuerId,
+      String vct,
+      Map<String, Object> claims,
+      String claimsCanonical,
+      ObjectMapper mapper) throws Exception {
+    String key = "consent-" + UUID.randomUUID();
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("issuerId", issuerId);
+    body.put("vct", vct);
+    body.put("holderJwk", mapper.convertValue(holder.jwk(), Map.class));
+    body.put("holderProof",
+        IssuanceFixtures.proofWithClaims(holder, key, vct, claimsCanonical, mapper));
+    body.put("claims", claims);
+    body.put("expiresAt", Instant.now().plusSeconds(7200).toString());
+    Map<String, Object> response =
+        client
+            .post()
+            .uri("/api/issuance/credentials")
+            .headers(
+                h -> {
+                  issuer.headers().accept(h);
+                  h.set("Idempotency-Key", key);
+                })
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(body)
+            .retrieve()
+            .body(Map.class);
+    assert response != null;
+    return response.get("credentialId").toString();
+  }
+
   /** Snake-case wire form, mirroring the frozen corpus shape. */
   public static Map<String, Object> planBody(CandidatePlan plan) {
     Map<String, Object> body = new LinkedHashMap<>();

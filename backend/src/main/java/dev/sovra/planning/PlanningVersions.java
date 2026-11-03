@@ -15,8 +15,14 @@ import org.springframework.ai.tool.ToolCallback;
  */
 public final class PlanningVersions {
 
-  /** System/user prompt template version; text lives in PlanningPrompts. */
-  public static final String PROMPT_VERSION = "sovra-planner-prompts/2";
+  /**
+   * System/user prompt template version; text lives in PlanningPrompts.
+   * {@code /3} adds generic discovery-scope rendering to the user prompt
+   * (scoped intents only; unscoped bytes are identical to {@code /2}) with
+   * no fixture names. Frozen from here: novel registry metadata is
+   * introduced after this freeze without prompt hints.
+   */
+  public static final String PROMPT_VERSION = "sovra-planner-prompts/3";
 
   /** Tool name/description/schema contract version. */
   public static final String TOOL_CONTRACT_VERSION = "sovra-planner-tools/1";

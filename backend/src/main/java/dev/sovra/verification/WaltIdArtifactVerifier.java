@@ -33,6 +33,10 @@ import tools.jackson.databind.ObjectMapper;
  * safe reason code; callers turn it into a REJECTED decision, never
  * an acceptance. Walt-id parse errors embed the artifact, so their
  * messages are never propagated.
+ *
+ * <p>PROFILE BOUNDARY (explicit): legacy {@code adult-status/1} +
+ * {@code adultOver18} ONLY. New registry schemas are
+ * synthetic-profile-only and fail closed here with TYPE_OUT_OF_SCOPE.
  */
 public final class WaltIdArtifactVerifier {
 

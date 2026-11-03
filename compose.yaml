@@ -121,6 +121,28 @@ services:
       SOVRA_AI_BASE_URL: ${SOVRA_AI_BASE_URL:-}
       SOVRA_AI_MODEL: ${SOVRA_AI_MODEL:-}
       SOVRA_AI_API_KEY: ${SOVRA_AI_API_KEY:-}
+      # Live-planning bounds (PROD-012): allowlist empty denies every
+      # call (never auto-allow); retries stay 0 for metered runs;
+      # transcript cap bounds each attempt's wire bytes. Remaining
+      # bound/timeout/tool/output knobs match PlanningProperties
+      # defaults. All map explicitly from root .env — absent
+      # container env never binds via Spring relaxed binding.
+      SOVRA_AI_ALLOWED_MODELS: ${SOVRA_AI_ALLOWED_MODELS:-}
+      SOVRA_AI_MAX_RETRIES: ${SOVRA_AI_MAX_RETRIES:-0}
+      SOVRA_AI_MAX_TRANSCRIPT_BYTES: ${SOVRA_AI_MAX_TRANSCRIPT_BYTES:-32768}
+      SOVRA_AI_MAX_TOOL_CALLS: ${SOVRA_AI_MAX_TOOL_CALLS:-8}
+      SOVRA_AI_TIMEOUT: ${SOVRA_AI_TIMEOUT:-10s}
+      SOVRA_AI_MAX_TOKENS: ${SOVRA_AI_MAX_TOKENS:-8000}
+      SOVRA_AI_MAX_PROMPT_CHARS: ${SOVRA_AI_MAX_PROMPT_CHARS:-8000}
+      SOVRA_AI_TEMPERATURE: ${SOVRA_AI_TEMPERATURE:-0.0}
+      SOVRA_AI_SEED: ${SOVRA_AI_SEED:-7}
+      # Fleet live-AI budgets (PROD-012): zero defaults deny every
+      # reservation, so live spending needs the arming flag above AND
+      # funded limits. Lease covers one provider timeout plus margin.
+      SOVRA_AI_BUDGET_DAILY_REQUESTS: ${SOVRA_AI_BUDGET_DAILY_REQUESTS:-0}
+      SOVRA_AI_BUDGET_DAILY_TOKENS: ${SOVRA_AI_BUDGET_DAILY_TOKENS:-0}
+      SOVRA_AI_BUDGET_MAX_CONCURRENCY: ${SOVRA_AI_BUDGET_MAX_CONCURRENCY:-0}
+      SOVRA_AI_BUDGET_LEASE_SECONDS: ${SOVRA_AI_BUDGET_LEASE_SECONDS:-120}
       # PROD-011: fleet scrape/health port. Deliberately unpublished:
       # reachable only inside sovra-net (scraper / docker exec), never
       # through ingress. Host :8081 is app-b's app port, unrelated.
@@ -208,6 +230,28 @@ services:
       SOVRA_AI_BASE_URL: ${SOVRA_AI_BASE_URL:-}
       SOVRA_AI_MODEL: ${SOVRA_AI_MODEL:-}
       SOVRA_AI_API_KEY: ${SOVRA_AI_API_KEY:-}
+      # Live-planning bounds (PROD-012): allowlist empty denies every
+      # call (never auto-allow); retries stay 0 for metered runs;
+      # transcript cap bounds each attempt's wire bytes. Remaining
+      # bound/timeout/tool/output knobs match PlanningProperties
+      # defaults. All map explicitly from root .env — absent
+      # container env never binds via Spring relaxed binding.
+      SOVRA_AI_ALLOWED_MODELS: ${SOVRA_AI_ALLOWED_MODELS:-}
+      SOVRA_AI_MAX_RETRIES: ${SOVRA_AI_MAX_RETRIES:-0}
+      SOVRA_AI_MAX_TRANSCRIPT_BYTES: ${SOVRA_AI_MAX_TRANSCRIPT_BYTES:-32768}
+      SOVRA_AI_MAX_TOOL_CALLS: ${SOVRA_AI_MAX_TOOL_CALLS:-8}
+      SOVRA_AI_TIMEOUT: ${SOVRA_AI_TIMEOUT:-10s}
+      SOVRA_AI_MAX_TOKENS: ${SOVRA_AI_MAX_TOKENS:-8000}
+      SOVRA_AI_MAX_PROMPT_CHARS: ${SOVRA_AI_MAX_PROMPT_CHARS:-8000}
+      SOVRA_AI_TEMPERATURE: ${SOVRA_AI_TEMPERATURE:-0.0}
+      SOVRA_AI_SEED: ${SOVRA_AI_SEED:-7}
+      # Fleet live-AI budgets (PROD-012): zero defaults deny every
+      # reservation, so live spending needs the arming flag above AND
+      # funded limits. Lease covers one provider timeout plus margin.
+      SOVRA_AI_BUDGET_DAILY_REQUESTS: ${SOVRA_AI_BUDGET_DAILY_REQUESTS:-0}
+      SOVRA_AI_BUDGET_DAILY_TOKENS: ${SOVRA_AI_BUDGET_DAILY_TOKENS:-0}
+      SOVRA_AI_BUDGET_MAX_CONCURRENCY: ${SOVRA_AI_BUDGET_MAX_CONCURRENCY:-0}
+      SOVRA_AI_BUDGET_LEASE_SECONDS: ${SOVRA_AI_BUDGET_LEASE_SECONDS:-120}
       # PROD-011: fleet scrape/health port. Deliberately unpublished:
       # reachable only inside sovra-net (scraper / docker exec), never
       # through ingress.

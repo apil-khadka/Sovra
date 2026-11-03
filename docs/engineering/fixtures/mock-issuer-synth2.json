@@ -1,0 +1,65 @@
+{
+  "issuer_id": "https://sovra.example/issuers/synth-2",
+  "jurisdiction": "SYNTHETIC",
+  "public_metadata_only": true,
+  "accreditation": {
+    "simulated": true,
+    "allowed_credential_types": [
+      "https://sovra.example/vct/fjord-adult/1",
+      "https://sovra.example/vct/harbor-adult/1",
+      "https://sovra.example/vct/employment-tenure/1"
+    ]
+  },
+  "credential_schemas": [
+    {
+      "schema_id": "sovra-schema/fjord-adult-v1",
+      "type": "https://sovra.example/vct/fjord-adult/1",
+      "claims": {
+        "isAdult": {
+          "type": "boolean",
+          "meaning": "Holder has reached 18 years of age at issuance (fictional Fjord jurisdiction; equal semantics, adequate assurance)",
+          "predicate": "claim == true",
+          "semantic": "age_over_18"
+        }
+      },
+      "section_id": "adult_eligibility",
+      "registry": "sovra-synthetic-schemas/1",
+      "compatible_with_age_over_18": true
+    },
+    {
+      "schema_id": "sovra-schema/harbor-adult-v1",
+      "type": "https://sovra.example/vct/harbor-adult/1",
+      "claims": {
+        "qualifiesAsAdult": {
+          "type": "boolean",
+          "meaning": "Holder qualifies as an adult at issuance (fictional Harbor jurisdiction; equal semantics)",
+          "predicate": "claim == true",
+          "semantic": "age_over_18"
+        }
+      },
+      "section_id": "adult_qualification",
+      "registry": "sovra-synthetic-schemas/1",
+      "compatible_with_age_over_18": true
+    },
+    {
+      "schema_id": "sovra-schema/employment-tenure-v1",
+      "type": "https://sovra.example/vct/employment-tenure/1",
+      "claims": {
+        "yearsInEmployment": {
+          "type": "integer",
+          "meaning": "Years the holder has been employed. Tenure is not proof of age and MUST NOT satisfy age_over_18 at any value.",
+          "predicate": "value >= 0; never satisfies age_over_18",
+          "semantic": "employment_tenure_years"
+        }
+      },
+      "section_id": "tenure",
+      "registry": "sovra-synthetic-schemas/1",
+      "compatible_with_age_over_18": false
+    }
+  ],
+  "trusted_key_ids": [
+    "synth-2"
+  ],
+  "key_note": "P-256 scalar 3 (3G), memory-only synthetic double. Node B only; node A refuses this key.",
+  "status_endpoint": "https://synth-2.example.test/status"
+}

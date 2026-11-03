@@ -11,11 +11,8 @@ import dev.sovra.authz.ResourceRef;
 import dev.sovra.trust.TrustSnapshotProvider;
 import dev.sovra.issuance.TrustUnavailableException;
 import java.time.Clock;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 /**
@@ -63,7 +60,7 @@ public class GuardService {
     var snapshot = snapshots.current().orElseThrow(TrustUnavailableException::new);
     GuardVerdict verdict =
         PlanGuard.validate(
-            plan, context(snapshot), selected,
+            plan, GuardContexts.fromSnapshot(snapshot), selected,
             new GuardInputs(PlanGuard.RULES_VERSION, clock.instant()));
     Map<String, String> detail = new LinkedHashMap<>();
     detail.put("accepted", String.valueOf(verdict.accepted()));
@@ -76,22 +73,13 @@ public class GuardService {
         snapshot.version());
   }
 
-  private static GuardContext context(dev.sovra.trust.TrustService.SnapshotView snapshot) {
-    Map<String, TrustedIssuer> issuers = new LinkedHashMap<>();
-    for (var issuer : snapshot.issuers()) {
-      List<String> claims = new ArrayList<>();
-      for (String vct : issuer.credentialTypes()) {
-        claims.addAll(GuardClaims.forType(vct));
-      }
-      // First row wins per issuer, matching the verifier's issuer
-      // lookup; G1 snapshots carry one row per issuer.
-      issuers.putIfAbsent(
-          issuer.issuerId(),
-          new TrustedIssuer(
-              issuer.issuerId(), issuer.credentialTypes(), List.copyOf(claims),
-              List.of(issuer.keyId()), issuer.status(), issuer.validFrom(),
-              issuer.validThrough()));
-    }
-    return new GuardContext(Map.copyOf(issuers), GuardPolicies.documents());
+  /**
+   * Shared trusted-context construction, delegated to {@link GuardContexts}
+   * so the evaluator scores against the identical inputs production uses.
+   * Kept package-visible for direct parity tests; production calls go
+   * through {@link GuardContexts#fromSnapshot}.
+   */
+  static GuardContext context(dev.sovra.trust.TrustService.SnapshotView snapshot) {
+    return GuardContexts.fromSnapshot(snapshot);
   }
 }

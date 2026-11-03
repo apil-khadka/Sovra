@@ -35,7 +35,9 @@ public class PlanningController {
     PlanningIntent intent =
         PlanningIntents.validate(
             request.rpId(), request.audience(), request.purpose(), request.outcome(),
-            request.policyId(), request.policyVersion(), request.requestedClaims());
+            request.policyId(), request.policyVersion(), request.requestedClaims(),
+            request.scopeIssuerIds(), request.scopeCredentialTypes(),
+            request.scopeJurisdictions());
     return ResponseEntity.ok(planning.propose(caller, intent));
   }
 
@@ -53,5 +55,8 @@ public class PlanningController {
       @NotNull String outcome,
       @NotNull String policyId,
       @NotNull String policyVersion,
-      @NotNull List<String> requestedClaims) {}
+      @NotNull List<String> requestedClaims,
+      List<String> scopeIssuerIds,
+      List<String> scopeCredentialTypes,
+      List<String> scopeJurisdictions) {}
 }

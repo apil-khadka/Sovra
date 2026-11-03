@@ -209,6 +209,205 @@ class AiBudgetTests extends SovraPostgresBase {
         .hasMessageContaining("not held");
   }
 
+  @Test
+  void topUpGrowsReservationAndSettlesActual() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID lease = ledger.reserve(UUID.randomUUID(), 1_000);
+    ledger.topUp(lease, 2_000);
+    assertThat(ledger.currentEstimate(lease)).isEqualTo(3_000);
+    assertThat(day().tokensReserved()).isEqualTo(3_000);
+    ledger.settle(lease, 2_500);
+    assertThat(day().tokensUsed()).isEqualTo(2_500);
+    assertThat(day().tokensReserved()).isEqualTo(0);
+    assertThat(leaseState(lease)).isEqualTo("SETTLED");
+  }
+
+  @Test
+  void topUpPastLimitDeniedKeepsReservation() {
+    AiBudgetService ledger = ledger(100, 10_000, 10);
+    UUID lease = ledger.reserve(UUID.randomUUID(), 6_000);
+    assertThatThrownBy(() -> ledger.topUp(lease, 5_000))
+        .isInstanceOf(AiBudgetExhaustedException.class)
+        .hasMessageContaining("token budget");
+    assertThat(day().tokensReserved()).isEqualTo(6_000);
+    assertThat(leaseState(lease)).isEqualTo("HELD");
+    ledger.refund(lease);
+  }
+
+  @Test
+  void topUpOnTerminalLeaseFailsLoud() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID lease = ledger.reserve(UUID.randomUUID(), 1_000);
+    ledger.settle(lease, 1_000);
+    assertThatThrownBy(() -> ledger.topUp(lease, 1_000))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("not held");
+    assertThatThrownBy(() -> ledger.topUp(UUID.randomUUID(), 1_000))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("not held");
+  }
+
+  @Test
+  void topUpHeartbeatsPastSweep() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID progressing = ledger.reserve(UUID.randomUUID(), 1_000);
+    // The round took longer than the lease: a zero top-up renews the
+    // expiry, so the sweeper leaves the progressing session alone.
+    owner.update(
+        "UPDATE ai_call_lease SET expires_at = now() - interval '1 minute' WHERE id = ?",
+        progressing);
+    ledger.topUp(progressing, 0);
+    assertThat(ledger.sweepStale()).isZero();
+    assertThat(leaseState(progressing)).isEqualTo("HELD");
+    assertThat(day().tokensReserved()).isEqualTo(1_000);
+    ledger.refund(progressing);
+  }
+
+  @Test
+  void topUpRaceAdmitsExactlyRemaining() throws Exception {
+    AiBudgetService ledger = ledger(100, 3_000, 10);
+    UUID lease = ledger.reserve(UUID.randomUUID(), 1_000);
+    AtomicInteger admitted = new AtomicInteger();
+    AtomicInteger denied = new AtomicInteger();
+    ExecutorService pool = Executors.newFixedThreadPool(8);
+    try {
+      List<Future<?>> futures = new ArrayList<>();
+      for (int i = 0; i < 8; i++) {
+        futures.add(
+            pool.submit(
+                () -> {
+                  try {
+                    ledger.topUp(lease, 1_500);
+                    admitted.incrementAndGet();
+                  } catch (AiBudgetExhaustedException e) {
+                    denied.incrementAndGet();
+                  }
+                }));
+      }
+      for (Future<?> future : futures) {
+        future.get();
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+    assertThat(admitted.get()).isEqualTo(1);
+    assertThat(denied.get()).isEqualTo(7);
+    assertThat(day().tokensReserved()).isEqualTo(2_500);
+    ledger.refund(lease);
+  }
+
+  @Test
+  void abortSettlesExactSpend() {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID tenant = UUID.randomUUID();
+    assertThatThrownBy(
+            () -> ledger.execute(
+                tenant,
+                4_000,
+                new AiBudgetService.LeaseAwareCall<String>() {
+                  @Override
+                  public void lease(UUID leaseId) {}
+
+                  @Override
+                  public String invoke() {
+                    throw new AiBudgetService.BudgetAbort(
+                        1_200, new PlanningUnavailableException("budget exhausted"));
+                  }
+
+                  @Override
+                  public long usageOf(String result) {
+                    return -1;
+                  }
+                }))
+        .isInstanceOf(PlanningUnavailableException.class)
+        .hasMessageContaining("budget exhausted");
+    assertThat(day().requestsUsed()).isEqualTo(1);
+    assertThat(day().tokensUsed()).isEqualTo(1_200);
+    assertThat(day().tokensReserved()).isZero();
+    assertThat(
+            owner.queryForObject(
+                "SELECT state FROM ai_call_lease WHERE tenant_id = ?", String.class, tenant))
+        .isEqualTo("SETTLED");
+  }
+
+  @Test
+  void wrappedAbortStillSettlesExactSpend() {
+    // The tool loop may wrap a guard refusal in a framework
+    // exception; the ledger sees through the wrapper and settles
+    // exact completed spend instead of burning the funding.
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    UUID tenant = UUID.randomUUID();
+    assertThatThrownBy(
+            () -> ledger.execute(
+                tenant,
+                4_000,
+                new AiBudgetService.AiCall<String>() {
+                  @Override
+                  public String invoke() {
+                    throw new RuntimeException(
+                        "framework wrapper",
+                        new AiBudgetService.BudgetAbort(
+                            1_200, new PlanningUnavailableException("round budget exceeded")));
+                  }
+
+                  @Override
+                  public long usageOf(String result) {
+                    return -1;
+                  }
+                }))
+        .isInstanceOf(PlanningUnavailableException.class)
+        .hasMessageContaining("round budget");
+    assertThat(day().requestsUsed()).isEqualTo(1);
+    assertThat(day().tokensUsed()).isEqualTo(1_200);
+    assertThat(day().tokensReserved()).isZero();
+    assertThat(
+            owner.queryForObject(
+                "SELECT state FROM ai_call_lease WHERE tenant_id = ?", String.class, tenant))
+        .isEqualTo("SETTLED");
+  }
+
+  @Test
+  void unknownUsageSettlesLiveReservation() throws Exception {
+    AiBudgetService ledger = ledger(100, 1_000_000, 10);
+    String ok =
+        ledger.execute(
+            UUID.randomUUID(),
+            4_000,
+            new AiBudgetService.LeaseAwareCall<String>() {
+              @Override
+              public void lease(UUID leaseId) {
+                ledger.topUp(leaseId, 2_000);
+              }
+
+              @Override
+              public String invoke() {
+                return "candidate";
+              }
+
+              @Override
+              public long usageOf(String result) {
+                return -1;
+              }
+            });
+    assertThat(ok).isEqualTo("candidate");
+    // Topped-up funding settles in full when usage is unknown.
+    assertThat(day().tokensUsed()).isEqualTo(6_000);
+    assertThat(day().tokensReserved()).isZero();
+  }
+
+  @Test
+  void settlePastEstimateRecordsHonestly() {
+    // Prevention is pre-call (reserve/top-up deny); settle records the
+    // provider-reported truth even past the funding, and the bound
+    // violation is logged loud for re-sizing before re-arming.
+    AiBudgetService ledger = ledger(100, 10_000, 10);
+    UUID lease = ledger.reserve(UUID.randomUUID(), 6_000);
+    ledger.settle(lease, 12_000);
+    assertThat(day().tokensUsed()).isEqualTo(12_000);
+    assertThat(day().tokensReserved()).isZero();
+    assertThat(leaseState(lease)).isEqualTo("SETTLED");
+  }
+
   private AiBudgetService ledger(int requests, long tokens, int concurrency) {
     AiBudgetProperties budgets = new AiBudgetProperties();
     budgets.setDailyRequests(requests);

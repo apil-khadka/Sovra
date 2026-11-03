@@ -1433,14 +1433,41 @@ paths:
                 requestedClaims:
                   type: array
                   items: { type: string }
-                  description: 'Exactly [adultOver18] at G1'
+                  description: >-
+                    Required, non-empty. Each a registry-approved spelling
+                    of the outcome (adultOver18, isAdult, qualifiesAsAdult
+                    for age_over_18). Unseen cases send the canonical hint
+                    [adultOver18] plus scope; the discovered wire name
+                    comes from tool outputs, never the prompt.
+                scopeIssuerIds:
+                  type: array
+                  items: { type: string }
+                  description: >-
+                    Optional discovery scope (max 8, each non-blank,
+                    <=512 chars). Exact issuer ids to consider; untrusted
+                    narrowing only, never authority. Absent/empty =
+                    unscoped legacy behavior.
+                scopeCredentialTypes:
+                  type: array
+                  items: { type: string }
+                  description: >-
+                    Optional discovery scope (max 8). Exact credential
+                    types to consider; same narrowing semantics.
+                scopeJurisdictions:
+                  type: array
+                  items: { type: string }
+                  description: >-
+                    Optional discovery scope (max 8). Substring hints on
+                    issuer scope; same narrowing semantics.
       responses:
         '200':
           description: >-
             {mode LIVE|FIXTURE, liveAcceptance, synthetic, profile, plan
             (CandidatePlanWire or null), recommendation, reason, model,
             promptVersion, toolContractVersion, toolSchemaHash, toolCalls,
-            latencyMs, usageTokens, cost, snapshotVersion}
+            latencyMs, usageTokens, cost, snapshotVersion, scopeIssuerIds,
+            scopeCredentialTypes, scopeJurisdictions (echo of the bound
+            scope, empty when unscoped)}
         '400': { description: Invalid intent, before any model contact }
         '401': { description: Anonymous }
         '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
@@ -1457,7 +1484,11 @@ paths:
           description: >-
             {mode LIVE|FIXTURE, liveEnabled, modelConfigured,
             promptVersion, toolContractVersion, toolSchemaHash,
-            baselineVersion, tools}
+            baselineVersion, tools, discoveryScopeSupported,
+            schemaRegistryVersion, guardRulesVersion,
+            supportedPolicyBindings [{policyId, policyVersion}]}.
+            Read-only capabilities for UI feature detection; no model
+            call. Clients must probe here, never by POSTing /propose.
         '401': { description: Anonymous }
         '403': { description: Lacks TENANT_MEMBER/RP_CLIENT }
   /api/guard/validate:

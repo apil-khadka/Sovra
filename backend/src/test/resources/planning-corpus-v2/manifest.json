@@ -1,0 +1,26 @@
+{
+  "corpusVersion": "sovra-planning-corpus/2",
+  "promptVersion": "sovra-planner-prompts/3",
+  "toolContractVersion": "sovra-planner-tools/1",
+  "toolSchemaHash": "2cb3ae5f78cdea7369268faf9582e8f2ae3d1dc3ec5028ee3d047bd4b61dbff2",
+  "baselineVersion": "sovra-baseline-planner/1",
+  "schemaRegistryVersion": "sovra-synthetic-schemas/1",
+  "guardRulesVersion": "sovra-guard/2",
+  "profile": "sovra-synthetic-planning/1",
+  "cases": [
+    "v2-known-adult.json",
+    "v2-fjord-scoped.json",
+    "v2-harbor-scoped.json",
+    "v2-employment-incompatible.json",
+    "v2-unknown-scope.json"
+  ],
+  "files": {
+    "README.md": "14e0dc35d9158a84fbea0abcfd16980c3da0570d3d7bbd24b623718798499720",
+    "v2-employment-incompatible.json": "c184901840819bd99bd79c0ee82050b87ae54594f87a8a9f404bc65a255d6366",
+    "v2-fjord-scoped.json": "41976ea31ac63cb80f3a4ae6cd7a141cd0c9d7d8e36feaf8aa77736c8f71eed2",
+    "v2-harbor-scoped.json": "673d5456ebe9d5f371ab0eb65e89da19a98a444e824894675bad48e29983ca6b",
+    "v2-known-adult.json": "3239b2408a18529faa977e5200870f5fdbc33cdcf7cbab0b89c4c4b1e2cea10c",
+    "v2-unknown-scope.json": "02dcd4d37f3af763c622259560727572028e7b4fff834a83c2268fc525b7b0ce"
+  },
+  "notes": "Frozen input/expected fixtures plus governing configuration versions. Never silently replace v1 (../planning-corpus stays byte-identical). Cost is unreported at proposal level; future sanitized billing corroboration stays out of this manifest."
+}

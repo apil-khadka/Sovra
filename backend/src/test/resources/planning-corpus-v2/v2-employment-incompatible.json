@@ -1,0 +1,19 @@
+{
+  "caseId": "V2-TENURE",
+  "note": "Incompatible employment tenure scoped to synth-2; discovery must refuse with NO_PATH or MANUAL_REVIEW and no plan, never a candidate.",
+  "outcome": "age_over_18",
+  "rpId": "https://rp.example/synth-shop",
+  "audience": "https://rp.example/synth-shop/callback",
+  "purpose": "synthetic age check at checkout",
+  "policyId": "sovra-synthetic-policy/age-check-mapped",
+  "policyVersion": "1",
+  "requestedClaims": ["adultOver18"],
+  "scopeIssuerIds": ["https://sovra.example/issuers/synth-2"],
+  "scopeCredentialTypes": ["https://sovra.example/vct/employment-tenure/1"],
+  "scopeJurisdictions": [],
+  "baselineIssuerId": "https://sovra.example/issuers/synth-2",
+  "baselineCredentialType": "https://sovra.example/vct/employment-tenure/1",
+  "baselineRequestedClaims": ["adultOver18"],
+  "expectBaseline": "MANUAL_REVIEW",
+  "expectCandidate": false
+}

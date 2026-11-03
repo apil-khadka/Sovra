@@ -69,7 +69,12 @@ public class PlanningService {
       long latencyMs,
       Long usageTokens,
       String cost,
-      long snapshotVersion) {}
+      long snapshotVersion,
+      List<String> scopeIssuerIds,
+      List<String> scopeCredentialTypes,
+      List<String> scopeJurisdictions) {}
+
+  public record PolicyBindingView(String policyId, String policyVersion) {}
 
   public record StatusView(
       PlanningMode mode,
@@ -79,7 +84,11 @@ public class PlanningService {
       String toolContractVersion,
       String toolSchemaHash,
       String baselineVersion,
-      List<String> tools) {}
+      List<String> tools,
+      boolean discoveryScopeSupported,
+      String schemaRegistryVersion,
+      String guardRulesVersion,
+      List<PolicyBindingView> supportedPolicyBindings) {}
 
   /** Authorizes, validates ahead of the model, plans, and audits. */
   public ProposalView propose(ServiceAccountPrincipal caller, PlanningIntent intent) {
@@ -92,7 +101,9 @@ public class PlanningService {
     PlanningResult result;
     if (properties.liveEnabled()) {
       PlanningInvocation.install(
-          new PlanningInvocation(caller, properties.maxToolCalls()));
+          new PlanningInvocation(
+              caller, properties.maxToolCalls(), intent.scopeIssuerIds(),
+              intent.scopeCredentialTypes(), intent.scopeJurisdictions()));
       try {
         result = live.plan(intent, toolHash);
       } finally {
@@ -101,6 +112,7 @@ public class PlanningService {
     } else {
       result = FixturePlanner.plan(intent, snapshot, clock.instant(), toolHash);
     }
+    result = bindToScope(result, intent, snapshot);
     Map<String, String> detail = new LinkedHashMap<>();
     detail.put("mode", result.mode().name());
     detail.put("recommendation", result.recommendation().name());
@@ -109,8 +121,9 @@ public class PlanningService {
     detail.put("tools", result.toolContractVersion());
     detail.put("toolCalls", String.valueOf(result.toolCalls()));
     detail.put("liveAcceptance", String.valueOf(result.liveAcceptance()));
+    detail.put("scoped", String.valueOf(intent.scoped()));
     audit.record(caller, Action.PROPOSE_PLAN, resource, decision, "", detail);
-    return view(result, snapshot.version());
+    return view(result, intent, snapshot.version());
   }
 
   /** Planner status: liveness, readiness, and degradation stay distinct (FR-29). */
@@ -130,7 +143,63 @@ public class PlanningService {
         PlanningVersions.TOOL_CONTRACT_VERSION,
         PlanningVersions.toolSchemaHash(tools.callbacks()),
         PlanningVersions.BASELINE_VERSION,
-        live.toolNames());
+        live.toolNames(),
+        true,
+        dev.sovra.guard.ApprovedSchemas.version(),
+        dev.sovra.guard.PlanGuard.RULES_VERSION,
+        List.of(
+            new PolicyBindingView(
+                dev.sovra.guard.GuardPolicies.POLICY_ID,
+                dev.sovra.guard.GuardPolicies.POLICY_VERSION),
+            new PolicyBindingView(
+                dev.sovra.guard.GuardPolicies.MAPPED_POLICY_ID,
+                dev.sovra.guard.GuardPolicies.MAPPED_POLICY_VERSION)));
+  }
+
+  /**
+   * Scope binding: a CANDIDATE_ONLY plan outside the intent's discovery
+   * scope becomes NO_PATH (same mode/provenance, no plan). Scope only
+   * narrows — an out-of-scope candidate is not rewritten into scope, it
+   * is refused. Unscoped intents and non-candidates pass through unchanged.
+   */
+  static PlanningResult bindToScope(
+      PlanningResult result,
+      PlanningIntent intent,
+      dev.sovra.trust.TrustService.SnapshotView snapshot) {
+    if (result == null || !intent.scoped() || result.plan() == null
+        || result.recommendation() != dev.sovra.guard.Recommendation.CANDIDATE_ONLY) {
+      return result;
+    }
+    var plan = result.plan();
+    if (!intent.scopeIssuerIds().isEmpty()
+        && !intent.scopeIssuerIds().contains(plan.candidateIssuerId())) {
+      return scopedOut(result);
+    }
+    if (!intent.scopeCredentialTypes().isEmpty()
+        && !intent.scopeCredentialTypes().contains(plan.credentialType())) {
+      return scopedOut(result);
+    }
+    if (!intent.scopeJurisdictions().isEmpty()) {
+      var issuer = snapshot.issuers().stream()
+          .filter(i -> plan.candidateIssuerId().equals(i.issuerId()))
+          .findFirst().orElse(null);
+      boolean hit = issuer != null && intent.scopeJurisdictions().stream()
+          .anyMatch(hint -> issuer.scope() != null && issuer.scope().contains(hint));
+      if (!hit) {
+        return scopedOut(result);
+      }
+    }
+    return result;
+  }
+
+  private static PlanningResult scopedOut(PlanningResult result) {
+    return new PlanningResult(
+        result.mode(), result.liveAcceptance(), result.synthetic(), result.profile(),
+        null, dev.sovra.guard.Recommendation.NO_PATH,
+        "candidate is outside the requested discovery scope",
+        result.model(), result.promptVersion(), result.toolContractVersion(),
+        result.toolSchemaHash(), result.toolCalls(), result.latencyMs(),
+        result.usageTokens(), result.cost());
   }
 
   /**
@@ -145,7 +214,8 @@ public class PlanningService {
     return result;
   }
 
-  private static ProposalView view(PlanningResult result, long snapshotVersion) {
+  private static ProposalView view(
+      PlanningResult result, PlanningIntent intent, long snapshotVersion) {
     CandidatePlan plan = result.plan();
     return new ProposalView(
         result.mode(),
@@ -163,6 +233,9 @@ public class PlanningService {
         result.latencyMs(),
         result.usageTokens(),
         result.cost(),
-        snapshotVersion);
+        snapshotVersion,
+        List.copyOf(intent.scopeIssuerIds()),
+        List.copyOf(intent.scopeCredentialTypes()),
+        List.copyOf(intent.scopeJurisdictions()));
   }
 }

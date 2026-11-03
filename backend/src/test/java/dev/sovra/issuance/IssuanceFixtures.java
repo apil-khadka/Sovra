@@ -69,10 +69,16 @@ public final class IssuanceFixtures {
   /** Holder proof of possession over the issuance proof message. */
   public static String proof(HolderKeys holder, String idempotencyKey, String vct,
       ObjectMapper mapper) throws Exception {
+    return proofWithClaims(holder, idempotencyKey, vct, "adultOver18=true", mapper);
+  }
+
+  /** Holder proof over a caller-supplied canonical claims line (mapped schemas). */
+  public static String proofWithClaims(HolderKeys holder, String idempotencyKey, String vct,
+      String claimsCanonical, ObjectMapper mapper) throws Exception {
     String message =
         IssuanceService.PROOF_LABEL + "\n" + idempotencyKey + "\n" + vct + "\n"
             + thumbprint(holder) + "\n"
-            + "adultOver18=true";
+            + claimsCanonical;
     return proofOver(holder, message, mapper);
   }
 

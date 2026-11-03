@@ -1,0 +1,22 @@
+{
+  "caseId": "V2-HARBOR",
+  "note": "Unfamiliar Harbor schema scoped to synth-2; the qualifiesAsAdult wire name must come from discovery, never the prompt.",
+  "outcome": "age_over_18",
+  "rpId": "https://rp.example/synth-shop",
+  "audience": "https://rp.example/synth-shop/callback",
+  "purpose": "synthetic age check at checkout",
+  "policyId": "sovra-synthetic-policy/age-check-mapped",
+  "policyVersion": "1",
+  "requestedClaims": ["adultOver18"],
+  "scopeIssuerIds": ["https://sovra.example/issuers/synth-2"],
+  "scopeCredentialTypes": ["https://sovra.example/vct/harbor-adult/1"],
+  "scopeJurisdictions": [],
+  "baselineIssuerId": "https://sovra.example/issuers/synth-2",
+  "baselineCredentialType": "https://sovra.example/vct/harbor-adult/1",
+  "baselineRequestedClaims": ["adultOver18"],
+  "expectBaseline": "MANUAL_REVIEW",
+  "expectCandidate": true,
+  "expectedIssuerId": "https://sovra.example/issuers/synth-2",
+  "expectedCredentialType": "https://sovra.example/vct/harbor-adult/1",
+  "expectedClaimPaths": ["qualifiesAsAdult"]
+}
