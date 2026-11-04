@@ -1,40 +1,48 @@
-# Sovra synthetic walkthrough
+# Sovra product story
 
-This project packages a real browser recording of Sovra's local synthetic unfamiliar-schema flow into a captioned three-minute video.
+This project renders a silent, three-minute walkthrough with animated block diagrams and actual browser captures from the local synthetic demos.
+The story moves from the over-collection problem through the two app demos, both Compose topologies, live plan and guard JSON, holder consent, verification, a fail-closed refusal, and the separate backend encryption path.
 
-The finished H.264 video and SRT captions are in [`deliverables/`](deliverables/).
+The MP4 has no fixed video header or burned-in caption bar.
+The synchronized subtitle track is delivered as a separate SRT file in `deliverables/`.
 
-The capture uses fictional issuers and credentials, the fixture planner, and local demo backends.
+## Evidence and limits
 
-Live AI is disabled for the recording.
+NovaBank and CornerCellar run against the root Compose stack through the demo server on port 5174.
+The unfamiliar-schema page runs against the separate dual-issuer Compose stack through the demo server on port 5176.
+Both runtimes use synthetic records, and live AI is disabled.
 
-The video does not claim legal KYC, production hosting or keys, real identity-data processing, or external wallet conformance.
+The root Compose `app-a` and `app-b` instances share one PostgreSQL database.
+The separate dual-issuer Compose file runs two local nodes with separate databases, networks, and signing keys, but one developer host still controls both.
+The video labels this as local logical separation rather than sovereign-host isolation.
 
-## Render the video
+The vault diagram describes the implemented backend encryption path, not a document read from the age-check browser journey.
+The local synthetic provider uses software-derived wrapping keys.
+Production KMS/HSM, production hosting, legal KYC, zero-knowledge proofs, and external wallet conformance are not demonstrated.
+
+## Preview and render
 
 Install dependencies with `npm ci`.
-
-Start Remotion Studio with `npm run dev` to inspect the composition in the integrated browser.
-
-Generate the sidecar captions with `npm run captions`.
-
+Run `npm run dev -- --no-open` and open the printed URL in the integrated browser to inspect the Remotion composition.
+Generate captions with `npm run captions`.
 Render the H.264 MP4 with `npm run render:sovra`.
 
-The MP4 and SRT are written to `deliverables/`.
+The finished MP4 and SRT are written to `deliverables/`.
+Remotion writes build output under the ignored `out/` directory.
 
-The Remotion bundle and preview frames are written under `out/`, which is ignored by Git.
+## Refresh browser evidence
 
-## Refresh the browser capture
+Start the root synthetic Compose stack and the separate dual-issuer stack using the documented commands in `docs/demo/kyc-demo-apps.md` and `docs/demo/interoperability.md`.
+Run the root-backed demo server on port 5174 with its existing `demo/.env.local` credentials.
+Run the interop-only demo server on port 5176 with the dual-issuer token directory and live planning disabled.
 
-Follow the synthetic dual-issuer setup in [`docs/demo/interoperability.md`](../docs/demo/interoperability.md).
-
-With the local demo server running on port 5176, run:
+Capture current application screenshots and redacted plan/guard evidence with `npm run capture:scenes`.
+Refresh the clean browser recording with:
 
 ```sh
-DEMO_BASE=http://127.0.0.1:5176 ARTIFACT_DIR=/tmp/sovra-3-minute-source \
-  pnpm --dir demo run record:demo
+DEMO_BASE=http://127.0.0.1:5176 ARTIFACT_DIR=/tmp/sovra-interop-source \
+  node demo/record-interop-demo.mjs
 ```
 
-Copy `sovra-synthetic-demo.mp4` and `captions.srt` from that artifact directory into `video/public/` before rendering.
-
-The captured browser footage is a source asset; the Remotion scenes add the opening, flow explanation, evidence summary, and scope card.
+Copy the resulting `sovra-synthetic-demo.mp4` into `video/public/` before rendering.
+The browser recording contains no caption overlay; its beat captions are saved separately for review.

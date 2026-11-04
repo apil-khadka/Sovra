@@ -27,6 +27,7 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "captions": "node scripts/generate-captions.mjs",
+    "capture:scenes": "node scripts/capture-product-scenes.mjs",
     "render:sovra": "remotion render SovraThreeMinute deliverables/sovra-three-minute.mp4 --codec=h264 --crf=18",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"

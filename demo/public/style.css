@@ -609,6 +609,540 @@ body.app-shop {
   --shop-olive: #5b6b3f;
 }
 
+/* Interoperability playground: bright, task-first technical story. */
+body.app-interop {
+  --bg: #f5f6ef;
+  --ink: #152538;
+  --muted: #50637a;
+  --line: #d3dde5;
+  --wash: #e8f1f4;
+  --code-bg: #10263d;
+  --ok: #08765e;
+  --bad: #b73d35;
+  --warn: #9b4b13;
+  --accent: #1858e8;
+  --accent-ink: #ffffff;
+  background: var(--bg);
+  color: var(--ink);
+  caret-color: var(--accent);
+  min-height: 100vh;
+}
+
+body.app-interop ::selection {
+  background: #d9f36d;
+  color: #152538;
+}
+
+body.app-interop main.interop-main {
+  width: 1180px;
+  max-width: 100%;
+  padding: 48px 28px 72px;
+  gap: 34px;
+}
+
+body.app-interop .interop-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.03fr) minmax(420px, 0.97fr);
+  gap: 44px;
+  align-items: center;
+}
+
+body.app-interop .hero-copy {
+  min-width: 0;
+}
+
+body.app-interop .runtime-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: 26px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+body.app-interop .mode-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 3px 12px;
+  border-radius: 8px;
+  background: #ddf378;
+  color: #19310b;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+body.app-interop .runtime-flags {
+  color: #28465a;
+}
+
+body.app-interop .runtime-flags::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 7px 1px 0;
+  border-radius: 50%;
+  background: #08765e;
+}
+
+body.app-interop .state-pill {
+  margin-left: auto;
+  border: 1px solid #c8d2dd;
+  border-radius: 8px;
+  padding: 5px 10px;
+  color: #435469;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+body.app-interop .state-pill.ok {
+  color: #075b49;
+  background: #ddf4e8;
+  border-color: #9ed8bf;
+}
+
+body.app-interop .state-pill.warn {
+  color: #873b0f;
+  background: #fff0d8;
+  border-color: #f0c58b;
+}
+
+body.app-interop h1 {
+  max-width: 660px;
+  margin: 0;
+  font-size: 58px;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+body.app-interop .lede {
+  max-width: 62ch;
+  margin-top: 18px;
+  color: #455b70;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+body.app-interop .other-app-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  color: #164fd2;
+  font-weight: 750;
+  text-underline-offset: 4px;
+}
+
+body.app-interop .other-app-link span {
+  font-size: 20px;
+}
+
+body.app-interop .flow-preview {
+  padding: 26px 28px 22px;
+  border-radius: 18px;
+  background: #1749c9;
+  color: #ffffff;
+}
+
+body.app-interop .flow-preview-label {
+  margin-bottom: 12px;
+  color: #e2f675;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+body.app-interop .flow-preview-steps {
+  display: grid;
+  gap: 0;
+}
+
+body.app-interop .flow-preview-steps > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+body.app-interop .flow-preview-steps b {
+  font-size: 15px;
+}
+
+body.app-interop .flow-preview-steps code {
+  color: #e6f3ff;
+  font: 500 12px/1.4 var(--mono);
+  text-align: right;
+}
+
+body.app-interop .flow-preview p {
+  margin: 16px 0 0;
+  color: #e8efff;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+body.app-interop .case-panel {
+  padding: 26px 12px 28px;
+  border: 0;
+  border-top: 2px solid #172d42;
+  border-radius: 0;
+  background: transparent;
+}
+
+body.app-interop .section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+body.app-interop .section-heading h2,
+body.app-interop #s-progress h2,
+body.app-interop #s-consent h2 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+
+body.app-interop .section-heading p {
+  max-width: 70ch;
+  margin: 0;
+  color: #4f6174;
+}
+
+body.app-interop .case-count {
+  flex: none;
+  color: #1749c9;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+body.app-interop .case-panel .actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0 0;
+}
+
+body.app-interop .case-choice {
+  display: flex;
+  min-height: 82px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 15px;
+  border: 1px solid #cbd6e0;
+  border-radius: 11px;
+  background: #ffffff;
+  text-align: left;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+body.app-interop .case-choice:hover {
+  border-color: #1858e8;
+  background: #edf3ff;
+}
+
+body.app-interop .case-choice[aria-pressed="true"] {
+  border-color: #173eaa;
+  background: #dff27b;
+  color: #142b24;
+}
+
+body.app-interop .case-choice b {
+  font-size: 16px;
+}
+
+body.app-interop .case-choice span {
+  color: #516276;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+body.app-interop .case-choice[aria-pressed="true"] span {
+  color: #31513e;
+}
+
+body.app-interop .case-choice.case-refusal[aria-pressed="true"] {
+  border-color: #a94c20;
+  background: #ffdfc8;
+}
+
+body.app-interop .case-explanation {
+  min-height: 24px;
+  margin: 16px 0 0;
+  color: #465c70;
+}
+
+body.app-interop .case-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  margin-top: 18px;
+}
+
+body.app-interop .run-button {
+  min-height: 50px;
+  padding: 11px 20px;
+  border-radius: 10px;
+  background: #1858e8;
+  color: #ffffff;
+  box-shadow: 0 5px 14px rgba(24, 88, 232, 0.2);
+}
+
+body.app-interop .case-actions > span {
+  color: #506277;
+  font-size: 13px;
+}
+
+body.app-interop #s-progress,
+body.app-interop #s-consent,
+body.app-interop #s-refusal,
+body.app-interop #s-unavailable,
+body.app-interop #s-outcome {
+  scroll-margin-top: 18px;
+  padding: 24px 26px;
+  border: 1px solid #ccd7e2;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(20, 42, 64, 0.08);
+}
+
+body.app-interop #s-progress .progress-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+body.app-interop .progress-steps li.active {
+  color: #173eaa;
+}
+
+body.app-interop .progress-steps li.active .progress-dot {
+  background: #1858e8;
+}
+
+body.app-interop .progress-steps li.done .progress-dot {
+  background: #08765e;
+}
+
+body.app-interop #s-consent .learn-split > div {
+  min-height: 100px;
+  border-radius: 11px;
+  padding: 15px 17px;
+  background: #e4f7ed;
+}
+
+body.app-interop #s-consent .learn-no {
+  background: #f1f2f5;
+}
+
+body.app-interop .api-inspector,
+body.app-interop .tech-drawer {
+  margin-top: 16px;
+  border: 1px solid #ced8e2;
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+body.app-interop .api-inspector {
+  padding: 0 16px 16px;
+  border-color: #193c5b;
+  background: #10263d;
+  color: #f5f9ff;
+}
+
+body.app-interop .api-inspector summary,
+body.app-interop .tech-drawer summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+body.app-interop .api-inspector summary {
+  color: #e2f675;
+}
+
+body.app-interop .api-inspector summary::marker,
+body.app-interop .tech-drawer summary::marker {
+  color: #ff8e62;
+}
+
+body.app-interop .api-explainer,
+body.app-interop .api-footnote {
+  max-width: 76ch;
+  color: #d4e3f2;
+}
+
+body.app-interop .api-route {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+  padding: 0;
+  list-style-position: inside;
+}
+
+body.app-interop .api-route li {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 9px;
+  background: #193953;
+  color: #e1f16e;
+}
+
+body.app-interop .api-route li span {
+  display: block;
+  margin-bottom: 7px;
+  color: #d2e0ef;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.app-interop .api-route code {
+  display: block;
+  color: #ffffff;
+  font: 500 12px/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+body.app-interop .json-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+body.app-interop .json-grid section {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #193953;
+}
+
+body.app-interop .json-grid h3,
+body.app-interop .api-inspector > h3 {
+  margin: 0 0 7px;
+  color: #e1f16e;
+  font-size: 13px;
+}
+
+body.app-interop .json-block {
+  max-height: 330px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid #31516c;
+  border-radius: 8px;
+  background: #091b2c;
+  color: #eff7ff;
+  font: 12px/1.55 var(--mono);
+  tab-size: 2;
+  white-space: pre;
+}
+
+body.app-interop .tech-drawer {
+  padding: 12px 16px 16px;
+}
+
+body.app-interop .tech-drawer p {
+  color: #506277;
+}
+
+body.app-interop .tech-drawer .json-block {
+  max-height: 420px;
+}
+
+body.app-interop :focus-visible {
+  outline: 3px solid #ff713f;
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  body.app-interop main.interop-main {
+    padding-top: 30px;
+  }
+
+  body.app-interop .interop-hero {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  body.app-interop .flow-preview {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  body.app-interop main.interop-main {
+    padding: 22px 16px 48px;
+    gap: 24px;
+  }
+
+  body.app-interop h1 {
+    font-size: 42px;
+  }
+
+  body.app-interop .runtime-strip {
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+
+  body.app-interop .state-pill {
+    margin-left: 0;
+  }
+
+  body.app-interop .flow-preview {
+    padding: 20px;
+  }
+
+  body.app-interop .flow-preview-steps > div {
+    align-items: flex-start;
+  }
+
+  body.app-interop .section-heading {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  body.app-interop .case-panel .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  body.app-interop .case-choice {
+    min-height: 74px;
+    padding: 10px 11px;
+  }
+
+  body.app-interop #s-progress .progress-steps,
+  body.app-interop .api-route,
+  body.app-interop .json-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.app-interop #s-progress,
+  body.app-interop #s-consent,
+  body.app-interop #s-refusal,
+  body.app-interop #s-unavailable,
+  body.app-interop #s-outcome {
+    padding: 20px 16px;
+  }
+
+  body.app-interop #s-consent .learn-split {
+    grid-template-columns: 1fr;
+  }
+}
+
 body.app-shop main {
   background: linear-gradient(var(--shop-cream), var(--bg) 320px);
 }

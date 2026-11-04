@@ -1,0 +1,50 @@
+{
+  "capturedAt": "2026-11-04T06:07:07.757Z",
+  "demoBases": {
+    "apps": "http://127.0.0.1:5174",
+    "interoperability": "http://127.0.0.1:5176"
+  },
+  "runtime": {
+    "mode": "FIXTURE",
+    "liveEnabled": false,
+    "modelConfigured": false,
+    "discoveryScopeSupported": true,
+    "secondIssuerReachable": true
+  },
+  "relyingPartyApps": [
+    {
+      "app": "NovaBank",
+      "consent": "Who asks\nNovaBank (demo)\nWhat they learn\nThat you are over 18\nExpires\nexpires in about an hour",
+      "outcome": "Eligibility evidence recorded.",
+      "receipt": ""
+    },
+    {
+      "app": "CornerCellar",
+      "consent": "Who asks\nCornerCellar (demo)\nWhat they learn\nThat you are over 18\nExpires\nexpires in about an hour",
+      "outcome": "Age check passed — demo order placed.",
+      "receipt": ""
+    }
+  ],
+  "fjord": {
+    "request": {
+      "case": "fjord"
+    },
+    "recommendation": "CANDIDATE_ONLY",
+    "issuer": "https://sovra.example/issuers/synth-2",
+    "claimPath": "isAdult",
+    "credentialType": "https://sovra.example/vct/fjord-adult/1",
+    "guard": {
+      "accepted": true,
+      "code": "GUARD_ACCEPTED",
+      "rulesVersion": "sovra-guard/2"
+    },
+    "outcome": "Eligibility evidence recorded."
+  },
+  "employment": {
+    "recommendation": "NO_PATH",
+    "reason": "no usable issuer attests the requested semantic",
+    "plan": null,
+    "guard": null
+  },
+  "pageErrors": []
+}

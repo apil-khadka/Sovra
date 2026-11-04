@@ -1,119 +1,159 @@
 1
-00:00:00,000 --> 00:00:05,500
-Sovra — a synthetic identity verification walkthrough.
+00:00:00,000 --> 00:00:03,000
+Imagine a local shop needs only to know that a customer is over 18.
 
 2
-00:00:05,500 --> 00:00:12,000
-One question: can this credential prove someone is over 18?
+00:00:03,000 --> 00:00:06,000
+But a credential may contain a birth date, document number, and address.
 
 3
-00:00:12,000 --> 00:00:15,800
-One request enters the central planner.
+00:00:06,000 --> 00:00:09,000
+Different schemas can push a simple check toward over-collection.
 
 4
-00:00:15,800 --> 00:00:19,800
-The fixture planner proposes. The deterministic guard checks the plan.
+00:00:09,000 --> 00:00:12,000
+Sovra starts with a smaller question: age_over_18.
 
 5
-00:00:19,800 --> 00:00:23,600
-A valid plan routes issuance and consent to its issuer node.
+00:00:12,000 --> 00:00:16,000
+Follow that question through two fictional relying-party apps.
 
 6
-00:00:23,600 --> 00:00:27,667
-The holder reviews the claims. Incompatible evidence stops early.
+00:00:16,000 --> 00:00:20,000
+NovaBank and CornerCellar ask the same eligibility question.
 
 7
-00:00:28,243 --> 00:00:34,247
-Four issuer schemas. One central plan. A deterministic guard.
+00:00:20,000 --> 00:00:23,000
+The holder reviews the exact evidence before choosing to share it.
 
 8
-00:00:34,247 --> 00:00:42,251
-Synthetic functional demo — fixture planner. No Meta model invocation in this capture; eligible live evaluation pending account prerequisites.
+00:00:23,000 --> 00:00:26,000
+Both app flows are local and synthetic.
 
 9
-00:00:42,654 --> 00:00:46,658
-Baseline first: the known schema plans on the central ledger.
+00:00:26,000 --> 00:00:31,000
+The core Compose file starts PostgreSQL, Keycloak, a seed job, and a quarantine worker.
 
 10
-00:00:47,287 --> 00:00:53,290
-Known plan: adultOver18 on synth-1, guard accepted. Review shows exactly what is shared.
+00:00:31,000 --> 00:00:37,000
+Two backend instances, app-a and app-b, share the same PostgreSQL database.
 
 11
-00:00:53,779 --> 00:00:58,782
-Known baseline accepted — decision and plan receipt recorded.
+00:00:37,000 --> 00:00:44,000
+That is the application replica setup; it is not issuer-level separation.
 
 12
-00:01:00,621 --> 00:01:05,624
-Now the unfamiliar schema: Fjord. The page never names its wire field up front.
+00:00:44,000 --> 00:00:50,000
+A separate Compose file powers the unfamiliar-schema demonstration with two issuer nodes.
 
 13
-00:01:06,156 --> 00:01:11,159
-Fjord consent: who asks, what they learn, expiry — controls in view.
+00:00:50,000 --> 00:00:56,000
+Node A owns its database and signing key. Node B owns a different database and key.
 
 14
-00:01:12,861 --> 00:01:18,864
-Provenance is the exact backend answer: FIXTURE mode, mapped policy, guard verdict.
+00:00:56,000 --> 00:01:02,000
+The plan selects the issuer. Public trust metadata is copied; credentials and private keys stay local to each node.
 
 15
-00:01:19,266 --> 00:01:26,269
-Returned plan discovers claim "isAdult" on synth-2 — issuance routes there.
+00:01:02,000 --> 00:01:06,000
+The browser sends a small case selector for Fjord.
 
 16
-00:01:26,674 --> 00:01:31,676
-Deterministic guard accepted under sovra-guard/2 before anything was minted.
+00:01:06,000 --> 00:01:11,000
+The demo server builds a scoped intent and asks the central planner to find a compatible claim.
 
 17
-00:01:32,079 --> 00:01:36,086
-Holder reviews exact claims, issuer, plan hash — then decides.
+00:01:11,000 --> 00:01:17,000
+The real response proposes candidate-only and returns isAdult on synth-2.
 
 18
-00:01:36,920 --> 00:01:42,923
-Fjord accepted: real ACCEPTED receipt with decision and plan identifiers.
+00:01:17,000 --> 00:01:22,000
+A deterministic guard checks that plan and returns GUARD_ACCEPTED.
 
 19
-00:01:43,718 --> 00:01:48,722
-Second alias: Harbor discovers a different wire field for the same outcome.
+00:01:22,000 --> 00:01:24,000
+The browser never chooses or echoes the unfamiliar field.
 
 20
-00:01:49,289 --> 00:01:56,291
-Harbor plan carries "qualifiesAsAdult" from the returned plan only — no echo.
+00:01:24,000 --> 00:01:29,000
+Before issuance, the holder sees the purpose, issuer, exact claim, expiry, and plan hash.
 
 21
-00:01:56,752 --> 00:02:02,756
-Harbor accepted on its own issuer node — two stores, one outcome each.
+00:01:29,000 --> 00:01:35,000
+They can approve, decline, or go back. No proof is shared before approval.
 
 22
-00:02:03,550 --> 00:02:07,553
-Incompatible schema: employment tenure cannot prove age.
+00:01:35,000 --> 00:01:44,000
+This plan, guard response, and consent screen came from the running synthetic flow.
 
 23
-00:02:08,737 --> 00:02:15,741
-Grounded NO_PATH with null plan: no credential, no consent, nothing shared.
+00:01:44,000 --> 00:01:49,000
+After approval, the selected issuer signs a scoped synthetic credential.
 
 24
-00:02:16,689 --> 00:02:20,692
-Decline is honored: no presentation exists for a declined request.
+00:01:49,000 --> 00:01:54,000
+Verification checks the evidence and records an accepted decision.
 
 25
-00:02:21,276 --> 00:02:27,278
-Back and Cancel before a decision also share nothing; a committed decision cannot be cancelled.
+00:01:54,000 --> 00:01:58,000
+The relying party receives one bounded result, not a source identity record.
 
 26
-00:02:27,278 --> 00:02:34,281
-Synthetic fixtures only; live AI is off. Backend verify: 860 tests passed.
+00:01:58,000 --> 00:02:02,000
+NovaBank records eligibility evidence in its synthetic onboarding flow.
 
 27
-00:02:34,533 --> 00:02:41,033
-Fjord and Harbor map to the requested age-over-18 result.
+00:02:02,000 --> 00:02:07,000
+CornerCellar places a fictional demo order after the synthetic age check.
 
 28
-00:02:41,033 --> 00:02:47,533
-Employment returns NO_PATH: no plan, credential, or consent.
+00:02:07,000 --> 00:02:12,000
+These are local browser demos, not external production services.
 
 29
-00:02:47,533 --> 00:02:53,733
-Synthetic fixtures. Fixture planner. Live AI is off.
+00:02:12,000 --> 00:02:16,000
+Now test an incompatible input: employment tenure cannot prove age.
 
 30
-00:02:53,733 --> 00:03:00,000
-Production KYC, keys, hosting, and conformance are not shown.
+00:02:16,000 --> 00:02:20,000
+The fixture planner returns NO_PATH with a null plan.
+
+31
+00:02:20,000 --> 00:02:24,000
+No guard result, credential, or consent request follows.
+
+32
+00:02:24,000 --> 00:02:28,000
+Credentials use P-256/ES256 signatures; vault objects use AES-GCM encryption.
+
+33
+00:02:28,000 --> 00:02:32,000
+Each object version gets a fresh 32-byte data key and 12-byte nonce.
+
+34
+00:02:32,000 --> 00:02:36,000
+AES-GCM binds holder identity as associated data.
+
+35
+00:02:36,000 --> 00:02:40,000
+HKDF-SHA256 derives versioned tenant wrapping keys in this synthetic software provider.
+
+36
+00:02:40,000 --> 00:02:44,000
+Production KMS is unavailable; its production gate fails closed.
+
+37
+00:02:44,000 --> 00:02:48,000
+The browser age-check route never reads vault documents.
+
+38
+00:02:48,000 --> 00:02:52,000
+Ask, plan, guard, consent, and verify are separate steps.
+
+39
+00:02:52,000 --> 00:02:56,000
+Synthetic fixtures only. FIXTURE planner, live AI off, one local host.
+
+40
+00:02:56,000 --> 00:03:00,000
+No legal KYC, zero-knowledge proof, production hosting, or external conformance is shown.

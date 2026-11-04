@@ -1,7 +1,8 @@
-// Paced captioned functional demo recording for the interop page.
+// Paced functional demo recording for the interop page.
 //
 // Drives the REAL demo server + REAL backend nodes through a real
-// Chromium (Playwright) and records a narrated-by-captions video:
+// Chromium (Playwright) and records a clean browser video with a
+// synchronized SRT sidecar:
 // no invented events, no mocked responses, no terminals, no secrets
 // on screen. Scope is the native-synthetic interop journey only
 // (FIXTURE planner, two synthetic issuer nodes); it says nothing
@@ -53,24 +54,6 @@ function loadPlaywright() {
   }
 }
 
-const CAPTION_CSS = `
-#demo-caption {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
-  background: rgba(10, 18, 32, 0.94); color: #fff;
-  font: 500 19px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
-  padding: 12px 28px 14px; text-align: center;
-  border-top: 3px solid #2f7a4d; min-height: 30px;
-}
-#demo-caption .tag {
-  display: inline-block; font-size: 12px; font-weight: 700;
-  letter-spacing: 0.08em; color: #0a1220; background: #ffd866;
-  border-radius: 4px; padding: 1px 8px; margin-right: 10px;
-  vertical-align: 2px;
-}
-/* Keep page controls scrollable above the fixed bar. */
-body { padding-bottom: 120px !important; }
-`
-
 function srtTimestamp(ms) {
   const pad = (n, w = 2) => String(n).padStart(w, '0')
   const hours = Math.floor(ms / 3600000)
@@ -88,31 +71,6 @@ async function main() {
     viewport: { width: WIDTH, height: HEIGHT },
     recordVideo: { dir: ARTIFACT_DIR, size: { width: WIDTH, height: HEIGHT } },
   })
-  // Installed on the context before any page exists; the installer
-  // waits for DOMContentLoaded because document.head/body do not
-  // exist when init scripts first run.
-  await context.addInitScript((css) => {
-    const install = () => {
-      if (document.getElementById('demo-caption')) return
-      const style = document.createElement('style')
-      style.textContent = css
-      document.head.append(style)
-      const bar = document.createElement('div')
-      bar.id = 'demo-caption'
-      const tag = document.createElement('span')
-      tag.className = 'tag'
-      tag.textContent = 'SYNTHETIC DEMO'
-      const line = document.createElement('span')
-      line.className = 'line'
-      bar.append(tag, line)
-      document.body.append(bar)
-    }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', install, { once: true })
-    } else {
-      install()
-    }
-  }, CAPTION_CSS)
   const page = await context.newPage()
   const video = page.video()
   let rawPath = null
@@ -123,21 +81,8 @@ async function main() {
   const evidence = []
   const note = (beat, data) => evidence.push({ beat, ...data })
 
-  async function caption(text) {
-    // Fail fast when the bar is missing: a silent no-caption video
-    // must never pass as the deliverable.
-    const present = await page.evaluate((line) => {
-      const el = document.querySelector('#demo-caption .line')
-      if (!el) return false
-      el.textContent = line
-      return true
-    }, text)
-    if (!present) throw new Error('caption bar missing from page')
-  }
-
   async function beat(text, ms) {
     const start = Date.now() - t0
-    await caption(text)
     await page.waitForTimeout(ms)
     beats.push({ startMs: start, endMs: Date.now() - t0, text })
   }
@@ -177,14 +122,14 @@ async function main() {
   }
 
   try {
-    // ---- Beat 1: purpose + FIXTURE mode (status open) ----
+    // ---- Beat 1: purpose + FIXTURE mode ----
     await page.goto(`${DEMO_BASE}/interoperability`)
     await page.waitForSelector('#mode-pill', { timeout: STEP_TIMEOUT })
     await page.waitForFunction(
       () => document.querySelector('#mode-pill')?.textContent?.trim() !== '…',
       { timeout: STEP_TIMEOUT },
     )
-    await center('#s-status')
+    await center('.interop-hero')
     const modePill = (await page.locator('#mode-pill').innerText()).trim()
     const flags = (await page.locator('#status-flags').innerText()).trim()
     if (modePill !== 'FIXTURE') throw new Error(`mode pill "${modePill}", want FIXTURE`)
@@ -233,11 +178,11 @@ async function main() {
     await center('#s-consent')
     await beat('Fjord consent: who asks, what they learn, expiry — controls in view.', 5000)
     await expandAll('#s-consent')
-    await center('#provenance-fields')
-    await beat('Provenance is the exact backend answer: FIXTURE mode, mapped policy, guard verdict.', 6000)
+    await center('#api-inspector')
+    await beat('The inspector separates the browser request from the actual plan and guard JSON.', 6000)
     await center('#plan-json')
     await beat(`Returned plan discovers claim "${fjord.plan?.claim_paths?.[0]}" on synth-2 — issuance routes there.`, 7000)
-    await center('#guard-fields')
+    await center('#guard-json')
     await beat('Deterministic guard accepted under sovra-guard/2 before anything was minted.', 5000)
     await center('#consent-fields')
     await beat('Holder reviews exact claims, issuer, plan hash — then decides.', 4000)
@@ -304,7 +249,7 @@ async function main() {
     await page.waitForSelector('#s-outcome:not([hidden])', { timeout: STEP_TIMEOUT })
     await center('#s-outcome')
     await beat('Back and Cancel before a decision also share nothing; a committed decision cannot be cancelled.', 6000)
-    await beat('Synthetic fixtures only; live AI is off. Backend verify: 860 tests passed.', 7000)
+    await beat('Synthetic fixtures only; live AI is off. This walkthrough shows local browser behavior, not production deployment.', 7000)
 
     // ---- Sidecars ----
     const finishedAt = new Date().toISOString()

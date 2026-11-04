@@ -3,67 +3,69 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sovra interoperability demo — synthetic unfamiliar schemas</title>
+    <title>One request · four credential schemas</title>
     <link rel="stylesheet" href="/style.css" />
-    <style>
-      /* Compact status: the mode stays prominent while the full
-         technical table rests behind a disclosure, so consent context
-         fits the viewport once a run starts. */
-      #status-compact { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 0; }
-      #status-flags { color: var(--muted); }
-      #s-status details { margin-top: 8px; }
-      #s-cases, #s-progress, #s-consent, #s-refusal, #s-unavailable, #s-outcome { scroll-margin-top: 12px; }
-    </style>
   </head>
-  <body>
-    <div class="banner">Synthetic demo: unfamiliar-schema discovery over synthetic fixtures only</div>
-    <main>
-      <p class="brand">Sovra · interoperability demo</p>
-      <h1>One proof, unfamiliar schemas</h1>
-      <p class="lede">
-        The planner discovers how to prove over-18 from unfamiliar issuer
-        schemas at runtime — the page never names the unfamiliar wire
-        fields up front. Every value below comes from a live backend
-        response; anything the backend cannot do is labeled unavailable,
-        never faked.
-      </p>
-
-      <div class="sovra-head">
-        <span>Planning + guard by Sovra</span>
-        <span class="sovra-chip" title="Sovra performs this age check on synthetic fixtures">SOVRA · <span id="chip-profile">…</span></span>
-        <span class="state-pill" id="state-pill" aria-live="polite">Nothing shared yet</span>
-      </div>
-
-      <div class="card" id="s-status">
-        <h2>Planner status (live from the backend)</h2>
-        <p class="fine" id="status-note">Contacting the planner…</p>
-        <p id="status-compact" role="status">
-          <span class="state-pill" id="mode-pill">…</span>
-          <span id="status-flags"></span>
-        </p>
-        <details id="status-details" open>
-          <summary>Full technical status</summary>
-          <dl id="status-fields"></dl>
-        </details>
-      </div>
-
-      <div class="card" id="s-cases">
-        <h2>Step 1: Pick a case</h2>
-        <p>Each case plans on the central ledger, then issues and verifies against the plan's own issuer.</p>
-        <div class="actions" role="radiogroup" aria-label="Interoperability case">
-          <button type="button" data-case="known" aria-pressed="true">Known schema</button>
-          <button type="button" data-case="fjord" aria-pressed="false">Fjord (unfamiliar)</button>
-          <button type="button" data-case="harbor" aria-pressed="false">Harbor (unfamiliar)</button>
-          <button type="button" data-case="employment" aria-pressed="false">Employment (incompatible)</button>
+  <body class="app-interop">
+    <main class="interop-main">
+      <section class="interop-hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <div class="runtime-strip" role="status" aria-live="polite">
+            <span class="mode-tag" id="mode-pill">Checking services…</span>
+            <span class="runtime-flags" id="status-flags">Contacting both synthetic issuer nodes</span>
+            <span class="state-pill" id="state-pill">Nothing shared yet</span>
+          </div>
+          <h1 id="page-title">One question.<br />One fact shared.</h1>
+          <p class="lede">
+            Ask whether someone is over 18. Sovra finds the matching claim in each issuer's schema,
+            checks the plan, and lets the holder decide before any proof is shared.
+          </p>
+          <a class="other-app-link" href="/">Try the same age check in NovaBank or CornerCellar <span aria-hidden="true">↗</span></a>
         </div>
-        <p id="case-blurb"></p>
-        <p class="actions">
-          <button type="button" class="primary" id="b-start">Plan and check this case</button>
-        </p>
-      </div>
+
+        <div class="flow-preview" aria-label="Request flow: relying party, planner, guard, issuer, holder, verifier">
+          <div class="flow-preview-label">From question to answer</div>
+          <div class="flow-preview-steps">
+            <div><b>Request</b><code>age_over_18</code></div>
+            <div><b>Plan + guard</b><code>central ledger</code></div>
+            <div><b>Issuer</b><code>chosen by plan</code></div>
+            <div><b>Holder</b><code>reviews + decides</code></div>
+            <div><b>Result</b><code>one scoped fact</code></div>
+          </div>
+          <p>Different wire fields can answer the same question. An incompatible schema stops before issuance.</p>
+        </div>
+      </section>
+
+      <section class="card case-panel" id="s-cases" aria-labelledby="case-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="case-title">Try the request on four schemas</h2>
+            <p>The returned plan chooses the claim field and issuer. Nothing is shared until the holder approves.</p>
+          </div>
+          <span class="case-count">4 real scenarios</span>
+        </div>
+        <div class="actions" role="radiogroup" aria-label="Interoperability case">
+          <button type="button" class="case-choice" data-case="known" aria-pressed="true"><b>Known</b><span>adultOver18</span></button>
+          <button type="button" class="case-choice" data-case="fjord" aria-pressed="false"><b>Fjord</b><span>unfamiliar schema</span></button>
+          <button type="button" class="case-choice" data-case="harbor" aria-pressed="false"><b>Harbor</b><span>unfamiliar schema</span></button>
+          <button type="button" class="case-choice case-refusal" data-case="employment" aria-pressed="false"><b>Employment</b><span>should stop · no age claim</span></button>
+        </div>
+        <p id="case-blurb" class="case-explanation"></p>
+        <div class="case-actions">
+          <button type="button" class="primary run-button" id="b-start">Run this scenario</button>
+          <span>Uses live backend responses · synthetic data only</span>
+        </div>
+      </section>
+
+      <details id="status-details" class="tech-drawer">
+        <summary>Backend capability response (JSON)</summary>
+        <p id="status-service">Checking backend identity…</p>
+        <p>Exact capability data from the two local nodes. This does not include machine tokens.</p>
+        <pre id="status-json" class="json-block" aria-label="Backend status JSON">Waiting for backend response…</pre>
+      </details>
 
       <div class="card" id="s-progress" hidden>
-        <h2>Working…</h2>
+        <h2>Following the request</h2>
         <p role="status" id="progress-label">Starting…</p>
         <ol class="progress-steps" id="progress-steps" aria-label="Check progress"></ol>
         <p class="actions">
@@ -72,7 +74,7 @@
       </div>
 
       <div class="card" id="s-consent" hidden>
-        <h2>Step 2: Review and decide</h2>
+        <h2>Review the proof before you decide</h2>
         <p id="consent-lede">The demo needs one fact to complete this case.</p>
         <div class="learn-split">
           <div class="learn-yes">
@@ -85,17 +87,20 @@
           </div>
         </div>
         <dl id="consent-human"></dl>
-        <details>
-          <summary>Planner provenance (exact backend response)</summary>
-          <dl id="provenance-fields"></dl>
-        </details>
-        <details>
-          <summary>Exact returned plan</summary>
-          <pre id="plan-json" class="mono" aria-label="Returned plan JSON"></pre>
-        </details>
-        <details>
-          <summary>Deterministic guard verdict</summary>
-          <dl id="guard-fields"></dl>
+        <details class="api-inspector" id="api-inspector">
+          <summary>See the real JSON and how the request moves</summary>
+          <p class="api-explainer">The browser asks the demo API to plan. The demo server calls the central planner and deterministic guard, then routes issuance and consent to the issuer named by the accepted plan.</p>
+          <ol class="api-route">
+            <li><span>Browser → demo API</span><code>POST /api/interop/plan</code></li>
+            <li><span>Demo server → central node</span><code>POST /api/plans/propose → /api/guard/validate</code></li>
+            <li><span>Accepted plan → selected issuer</span><code>setup → request → decision → verify</code></li>
+          </ol>
+          <div class="json-grid">
+            <section><h3>Request body</h3><pre id="plan-request-json" class="json-block"></pre></section>
+            <section><h3>Returned plan</h3><pre id="plan-json" class="json-block" aria-label="Returned plan JSON"></pre></section>
+            <section><h3>Guard response</h3><pre id="guard-json" class="json-block" aria-label="Guard response JSON"></pre></section>
+          </div>
+          <p class="api-footnote">Holder signing key stays in page memory. Machine tokens stay on the server. This demo uses synthetic fixtures and a software key provider.</p>
         </details>
         <p class="fine">
           Synthetic evidence only. This demo performs no legal KYC/AML check.
@@ -105,8 +110,8 @@
           <button type="button" id="b-decline">Decline</button>
           <button type="button" class="linkish" id="b-back">Back without deciding</button>
         </p>
-        <details>
-          <summary>Exact technical values</summary>
+        <details class="tech-drawer">
+          <summary>Decision receipt fields</summary>
           <dl id="consent-fields"></dl>
         </details>
       </div>
@@ -114,12 +119,23 @@
       <div class="card" id="s-refusal" hidden>
         <p class="verdict warn" role="status">No acceptable path — nothing was shared.</p>
         <p id="refusal-note"></p>
-        <details>
-          <summary>Planner provenance (exact backend response)</summary>
+        <details class="api-inspector">
+          <summary>See the refusal result and API path</summary>
+          <p class="api-explainer">The central planner returned no compatible candidate, so the demo did not call the guard or any issuer.</p>
+          <ol class="api-route">
+            <li><span>Browser → demo API</span><code>POST /api/interop/plan</code></li>
+            <li><span>Planner result</span><code>200 · NO_PATH · plan: null</code></li>
+            <li><span>Stopped before</span><code>guard · credential mint · consent</code></li>
+          </ol>
+          <h3>Returned planner result · key fields</h3>
+          <pre id="refusal-json" class="json-block" aria-label="Returned planner result fields"></pre>
+        </details>
+        <details class="tech-drawer">
+          <summary>Planner provenance</summary>
           <dl id="refusal-provenance"></dl>
         </details>
-        <details>
-          <summary>Exact returned plan</summary>
+        <details class="tech-drawer">
+          <summary>Returned plan</summary>
           <pre id="refusal-plan" class="mono" aria-label="Returned plan JSON"></pre>
         </details>
         <p class="actions"><button type="button" id="b-refusal-restart">Try another case</button></p>
@@ -149,12 +165,13 @@
       import { createRunOwner, fetchDiscovery, fetchInteropStatus, isRunCancelled, runPlannedCheck } from '/shared.js'
 
       const $ = (id) => document.getElementById(id)
+      const otherAppLink = document.querySelector('.other-app-link')
+      if (otherAppLink && location.port === '5176' && ['localhost', '127.0.0.1', '::1'].includes(location.hostname)) {
+        otherAppLink.href = `${location.protocol}//${location.hostname}:5174/`
+      }
       const CARDS = ['s-cases', 's-progress', 's-consent', 's-refusal', 's-unavailable', 's-outcome']
       const show = (id) => {
         for (const s of CARDS) $(s).hidden = s !== id
-        // The full status table is expanded on the case picker and
-        // collapses to the compact mode line once a run leaves it.
-        $('status-details').open = id === 's-cases'
         const head = document.querySelector(`#${id} h2, #${id} .verdict`)
         if (head instanceof HTMLElement) {
           head.setAttribute('tabindex', '-1')
@@ -262,62 +279,32 @@
         ]
       }
 
-      function guardEntries(guard) {
-        if (!guard) return [['Guard', 'no candidate existed to adjudicate', false]]
-        return [
-          ['Accepted', text(guard.accepted), true],
-          ['Code', text(guard.code), true],
-          ['Reason', text(guard.reason), false],
-          ['Rules', text(guard.rulesVersion), true],
-        ]
-      }
-
       try {
         const d = await fetchDiscovery()
-        $('chip-profile').textContent = d.profile
+        $('status-service').textContent = `${d.service} ${d.version} · ${d.profile} profile · API contract ${d.contractVersion}`
       } catch {
-        $('chip-profile').textContent = 'unreachable'
+        $('status-service').textContent = 'Service identity is unavailable.'
       }
 
       try {
         const caps = await fetchInteropStatus()
         const p = caps?.primary ?? {}
-        const bindings = Array.isArray(p.supportedPolicyBindings)
-          ? p.supportedPolicyBindings.map((b) => `${b.policyId} v${b.policyVersion}`).join(', ')
-          : 'not advertised by this backend'
-        const entries = [
-          ['Planner mode', text(p.mode), true],
-          ['Live enabled (backend)', text(p.liveEnabled), true],
-          ['Model configured (backend)', text(p.modelConfigured), true],
-          ['Prompt', text(p.promptVersion), true],
-          ['Tool contract', text(p.toolContractVersion), true],
-          ['Registry', text(p.schemaRegistryVersion), true],
-          ['Guard rules', text(p.guardRulesVersion), true],
-          ['Policy bindings', bindings, false],
-          ['Discovery scope', p.scopeSupported === true ? 'supported' : p.scopeSupported === false ? 'not supported' : 'unknown', true],
-          ['Second issuer node', caps?.synth2Configured ? (caps?.synth2?.reachable ? 'configured · reachable' : 'configured · unreachable') : 'not configured (single node)', true],
-        ]
-        fill('status-fields', entries)
-        // Compact line: the actual mode stays prominent after the
-        // disclosure collapses; flags summarize the rest in inert text.
+        $('status-json').textContent = JSON.stringify(caps, null, 2)
         $('mode-pill').textContent = p.mode ?? (p.reachable ? 'unknown mode' : 'unreachable')
-        const liveFlag = p.liveEnabled === true && p.modelConfigured === true ? 'live armed' : 'live off'
+        const liveFlag = p.liveEnabled === true && p.modelConfigured === true ? 'live planning armed' : 'live AI off'
         const scopeFlag = p.scopeSupported === true ? 'scope supported'
           : p.scopeSupported === false ? 'scope pending' : 'scope unknown'
         const nodeFlag = caps?.synth2Configured
-          ? (caps?.synth2?.reachable ? 'two nodes · both reachable'
-            : caps?.synth2?.unconfigured ? 'second node unconfigured' : 'second node unreachable')
+          ? (caps?.synth2?.reachable ? '2 issuer nodes online'
+            : caps?.synth2?.unconfigured ? 'second issuer unconfigured' : 'second issuer offline')
           : 'single node'
         $('status-flags').textContent = p.reachable
           ? `${liveFlag} · ${scopeFlag} · ${nodeFlag}`
-          : 'planner unreachable: cases report unavailable'
-        $('status-note').textContent = p.reachable
-          ? 'Live backend answers below. Mode and live flags are backend-global: this page only displays them.'
-          : 'Planner unreachable: cases will report unavailable, never fall back to fixtures.'
+          : 'Planner offline · cases will report unavailable'
       } catch {
         $('mode-pill').textContent = 'unreachable'
-        $('status-flags').textContent = 'planner unreachable: cases report unavailable'
-        $('status-note').textContent = 'Planner status unreachable: cases will report unavailable, never fall back to fixtures.'
+        $('status-flags').textContent = 'Planner offline · cases will report unavailable'
+        $('status-json').textContent = '{\n  "error": "capability response unavailable"\n}'
       }
 
       const runs = createRunOwner()
@@ -374,9 +361,9 @@
               ['What they learn', 'That you are over 18', false],
               ['Expires', relativeExpiry(review.expiresAt), false],
             ])
-            fill('provenance-fields', provenanceEntries(meta))
+            $('plan-request-json').textContent = JSON.stringify({ case: selectedCase }, null, 2)
             $('plan-json').textContent = JSON.stringify(plan, null, 2)
-            fill('guard-fields', guardEntries(guard))
+            $('guard-json').textContent = JSON.stringify(guard, null, 2)
             fill('consent-fields', [
               ['Relying party', 'Interop demo (synthetic)', false],
               ['Purpose', review.purpose, false],
@@ -417,6 +404,12 @@
               : 'The planner found no acceptable path. No credential was minted and no consent was opened.'
             fill('refusal-provenance', provenanceEntries(out.meta))
             $('refusal-plan').textContent = out.plan ? JSON.stringify(out.plan, null, 2) : 'No candidate plan (null plan).'
+            $('refusal-json').textContent = JSON.stringify({
+              recommendation: out.meta?.recommendation ?? 'NO_PATH',
+              reason: out.meta?.reason ?? null,
+              plan: out.plan ?? null,
+              guard: out.guard ?? null,
+            }, null, 2)
             show('s-refusal')
             return
           }
