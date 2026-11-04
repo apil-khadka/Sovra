@@ -189,7 +189,7 @@ async function main() {
     const flags = (await page.locator('#status-flags').innerText()).trim()
     if (modePill !== 'FIXTURE') throw new Error(`mode pill "${modePill}", want FIXTURE`)
     note('status', { modePill, flags })
-    await beat('One over-18 proof across four issuer schemas — planned live, guarded deterministically.', 6000)
+    await beat('Four issuer schemas. One central plan. A deterministic guard.', 6000)
     await beat('Synthetic functional demo — fixture planner. No Meta model invocation in this capture; eligible live evaluation pending account prerequisites.', 8000)
 
     // ---- Beat 2: known baseline, briefly ----
@@ -304,7 +304,7 @@ async function main() {
     await page.waitForSelector('#s-outcome:not([hidden])', { timeout: STEP_TIMEOUT })
     await center('#s-outcome')
     await beat('Back and Cancel before a decision also share nothing; a committed decision cannot be cancelled.', 6000)
-    await beat('Synthetic fixtures on local demo stores only — no legal KYC, no production claim. Backend Java suite: 846/846 (Java-only evidence).', 7000)
+    await beat('Synthetic fixtures only; live AI is off. Backend verify: 860 tests passed.', 7000)
 
     // ---- Sidecars ----
     const finishedAt = new Date().toISOString()
