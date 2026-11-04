@@ -1,4 +1,5 @@
 import { Video } from "@remotion/media";
+import { Fragment } from "react";
 import {
   AbsoluteFill,
   Easing,
@@ -23,8 +24,8 @@ const colors = {
 
 const sceneFrames = {
   opening: 360,
-  map: 300,
-  footage: 3976,
+  map: 470,
+  footage: 3806,
   evidence: 390,
   boundary: 374,
 };
@@ -216,15 +217,15 @@ const SchemaCard = ({
         background: "rgba(251,252,245,0.045)",
         border: `1px solid ${refused ? "rgba(244,198,106,0.5)" : colors.line}`,
         borderRadius: 20,
-        minHeight: 170,
+        minHeight: 138,
         opacity,
         padding: "25px 28px",
         translate: `0px ${offset}px`,
       }}
     >
-      <div style={{ color: colors.muted, fontSize: 24, fontWeight: 700, letterSpacing: "0.06em" }}>{name}</div>
-      <div style={{ color: colors.white, fontSize: 32, fontWeight: 700, marginTop: 18 }}>{field}</div>
-      <div style={{ color: refused ? colors.amber : colors.green, fontSize: 25, fontWeight: 800, marginTop: 18 }}>
+      <div style={{ color: colors.muted, fontSize: 20, fontWeight: 700, letterSpacing: "0.06em" }}>{name}</div>
+      <div style={{ color: colors.white, fontSize: 27, fontWeight: 700, marginTop: 12 }}>{field}</div>
+      <div style={{ color: refused ? colors.amber : colors.green, fontSize: 21, fontWeight: 800, marginTop: 12 }}>
         {result}
       </div>
     </div>
@@ -234,11 +235,16 @@ const SchemaCard = ({
 const FlowScene = () => {
   const frame = useCurrentFrame();
   const opacity = fade(frame, 24);
-  const arrowWidth = interpolate(frame, [12, 70], [0, 100], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.16, 1, 0.3, 1),
-  });
+  const stages = [
+    { label: "REQUEST", title: "age_over_18", detail: "Relying party" },
+    { label: "PLAN", title: "candidate only", detail: "Central fixture planner" },
+    { label: "GUARD", title: "policy + scope", detail: "Deterministic check" },
+    { label: "ISSUER", title: "node from plan", detail: "Issuer-specific route" },
+    { label: "HOLDER", title: "review + decide", detail: "Explicit consent" },
+    { label: "RESULT", title: "one Boolean", detail: "Scoped verification" },
+  ];
+  const stageFrames = sceneFrames.map / stages.length;
+  const noPathOpacity = fade(frame - stageFrames * 1.2, 36);
 
   return (
     <AbsoluteFill
@@ -254,75 +260,124 @@ const FlowScene = () => {
       <AbsoluteFill style={{ padding: "82px 112px", opacity }}>
         <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between" }}>
           <Brand />
-          <Eyebrow>How the proof stays scoped</Eyebrow>
+          <Eyebrow>Animated system map · synthetic flow</Eyebrow>
         </div>
         <h2
           style={{
             color: colors.white,
-            fontSize: 86,
+            fontSize: 68,
             letterSpacing: "-0.045em",
             lineHeight: 1.05,
-            margin: "52px 0 18px",
+            margin: "36px 0 14px",
           }}
         >
-          Same intent. Different schemas.
+          Follow the request, step by step.
         </h2>
-        <p style={{ color: colors.muted, fontSize: 40, margin: 0 }}>
-          The fixture planner proposes. A deterministic guard decides.
+        <p style={{ color: colors.muted, fontSize: 32, margin: 0 }}>
+          A valid plan stays bound to its issuer. The holder decides what to share.
         </p>
 
-        <div style={{ alignItems: "center", display: "flex", gap: 22, marginTop: 68 }}>
-          <div
-            style={{
-              background: "rgba(103,209,188,0.10)",
-              border: "1px solid rgba(103,209,188,0.5)",
-              borderRadius: 18,
-              minWidth: 320,
-              padding: "24px 28px",
-            }}
-          >
-            <div style={{ color: colors.teal, fontSize: 22, fontWeight: 800, letterSpacing: "0.12em" }}>REQUEST</div>
-            <div style={{ color: colors.white, fontSize: 32, fontWeight: 700, marginTop: 14 }}>age_over_18</div>
-            <div style={{ color: colors.muted, fontSize: 25, marginTop: 8 }}>one boolean result</div>
+        <div style={{ alignItems: "stretch", display: "flex", gap: 8, marginTop: 42 }}>
+          {stages.map((stage, index) => {
+            const stageStart = index * stageFrames;
+            const active = frame >= stageStart && frame < stageStart + stageFrames;
+            const complete = frame >= stageStart + stageFrames;
+            const nodeOpacity = fade(frame - Math.max(0, stageStart - 10), 22);
+            const packet = interpolate(
+              frame,
+              [stageStart + 14, stageStart + stageFrames - 10],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+            );
+
+            return (
+              <Fragment key={stage.label}>
+                <div
+                  style={{
+                    background: active ? "rgba(103,209,188,0.12)" : "rgba(251,252,245,0.045)",
+                    border: `1px solid ${active ? colors.teal : complete ? "rgba(184,227,107,0.48)" : colors.line}`,
+                    borderRadius: 18,
+                    boxShadow: active ? "0 0 32px rgba(103,209,188,0.13)" : "none",
+                    flex: "1 1 0",
+                    minWidth: 0,
+                    opacity: nodeOpacity,
+                    padding: "20px 16px",
+                    transform: active ? "translateY(-7px)" : "translateY(0px)",
+                  }}
+                >
+                  <div style={{ color: active ? colors.teal : colors.muted, fontSize: 18, fontWeight: 800, letterSpacing: "0.1em" }}>
+                    {stage.label}
+                  </div>
+                  <div style={{ color: colors.white, fontSize: 23, fontWeight: 700, marginTop: 18, minHeight: 56 }}>
+                    {stage.title}
+                  </div>
+                  <div style={{ color: colors.muted, fontSize: 18, lineHeight: 1.3, marginTop: 8 }}>
+                    {stage.detail}
+                  </div>
+                </div>
+                {index < stages.length - 1 && (
+                  <div style={{ alignSelf: "center", height: 4, position: "relative", width: 24 }}>
+                    <div style={{ background: colors.line, height: 2, position: "absolute", top: 1, width: "100%" }} />
+                    <div
+                      style={{
+                        background: colors.teal,
+                        height: 2,
+                        position: "absolute",
+                        top: 1,
+                        width: `${packet * 100}%`,
+                      }}
+                    />
+                    <div
+                      style={{
+                        background: colors.green,
+                        borderRadius: "50%",
+                        height: 8,
+                        left: `${packet * 100}%`,
+                        opacity: active ? 1 : 0,
+                        position: "absolute",
+                        top: -2,
+                        transform: "translateX(-50%)",
+                        width: 8,
+                      }}
+                    />
+                  </div>
+                )}
+              </Fragment>
+            );
+          })}
+        </div>
+
+        <div style={{ alignItems: "center", display: "flex", gap: 16, marginTop: 22, opacity: noPathOpacity }}>
+          <div style={{ color: colors.amber, fontSize: 17, fontWeight: 800, letterSpacing: "0.08em" }}>
+            EARLY STOP · EMPLOYMENT TENURE
           </div>
-          <div style={{ background: colors.teal, height: 2, opacity: arrowWidth / 100, width: 110 }} />
+          <div style={{ background: "rgba(244,198,106,0.6)", height: 2, width: 76 }} />
           <div
             style={{
-              background: "rgba(184,227,107,0.09)",
-              border: "1px solid rgba(184,227,107,0.48)",
-              borderRadius: 18,
-              minWidth: 330,
-              padding: "24px 28px",
+              background: "rgba(244,198,106,0.10)",
+              border: "1px solid rgba(244,198,106,0.50)",
+              borderRadius: 999,
+              color: colors.amber,
+              fontSize: 18,
+              fontWeight: 800,
+              padding: "8px 16px",
             }}
           >
-            <div style={{ color: colors.green, fontSize: 22, fontWeight: 800, letterSpacing: "0.12em" }}>PLANNER · FIXTURE</div>
-            <div style={{ color: colors.white, fontSize: 31, fontWeight: 700, marginTop: 14 }}>candidate map</div>
-            <div style={{ color: colors.muted, fontSize: 25, marginTop: 8 }}>not a live model call</div>
-          </div>
-          <div style={{ background: colors.teal, height: 2, opacity: arrowWidth / 100, width: 110 }} />
-          <div
-            style={{
-              background: "rgba(244,198,106,0.08)",
-              border: "1px solid rgba(244,198,106,0.48)",
-              borderRadius: 18,
-              minWidth: 330,
-              padding: "24px 28px",
-            }}
-          >
-            <div style={{ color: colors.amber, fontSize: 22, fontWeight: 800, letterSpacing: "0.12em" }}>GUARD</div>
-            <div style={{ color: colors.white, fontSize: 31, fontWeight: 700, marginTop: 14 }}>accept or NO_PATH</div>
-            <div style={{ color: colors.muted, fontSize: 25, marginTop: 8 }}>independent policy check</div>
+            NO_PATH · no guard, mint, or consent
           </div>
         </div>
 
-        <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(4, 1fr)", marginTop: 44 }}>
+        <div style={{ color: colors.muted, fontSize: 21, fontWeight: 700, marginTop: 32 }}>
+          Same requested outcome. Different discovered claim fields.
+        </div>
+        <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(4, 1fr)", marginTop: 14 }}>
           <SchemaCard name="KNOWN" field="adultOver18" result="accepted" delay={6} />
           <SchemaCard name="FJORD" field="isAdult" result="accepted" delay={12} />
           <SchemaCard name="HARBOR" field="qualifiesAsAdult" result="accepted" delay={18} />
           <SchemaCard name="EMPLOYMENT" field="tenure" result="NO_PATH · no artifact" refused delay={24} />
         </div>
-        <div style={{ bottom: 62, color: colors.muted, fontSize: 25, left: 112, position: "absolute" }}>
-          These cases are shown in the recorded synthetic browser journey.
+        <div style={{ bottom: 52, color: colors.muted, fontSize: 18, left: 112, position: "absolute", right: 112 }}>
+          Central plan + guard · issuer route follows its plan · holder key stays in-page · machine tokens stay server-side
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

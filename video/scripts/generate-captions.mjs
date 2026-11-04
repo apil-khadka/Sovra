@@ -6,7 +6,11 @@ const projectDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourceCaptions = readFileSync(join(projectDir, "public/source-captions.srt"), "utf8");
 const outputDir = join(projectDir, "deliverables");
 const outputPath = join(outputDir, "sovra-three-minute.srt");
-const footageOffsetMs = 22_000;
+const openingFrames = 360;
+const mapFrames = 470;
+const footageFrames = 3806;
+const fps = 30;
+const footageOffsetMs = Math.round(((openingFrames + mapFrames) / fps) * 1_000);
 
 const toMs = (value) => {
   const [hours, minutes, rest] = value.split(":");
@@ -27,8 +31,10 @@ const timestamp = (milliseconds) => {
 const intro = [
   { start: 0, end: 5_500, text: "Sovra — a synthetic identity verification walkthrough." },
   { start: 5_500, end: 12_000, text: "One question: can this credential prove someone is over 18?" },
-  { start: 12_000, end: 17_000, text: "The same age intent meets four different issuer schemas." },
-  { start: 17_000, end: footageOffsetMs, text: "A fixture planner proposes. A deterministic guard decides." },
+  { start: 12_000, end: 15_800, text: "One request enters the central planner." },
+  { start: 15_800, end: 19_800, text: "The fixture planner proposes. The deterministic guard checks the plan." },
+  { start: 19_800, end: 23_600, text: "A valid plan routes issuance and consent to its issuer node." },
+  { start: 23_600, end: footageOffsetMs, text: "The holder reviews the claims. Incompatible evidence stops early." },
 ];
 
 const footage = sourceCaptions
@@ -45,8 +51,8 @@ const footage = sourceCaptions
     };
   });
 
-const proofStart = Math.round((360 + 300 + 3976) / 30 * 1_000);
-const proofEnd = Math.round((360 + 300 + 3976 + 390) / 30 * 1_000);
+const proofStart = Math.round(((openingFrames + mapFrames + footageFrames) / fps) * 1_000);
+const proofEnd = Math.round(((openingFrames + mapFrames + footageFrames + 390) / fps) * 1_000);
 const ending = [
   { start: proofStart, end: proofStart + 6_500, text: "Fjord and Harbor map to the requested age-over-18 result." },
   { start: proofStart + 6_500, end: proofEnd, text: "Employment returns NO_PATH: no plan, credential, or consent." },
