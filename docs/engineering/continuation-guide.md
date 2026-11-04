@@ -1,6 +1,6 @@
 # Implementation status and continuation guide
 
-**Reviewed:** 2026-11-03.
+**Runtime evidence reviewed:** 2026-11-03; video artifact notes updated 2026-11-04.
 **Scope:** public demo with synthetic identities/documents only and no new paid services.
 Passing synthetic checks does not authorize publication, real identity-data use or production claims.
 Use this guide with the [implementation plan](implementation-plan.md), [task registry](implementation-tasks.json) and dated assessments.
@@ -101,9 +101,10 @@ Frontend typecheck, lint and build passed after the responsive CSS change; the c
 
 The dual-issuer Compose images were rebuilt from the current source with separate databases, both nodes reachable, and live planning disabled.
 The standalone interop browser verifier passed 18/18 checks against that runtime, including ACCEPTED Fjord and Harbor journeys, the employment NO_PATH refusal, decline/cancel behavior, held-request cancellation and secret-hygiene checks.
-A captioned H.264 recording was generated from the same synthetic browser/backend journey at 1440x900; the current MP4 is 132.52 seconds.
-This recording is local working evidence, not a hosted release artifact or a claim about live Meta planning.
-The full commands for reproducing browser evidence and recording are in the [interoperability demo guide](../demo/interoperability.md).
+The 132.52-second, 1440×900 captioned H.264 file generated on Nov 3 is a historical source capture, not the current product-story video.
+It was superseded on Nov 4 by the [three-minute synthetic walkthrough](../../video/deliverables/sovra-three-minute.mp4), rendered at 1920×1080 and 30 fps with a separate SRT subtitle file.
+The current walkthrough uses fixture planning with live AI disabled and is local working evidence, not a hosted release artifact or live Meta-planning evidence.
+The full commands for reproducing browser evidence and source recording are in the [interoperability demo guide](../demo/interoperability.md).
 
 Both SDK suites passed sequentially against the rebuilt root backend: TypeScript 13/13 then Java 13/13, with trust-preservation coverage.
 The root app pair reported `READY` on both ports and applied migration 39; runtime configuration confirmed synthetic profile, live AI disabled and empty provider key, URL and model.

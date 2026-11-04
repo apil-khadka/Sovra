@@ -39,3 +39,10 @@ Do not accept generated code solely on generated tests.
 ## Deliverables
 
 Public running repository using only hackathon-eligible new project code (subject to organizer rules), reproducible startup script, demo fixtures, architecture docs, working verification workflow, live Meta integration, concise experiment report, recorded video and submission links. Identify prior research or idea explicitly; never commit unapproved private documents.
+
+## Recorded product story (2026-11-04)
+
+The [three-minute MP4](../../video/deliverables/sovra-three-minute.mp4) and its [SRT subtitles](../../video/deliverables/sovra-three-minute.srt) are rendered at 1920×1080 and 30 fps and show the synthetic Compose deployments, browser flows, plan/guard JSON, consent, outcomes, fail-closed refusal, and vault-encryption path.
+The video uses fixture planning with live AI disabled, so it demonstrates the working synthetic product rather than a live Meta invocation.
+The separate [2026-10-29 Baseten smoke](../ai/live-integration.md) is historical evidence for prompt version 2 and guard version 1; it does not qualify the current fixture contract or appear in the video.
+Submission requirements and the current evidence boundary are recorded in the [hackathon checklist](../hackathon/rules-and-deliverables.md).

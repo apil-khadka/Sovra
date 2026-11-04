@@ -21,6 +21,7 @@ Architecture documents describe intended behavior rather than implemented guaran
 - [Implemented API](docs/engineering/implemented-api.openapi.yaml): exact backend contract with per-operation scopes.
 - [Semantic health](docs/engineering/semantic-health.md): readiness probes, alerts, sanitized telemetry, and canaries.
 - [Acceptance criteria](docs/demo/evaluation-and-acceptance.md): evidence required for the demo.
+- [Three-minute demo storyboard](docs/demo/three-minute-demo.md): current video sequence and submission limits.
 - [Dual-issuer demo topology](docs/demo/dual-issuer-topology.md): two separate local synthetic issuer stacks with honest isolation boundaries.
 - [Interoperability demo](docs/demo/interoperability.md): governed unfamiliar-schema proof journey across four issuer schemas.
 - [Planner evaluation](docs/ai/planner-evaluation.md): frozen corpus v2 scoring for scoped discovery through the real guard.
@@ -30,6 +31,13 @@ Architecture documents describe intended behavior rather than implemented guaran
 
 The demo is designed for synthetic data and simulated jurisdictions.
 It does not establish legal KYC compliance, government approval, or production identity-system readiness.
+
+## Demo video
+
+The [three-minute walkthrough](video/deliverables/sovra-three-minute.mp4) shows the over-collection problem, both demo apps, their Compose topologies, the synthetic plan and guard JSON, holder consent, accepted outcomes, a fail-closed refusal, and the separate backend vault-encryption path.
+The matching [subtitle file](video/deliverables/sovra-three-minute.srt) is available separately.
+The video is a local synthetic walkthrough with live AI disabled; its plan JSON comes from fixture mode.
+A real Baseten/Muse Spark Open smoke is documented separately in [live-planning evidence](docs/ai/live-integration.md), and is not shown in this video.
 
 ## Repository checks
 

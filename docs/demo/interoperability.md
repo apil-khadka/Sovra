@@ -103,9 +103,9 @@ Headless contract tests (fake backend, no network, no model):
 pnpm --dir demo test
 ```
 
-Real-browser verification + captioned recording (live demo server and
+Real-browser verification and source recording (live demo server and
 backend nodes, repo-pinned frontend Playwright, system ffmpeg for the
-MP4; artifact paths configurable, no private files required):
+browser-capture MP4; artifact paths configurable, no private files required):
 
 ```sh
 DEMO_BASE=http://127.0.0.1:5176 ARTIFACT_DIR=/tmp/sovra-interop-browser \
@@ -113,6 +113,10 @@ DEMO_BASE=http://127.0.0.1:5176 ARTIFACT_DIR=/tmp/sovra-interop-browser \
 DEMO_BASE=http://127.0.0.1:5176 ARTIFACT_DIR=/tmp/sovra-interop-demo \
   pnpm --dir demo run record:demo
 ```
+
+The recorder produces source footage for the unfamiliar-schema journey.
+The separately composed [three-minute product story](../../video/deliverables/sovra-three-minute.mp4) combines browser captures with animated system diagrams and has a separate [SRT subtitle track](../../video/deliverables/sovra-three-minute.srt).
+That story video is synthetic-only with live AI disabled; it is not evidence of a live model invocation.
 
 ## Configuration contract (names and paths only, never values)
 

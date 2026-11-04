@@ -6,6 +6,11 @@ verification chain: **NovaBank** (demo bank onboarding) and
 one fact — over 18 — and never see documents, birth dates, or source
 profiles. Every issuer, holder, credential, and account is synthetic.
 
+The [three-minute product walkthrough](../video/deliverables/sovra-three-minute.mp4)
+shows both relying-party apps and the unfamiliar-schema journey.
+It uses synthetic fixtures with live AI disabled; the [separate Baseten live smoke](../docs/ai/live-integration.md)
+is not part of the recording.
+
 See [kyc-demo-apps.md](../docs/demo/kyc-demo-apps.md) for the reviewed
 run guide and [claims-and-limitations.md](../docs/compliance/claims-and-limitations.md)
 for what these demos must never claim.

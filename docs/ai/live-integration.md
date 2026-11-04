@@ -8,6 +8,12 @@ console-verified no-charge limits, processing/retention terms and the
 complete frozen live-evaluation corpus comparison.
 Owner acknowledgement records evidence; it does not substitute for those checks.
 
+The 2026-10-29 live smoke used `sovra-planner-prompts/2` and `sovra-guard/1`.
+The current fixture demo contract uses prompt version 3 and guard version 2, and no live requalification of that version pair is recorded here.
+The 2026-11-04 [three-minute video](../../video/deliverables/sovra-three-minute.mp4) runs with live AI disabled and does not contain a live Meta invocation.
+It shows the fixture plan and `GUARD_ACCEPTED` under guard version 2, but it does not show the planner prompt version.
+Treat the dated Baseten smoke as historical, version-specific evidence rather than evidence from the current video or current prompt/guard pair.
+
 ## Adapter
 
 The [2026-10-29 continuation guide](../engineering/continuation-guide.md) records remaining spend/retention/evaluation work and the uncommitted implementation baseline.

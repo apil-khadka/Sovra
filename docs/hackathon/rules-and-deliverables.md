@@ -20,3 +20,15 @@
 4. 3-minute demo shows both success and hard failure; user consent and security gates visible.
 5. Credits/permissions and approved member eligibility verified against official records.
 6. Links, recording access, README, and exact event submission portal tested.
+
+## Current project evidence (2026-11-04)
+
+The public submission-ready code and video are on the [`fix/security-and-demo-ux` branch](https://github.com/apil-khadka/Sovra/tree/fix/security-and-demo-ux).
+The default `main` branch does not include this branch's current video and documentation updates, so submit the branch URL or merge the changes before using a repository-root link.
+The [three-minute MP4](../../video/deliverables/sovra-three-minute.mp4) is exactly 180 seconds at 1920×1080 and 30 fps, with a separate [SRT subtitle file](../../video/deliverables/sovra-three-minute.srt).
+The recording is a working synthetic product walkthrough; it uses fixture planning with live AI off and does not show a live model invocation.
+The repository records a real Baseten/Muse Spark Open smoke from 2026-10-29, but that run used prompt version 2 and guard version 1; the current fixture contract uses prompt version 3 and guard version 2.
+The video shows the guard version but does not display the planner prompt version.
+Use the dated smoke only as version-labeled historical evidence, and do not claim that the current recording demonstrates it.
+The current browser links use loopback hosts, so they are not accessible to judges; provide reproducible run instructions or a tested public demo URL if the portal requires one.
+See the [current demo storyboard](../demo/three-minute-demo.md) and [live-integration record](../ai/live-integration.md) before writing submission claims.

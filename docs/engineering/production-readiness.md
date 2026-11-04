@@ -1,6 +1,6 @@
 # Production readiness and capacity assessment
 
-**Reviewed:** 2026-11-02; 2026-11-03 verification refresh appended.
+**Reviewed:** 2026-11-02; source/runtime verification refreshed 2026-11-03; video artifact note updated 2026-11-04.
 **Scope:** synthetic implementation and rebuilt local containers checked on 2026-11-03.
 The local evidence below does not certify hosted CI, a public deployment or production operation.
 **Verdict:** a working synthetic prototype with useful security and consistency foundations; production operation and capacity for large user populations are not yet demonstrated.
@@ -63,7 +63,8 @@ Both root synthetic profile runs passed: native 34 with 5 intended skips; SD-JWT
 The root app pair was rebuilt and returned `READY` on both ports, with migration 39 applied; environment inspection confirmed `SOVRA_AI_LIVE_ENABLED=false` and empty AI key, URL and model.
 The separate dual-issuer fixture pair was rebuilt with distinct databases and passed 18/18 browser checks, including exact consent visibility, accepted Fjord/Harbor, employment NO_PATH, cancellation and secret hygiene.
 NovaBank, CornerCellar and minimal relying-party smoke passed all 45 checks; TypeScript and Java SDK suites each passed 13/13 in sequence.
-A synthetic captioned H.264 recording was created locally at 1440x900 for 132.52 seconds; it is not a hosted release artifact.
+The Nov 3 synthetic browser source capture was 1440×900 and 132.52 seconds; it was superseded by the [Nov 4 three-minute fixture-mode story video](../../video/deliverables/sovra-three-minute.mp4), rendered at 1920×1080 and 30 fps with separate subtitles.
+Neither local recording is hosted release evidence, live-provider qualification, or production qualification.
 No production KMS/HSM, provider-backed planning, external wallet conformance, deployed HTTPS, restore or load qualification was performed.
 The earlier direct container-pair session probe was not repeated; cross-instance session behavior remains covered by backend tests but not a fresh root-container browser probe.
 

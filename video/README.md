@@ -1,16 +1,29 @@
 # Sovra product story
 
 This project renders a silent, three-minute walkthrough with animated block diagrams and actual browser captures from the local synthetic demos.
-The story moves from the over-collection problem through the two app demos, both Compose topologies, live plan and guard JSON, holder consent, verification, a fail-closed refusal, and the separate backend encryption path.
+The story moves from the over-collection problem through the two app demos, both Compose topologies, fixture plan and guard JSON, holder consent, verification, a fail-closed refusal, and the separate backend encryption path.
 
 The MP4 has no fixed video header or burned-in caption bar.
 The synchronized subtitle track is delivered as a separate SRT file in `deliverables/`.
+The current render is H.264 at 1920×1080 and 30 fps, with a duration of exactly 180 seconds.
+
+## Visual system
+
+Scene titles share one fixed right-hand column, size, and top alignment.
+Body copy, JSON, section labels, and scene footers use consistent type scales and spacing.
+Callouts use square-edged markers rather than pill-shaped badges.
+The project uses display serif for scene titles, sans serif for explanation, and monospace for protocol values.
 
 ## Evidence and limits
 
 NovaBank and CornerCellar run against the root Compose stack through the demo server on port 5174.
 The unfamiliar-schema page runs against the separate dual-issuer Compose stack through the demo server on port 5176.
 Both runtimes use synthetic records, and live AI is disabled.
+The plan and guard JSON in the video are actual outputs from the local fixture flow, not from a live model call.
+The separate Baseten live smoke from 2026-10-29 is documented in [live-integration.md](../docs/ai/live-integration.md); this video does not present that run.
+That smoke used prompt version 2 and guard version 1, while the current fixture demo contract uses prompt version 3 and guard version 2.
+The video shows fixture output and guard version 2, but it does not display the planner prompt version or a live Meta invocation.
+The smoke is historical, version-specific evidence and does not qualify the current prompt and guard pair.
 
 The root Compose `app-a` and `app-b` instances share one PostgreSQL database.
 The separate dual-issuer Compose file runs two local nodes with separate databases, networks, and signing keys, but one developer host still controls both.

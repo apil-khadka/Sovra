@@ -1,6 +1,6 @@
 # Sovra - Documentation Index
 
-**Snapshot:** 2026-11-03 · **Status:** working synthetic Java/React demo with fresh source/runtime evidence; wallet responsive fix and both local browser profiles are requalified, the interoperability recording is locally verified, and live/provider qualification plus production gates remain pending.
+**Snapshot:** 2026-11-04 · **Status:** working synthetic Java/React demo with fresh source/runtime evidence; wallet and browser profiles are requalified, and the three-minute story video is rendered and checked; live/provider qualification plus production gates remain pending.
 
 Sovra explores whether a **Meta-powered, policy-grounded interoperability planner** can discover compatible verification evidence across independently governed identity systems, while keeping user identity source records in local jurisdiction-controlled domains.
 It is a research/demo prototype using **synthetic data** and **simulated jurisdictions**.
@@ -14,6 +14,7 @@ It reconciles implemented demo features, fresh source/runtime evidence, remainin
 
 | Question | Document |
 | --- | --- |
+| How does the current three-minute product walkthrough work? | [Video, subtitles, and current storyboard](demo/three-minute-demo.md) |
 | Why does Sovra exist, and what is new? | [Vision](product/vision-and-scope.md), [Positioning](product/positioning-and-alternatives.md) |
 | What exactly must we build? | [Business SRS](requirements/software-requirements-specification.md) (requirements and production gates), [MVP](engineering/mvp-specification.md) (synthetic milestone) |
 | What should we implement next, and what blocks release? | [Business implementation plan](engineering/implementation-plan.md), [41-task backlog](engineering/implementation-backlog.md), [Machine-readable tasks](engineering/implementation-tasks.json) |
@@ -42,7 +43,8 @@ It reconciles implemented demo features, fresh source/runtime evidence, remainin
 
 The repository contains a Java 25/Spring Boot backend, React application, synthetic identity/document workflows, SDKs, operator/product desks and mock relying-party integration examples.
 The earlier TypeScript prototype was removed; JSON fixtures are preserved as migration evidence.
-The synthetic vertical slice has automated source and runtime evidence; the wallet's 390px responsive check and both local browser profiles now pass, and a fixture-mode interoperability recording was verified locally.
+The synthetic vertical slice has automated source and runtime evidence; the wallet's 390px responsive check and both local browser profiles now pass, and the three-minute fixture-mode video is verified locally at 1920×1080 and 30 fps.
+The video does not show a live Meta model call; the real Baseten smoke is recorded separately in [live integration evidence](ai/live-integration.md).
 Live/provider qualification, external wallet conformance, deployed production security assessment and capacity qualification remain pending.
 Use the [root README](../README.md) for the current setup and validation commands.
 
