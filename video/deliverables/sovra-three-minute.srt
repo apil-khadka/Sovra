@@ -64,7 +64,7 @@ The demo server builds a scoped intent and asks the central planner to find a co
 
 17
 00:01:11,000 --> 00:01:17,000
-The real response proposes candidate-only and returns isAdult on synth-2.
+The fixture plan returns candidate-only with isAdult on synth-2.
 
 18
 00:01:17,000 --> 00:01:22,000

@@ -29,7 +29,7 @@ const cues = [
 
   [62, 66, "The browser sends a small case selector for Fjord."],
   [66, 71, "The demo server builds a scoped intent and asks the central planner to find a compatible claim."],
-  [71, 77, "The real response proposes candidate-only and returns isAdult on synth-2."],
+  [71, 77, "The fixture plan returns candidate-only with isAdult on synth-2."],
   [77, 82, "A deterministic guard checks that plan and returns GUARD_ACCEPTED."],
   [82, 84, "The browser never chooses or echoes the unfamiliar field."],
 
