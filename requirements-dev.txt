@@ -1,2 +1,2 @@
 # Documentation and repository validation only; no application runtime yet.
-PyYAML==6.0.3
+PyYAML==6.0.4
